@@ -193,6 +193,14 @@ pub fn resolve(dir: &Path, rev: &str) -> Result<String, GitError> {
     }
 }
 
+/// The most recent tag reachable from `HEAD`, for a default baseline;
+/// `None` when there is none.
+pub fn latest_tag(dir: &Path) -> Option<String> {
+    let output = git(dir, &["describe", "--tags", "--abbrev=0", "HEAD"]).ok()?;
+    let tag = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    (output.status.success() && !tag.is_empty()).then_some(tag)
+}
+
 /// The files under `dir` at `commit` that `keep` accepts, by path relative
 /// to `dir` with `/`, with their contents: one `git ls-tree` and one
 /// `git cat-file --batch` for all of them, however many there are.
@@ -367,6 +375,7 @@ mod tests {
         git(d, &["tag", "v1"]);
         std::fs::write(d.join("sub/design/a.md"), "new a").unwrap();
         git(d, &["commit", "-q", "-am", "two"]);
+        assert_eq!(latest_tag(d).as_deref(), Some("v1"));
         let v1 = resolve(&d.join("sub"), "v1").unwrap();
         assert_eq!(resolve(d, "HEAD~1").unwrap(), v1);
         assert!(

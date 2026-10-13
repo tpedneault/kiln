@@ -7,6 +7,8 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 publish.workspace = true
+# `cargo run -p kiln` runs the CLI, not kilnw (ADR-010).
+default-run = "kiln"
 
 [lints]
 workspace = true
@@ -27,7 +29,18 @@ kiln-confluence.workspace = true
 kiln-secrets.workspace = true
 kiln-lsp.workspace = true
 kiln-flint.workspace = true
+kiln-gui.workspace = true
 dirs.workspace = true
+
+[[bin]]
+name = "kiln"
+path = "src/main.rs"
+
+# Windows: opens the GUI without a console window (docs/GUI.md, "Windows:
+# two executables"). Elsewhere it is the same as `kiln gui`.
+[[bin]]
+name = "kilnw"
+path = "src/bin/kilnw.rs"
 
 [dev-dependencies]
 kiln-confluence = { workspace = true, features = ["fake"] }

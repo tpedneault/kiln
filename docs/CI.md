@@ -10,7 +10,9 @@ compiler follows Rust stable; each run records the exact `rustc` and
 ## Gates
 
 Both jobs run the same script, `scripts/ci.ps1`, over the whole
-workspace; Kiln has no crate that needs a display before K7.
+workspace. `kiln-gui` builds headless on both (winit and wgpu load the
+display and GPU libraries at run time); no test opens a window: the GUI's
+pages and keys are tested as a state machine producing text.
 
 | Gate | Command |
 |---|---|

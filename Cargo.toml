@@ -14,6 +14,7 @@ members = [
     "crates/kiln-git",
     "crates/kiln-lsp",
     "crates/kiln-flint",
+    "crates/kiln-gui",
     "crates/kiln-fenix",
     "crates/kiln-secrets",
     "crates/kiln",
@@ -45,6 +46,7 @@ kiln-confluence = { path = "crates/kiln-confluence" }
 kiln-secrets = { path = "crates/kiln-secrets" }
 kiln-lsp = { path = "crates/kiln-lsp" }
 kiln-flint = { path = "crates/kiln-flint" }
+kiln-gui = { path = "crates/kiln-gui" }
 
 clap = { version = "4.5", features = ["derive"] }
 dirs = "6"
@@ -72,10 +74,18 @@ fontdb = "0.23"
 tempfile = "3"
 # The same minor as `fenix-storage`, so the build carries one copy.
 toml_edit = "0.22"
+# The GUI (K7): the same stack and versions as Fenix and Flint, so text
+# and colours look alike.
+bytemuck = { version = "1.25", features = ["derive"] }
+glyphon = "0.12"
+pollster = "1"
+wgpu = "30.0.1"
+winit = { version = "0.30.13", default-features = false }
 
 fenix-storage = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
 fenix-diagram = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
 fenix-control = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
+fenix-keymap = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
 flint-protocol = { git = "https://github.com/tpedneault/flint", rev = "eb23547eb5939a52b8de06c298271ce4c8604927" }
 
 [workspace.lints.rust]

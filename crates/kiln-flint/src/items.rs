@@ -124,6 +124,26 @@ fn actions(ctx: &Context, project: &Project, item: &kiln_model::Item) -> Vec<Act
             },
         ),
     ];
+    // The GUI, at this item; `kilnw` on Windows opens it without a console.
+    let program = if cfg!(windows) { "kilnw" } else { "kiln" };
+    let argv = vec![
+        program.to_owned(),
+        "gui".to_owned(),
+        "--project".to_owned(),
+        ctx.root.to_string_lossy().into_owned(),
+        "--item".to_owned(),
+        id.to_string(),
+    ];
+    out.push(action(
+        "open-in-kiln",
+        "Open in Kiln",
+        'g',
+        ActionKind::Run {
+            argv,
+            cwd: None,
+            terminal: false,
+        },
+    ));
     if ctx.confluence {
         out.push(action(
             "open-confluence",

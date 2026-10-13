@@ -60,6 +60,21 @@ provider open an item's page without asking the server; and
 `state/flint-project`, the project the Flint provider last followed Fenix
 to. Any of them can be deleted at any time.
 
+## The GUI's settings
+
+`settings.toml` in the settings folder holds the window's looks; every key
+is optional, and an unknown key or a bad value is reported in the footer
+and otherwise ignored (GUI.md, "Looks"):
+
+```toml
+theme = "Orbit Dark"   # one of Fenix's themes (as Flint has them)
+font = "Cascadia Mono" # a monospace family; the system's monospace if absent
+font_size = 15         # 8 to 40
+```
+
+When `kilnw` (Windows) can't start the window, it writes why to
+`kilnw.log` in the temporary folder, since it has no console to say it.
+
 ## Credentials
 
 Tokens are never in a file Kiln reads or writes. `kiln auth confluence`

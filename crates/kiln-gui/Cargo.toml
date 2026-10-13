@@ -1,0 +1,28 @@
+[package]
+name = "kiln-gui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+kiln-model.workspace = true
+kiln-index.workspace = true
+kiln-fenix.workspace = true
+fenix-keymap.workspace = true
+toml_edit.workspace = true
+bytemuck.workspace = true
+glyphon.workspace = true
+pollster.workspace = true
+wgpu.workspace = true
+# Decorated, resizable window; Wayland through dlopen, so nothing is linked
+# at build time and a CI container builds it without display libraries.
+winit = { workspace = true, features = ["rwh_06", "x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita"] }
+
+[dev-dependencies]
+tempfile.workspace = true
