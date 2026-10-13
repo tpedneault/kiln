@@ -215,9 +215,12 @@ fn remote(id: u64, key: &str, version: u64, render: &str, body_hash: Option<&str
             remote_hash: "R".into(),
             published_version: 3,
             attachments: BTreeMap::new(),
+            retired: false,
+            retired_at: String::new(),
         }),
         body_hash: body_hash.map(str::to_owned),
         empty: false,
+        leftover: false,
     }
 }
 
@@ -230,6 +233,13 @@ fn options() -> PlanOptions {
         max_page_kib: 1,
         adopting: false,
         adopt: false,
+        commit: "9f8e7d6c5b4a".into(),
+        prune_after_days: None,
+        today: kiln_model::Date {
+            year: 2026,
+            month: 10,
+            day: 13,
+        },
     }
 }
 
@@ -370,6 +380,49 @@ fn planner_table() {
         (vec!["Update doc".to_owned()], 0)
     );
     assert_eq!(p.count(OpKind::Update), 1);
+
+    // Version messages name the commit and what changed.
+    let p = plan(
+        &[page("doc", "b", "H2")],
+        &snapshot(Some(remote(10, "doc", 3, "H", None)), vec![]),
+        &options(),
+    );
+    assert_eq!(p.ops[0].message, "kiln 9f8e7d6: REQ-001 changed");
+
+    // A retired page is left alone, pruned once old enough, and moved back
+    // when its item returns.
+    let mut gone = remote(20, "item:REQ-009", 3, "Z", None);
+    let prop = gone.property.as_mut().unwrap();
+    prop.retired = true;
+    prop.retired_at = "2026-09-01".into();
+    let with_gone = snapshot(Some(remote(10, "doc", 3, "H", None)), vec![gone]);
+    let p = plan(&[page("doc", "b", "H")], &with_gone, &options());
+    assert_eq!(kinds(&p), ["Unchanged doc"]);
+    let p = plan(
+        &[page("doc", "b", "H")],
+        &with_gone,
+        &PlanOptions {
+            prune_after_days: Some(30),
+            ..options()
+        },
+    );
+    assert_eq!(kinds(&p), ["Unchanged doc", "Prune item:REQ-009"]);
+    let p = plan(
+        &[page("doc", "b", "H")],
+        &with_gone,
+        &PlanOptions {
+            prune_after_days: Some(60),
+            ..options()
+        },
+    );
+    assert_eq!(kinds(&p), ["Unchanged doc"]);
+    let p = plan(
+        &[page("doc", "b", "H"), page("item:REQ-009", "b", "Z")],
+        &with_gone,
+        &options(),
+    );
+    assert_eq!(kinds(&p), ["Unchanged doc", "Update item:REQ-009"]);
+    assert_eq!(p.ops[1].reasons, ["back in the repository"]);
 }
 
 fn fake_state() -> State {
@@ -452,7 +505,7 @@ fn client(fake: &Fake, cloud: bool) -> Box<dyn crate::Confluence> {
     let mut http = Http::new(&config, &Token::new("test-token"), "");
     http.sleep = |_| {};
     if cloud {
-        Box::new(crate::cloud::Cloud { http })
+        Box::new(crate::cloud::Cloud::new(http))
     } else {
         Box::new(crate::dc::DataCenter { http })
     }
@@ -471,7 +524,15 @@ fn snapshots_read_the_same_from_both_flavours() {
         let fake = Fake::start(fake_state(), cloud);
         let c = client(&fake, cloud);
         assert_eq!(c.whoami().unwrap(), "Kiln Test");
-        let mut snapshot = take_snapshot(c.as_ref(), target, "Flint", "FLINT", &wanted).unwrap();
+        let mut snapshot = take_snapshot(
+            c.as_ref(),
+            target,
+            "Flint",
+            "FLINT",
+            &wanted,
+            &crate::PageCache::default(),
+        )
+        .unwrap();
         // Authors are names on Data Center and account ids on Cloud; both
         // are "alice" here. Times are the same string in the fake.
         snapshot.descendants.sort_by_key(|p| p.id);
@@ -531,4 +592,454 @@ fn a_refused_token_is_one_line_without_the_token() {
     );
     assert!(!e.contains("wrong-secret") && !e.contains('\n'));
     assert_eq!(crate::Confluence::page(&c, 1).unwrap_err().to_string(), e);
+}
+
+/// A fake space with an empty parent page 100 for targets to publish
+/// under.
+fn empty_space() -> State {
+    let mut state = State::default();
+    state.pages.insert(
+        100,
+        FakePage {
+            title: "Designs".into(),
+            parent: None,
+            version: 1,
+            author: "alice".into(),
+            body: String::new(),
+            property: None,
+        },
+    );
+    state
+}
+
+/// Snapshot, plan and (unless the plan is refused) apply `name` from
+/// `source`; the plan, and what applying did.
+fn publish(
+    fake: &Fake,
+    cloud: bool,
+    source: &MemorySource,
+    name: &str,
+    tweak: impl Fn(&mut PlanOptions),
+) -> (crate::Plan, Result<crate::Applied, crate::ClientError>) {
+    let project = Project::load(source).unwrap();
+    let c = client(fake, cloud);
+    let target = project.config.export(name).unwrap().clone();
+    let rev = Revision {
+        commit: Some("9f8e7d6c5b4a39281706f5e4d3c2b1a098765432".into()),
+        date: Some("2026-10-12".into()),
+        in_tree: false,
+    };
+    let a = Assembly {
+        project: &project,
+        findings: &[],
+        revision: &rev,
+    };
+    let all: Vec<_> = project
+        .config
+        .exports
+        .iter()
+        .map(|t| prepare(t, None, &a))
+        .collect();
+    let mut resolved = all.clone();
+    resolve_all(&mut resolved, &all, &project);
+    let p = resolved.iter().find(|p| p.target.name == name).unwrap();
+    let wanted: Vec<String> = crate::titles(p, &HashSet::new()).into_values().collect();
+    let snapshot = take_snapshot(
+        c.as_ref(),
+        &target,
+        "Flint",
+        "FLINT",
+        &wanted,
+        &crate::PageCache::default(),
+    )
+    .unwrap();
+    let taken: HashSet<String> = snapshot.taken_titles.iter().cloned().collect();
+    let image_hash = |path: &str| {
+        kiln_index::FileSource::read(source, path)
+            .ok()
+            .map(|b| crate::hash(&b).trim_start_matches("sha256:").to_owned())
+    };
+    let config = project.config.confluence.clone().unwrap();
+    let ctx = DesiredContext {
+        config: &config,
+        project: &project,
+        revision: &rev,
+        last_commits: &HashMap::new(),
+        repo: &RepoLinks::None,
+        image_hash: &image_hash,
+        all: &resolved,
+        taken_titles: &taken,
+    };
+    let desired = desired_pages(p, &ctx);
+    let mut options = PlanOptions {
+        export: name.into(),
+        max_page_kib: 1024,
+        adopting: target.confluence.page.is_some(),
+        ..options()
+    };
+    tweak(&mut options);
+    let the_plan = plan(&desired, &snapshot, &options);
+    if !the_plan.refusals.is_empty() {
+        return (the_plan, Err(crate::ClientError::new("refused")));
+    }
+    let bytes = |a: &crate::Attachment| match &a.source {
+        crate::AttachmentSource::Diagram(src) => {
+            kiln_export::Pictures::diagram(&kiln_export::FakePictures, src).map(|p| p.png)
+        }
+        crate::AttachmentSource::File(path) => {
+            kiln_index::FileSource::read(source, path).map_err(|e| e.to_string())
+        }
+    };
+    let apply_options = crate::ApplyOptions {
+        space: "FLINT",
+        anchor: target.confluence.page.or(target.confluence.parent).unwrap(),
+        adopting: options.adopting,
+        project: "Flint",
+        export: name,
+        target_title: &target.title,
+        commit: "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432",
+        restrict_edits: config.restrict_edits,
+        restrict_adopted: target.confluence.restrict_adopted,
+        on_drift: options.on_drift,
+        force: options.force,
+        today: options.today,
+    };
+    let applied = crate::apply(
+        c.as_ref(),
+        &desired,
+        &the_plan,
+        &snapshot,
+        &bytes,
+        &apply_options,
+    );
+    (the_plan, applied)
+}
+
+fn kinds_of(p: &crate::Plan) -> Vec<String> {
+    p.ops
+        .iter()
+        .map(|o| format!("{:?} {}", o.kind, o.key))
+        .collect()
+}
+
+/// The fake's pages as (title, parent title, body, labels), without ids,
+/// for comparing two end states.
+fn end_state(state: &State) -> Vec<(String, String, String, Vec<String>)> {
+    let mut out: Vec<_> = state
+        .pages
+        .iter()
+        .map(|(id, p)| {
+            let parent = p
+                .parent
+                .and_then(|x| state.pages.get(&x))
+                .map(|x| x.title.clone())
+                .unwrap_or_default();
+            let mut labels = state
+                .extra
+                .get(id)
+                .map(|e| e.labels.clone())
+                .unwrap_or_default();
+            labels.sort();
+            (p.title.clone(), parent, p.body.clone(), labels)
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+#[test]
+fn publishing_a_document_then_nothing_to_do() {
+    let (_, source) = project();
+    for cloud in [false, true] {
+        let fake = Fake::start(empty_space(), cloud);
+        let (p, applied) = publish(&fake, cloud, &source, "spec", |_| {});
+        assert_eq!(kinds_of(&p), ["Create doc"]);
+        let applied = applied.unwrap();
+        assert_eq!((applied.created, applied.updated), (1, 0));
+        {
+            let s = fake.state.lock().unwrap();
+            let (id, page) = s
+                .pages
+                .iter()
+                .find(|(_, p)| p.title == "Flint — design document")
+                .unwrap();
+            assert_eq!(page.parent, Some(100));
+            assert!(page
+                .body
+                .contains("<ac:parameter ac:name=\"\">REQ-002</ac:parameter>"));
+            let extra = &s.extra[id];
+            assert_eq!(extra.labels, ["flint"]);
+            let names: Vec<&str> = extra
+                .attachments
+                .iter()
+                .map(|(_, n, _)| n.as_str())
+                .collect();
+            assert_eq!(names.len(), 2, "{names:?}");
+            assert!(
+                names.iter().any(|n| n.starts_with("diagram-"))
+                    && names.iter().any(|n| n.starts_with("image-"))
+            );
+            let image = extra
+                .attachments
+                .iter()
+                .find(|(_, n, _)| n.starts_with("image-"))
+                .unwrap();
+            assert_eq!(image.2, b"\x89PNG a", "uploaded bytes arrive intact");
+            let property = page.property.as_ref().unwrap();
+            assert_eq!(property["key"], "doc");
+            assert_eq!(property["publishedVersion"], page.version);
+            assert_eq!(property["remoteHash"], crate::body_hash(&page.body));
+        }
+        let before = fake.state.lock().unwrap().writes();
+        let (p, applied) = publish(&fake, cloud, &source, "spec", |_| {});
+        assert_eq!(kinds_of(&p), ["Unchanged doc"], "cloud {cloud}");
+        assert!(!p.changes());
+        let _ = applied.unwrap();
+        assert_eq!(
+            fake.state.lock().unwrap().writes(),
+            before,
+            "an unchanged publish writes nothing"
+        );
+    }
+}
+
+#[test]
+fn a_tree_publishes_parent_first_and_retires_removed_items() {
+    let (_, source) = project();
+    for cloud in [false, true] {
+        let fake = Fake::start(empty_space(), cloud);
+        let (p, applied) = publish(&fake, cloud, &source, "browse", |_| {});
+        assert_eq!(
+            kinds_of(&p),
+            [
+                "Create doc",
+                "Create section:requirements",
+                "Create item:REQ-001",
+                "Create item:REQ-002"
+            ]
+        );
+        assert_eq!(applied.unwrap().created, 4);
+        {
+            let s = fake.state.lock().unwrap();
+            let parent_of = |title: &str| {
+                let page = s.pages.values().find(|p| p.title == title).unwrap();
+                s.pages[&page.parent.unwrap()].title.clone()
+            };
+            assert_eq!(
+                parent_of("REQ-002 Fast <enough>"),
+                "REQ-001 Flint is a launcher"
+            );
+            assert_eq!(parent_of("1 Requirements"), "Flint");
+        }
+        let (p, _) = publish(&fake, cloud, &source, "browse", |_| {});
+        assert!(!p.changes(), "{:?}", kinds_of(&p));
+
+        // REQ-002 leaves the repository.
+        let mut smaller = source.clone();
+        smaller.insert("design/REQ-002-fast.md", "removed: not an item any more\n");
+        let (p, applied) = publish(&fake, cloud, &smaller, "browse", |_| {});
+        assert!(
+            kinds_of(&p).contains(&"Retire item:REQ-002".to_owned()),
+            "{:?}",
+            kinds_of(&p)
+        );
+        assert_eq!(applied.unwrap().retired, 1);
+        {
+            let s = fake.state.lock().unwrap();
+            let (id, gone) = s
+                .pages
+                .iter()
+                .find(|(_, p)| p.title == "REQ-002 Fast <enough>")
+                .unwrap();
+            let removed = &s.pages[&gone.parent.unwrap()];
+            assert_eq!(removed.title, "Removed from the repository");
+            assert!(gone
+                .body
+                .starts_with("<ac:structured-macro ac:name=\"warning\">"));
+            assert!(s.extra[id].labels.contains(&"kiln-removed".to_owned()));
+            assert_eq!(gone.property.as_ref().unwrap()["retired"], true);
+        }
+        let (p, _) = publish(&fake, cloud, &smaller, "browse", |_| {});
+        assert!(!p.changes(), "a retired page stays put: {:?}", kinds_of(&p));
+        // It comes back.
+        let (p, applied) = publish(&fake, cloud, &source, "browse", |_| {});
+        assert!(
+            p.ops
+                .iter()
+                .any(|o| o.key == "item:REQ-002" && o.reasons == ["back in the repository"]),
+            "{:?}",
+            p.ops
+        );
+        applied.unwrap();
+        let s = fake.state.lock().unwrap();
+        let back = s
+            .pages
+            .values()
+            .find(|p| p.title == "REQ-002 Fast <enough>")
+            .unwrap();
+        assert_eq!(
+            s.pages[&back.parent.unwrap()].title,
+            "REQ-001 Flint is a launcher"
+        );
+    }
+}
+
+#[test]
+fn drift_stops_skips_or_is_overwritten() {
+    let (_, source) = project();
+    let fake = Fake::start(empty_space(), false);
+    publish(&fake, false, &source, "spec", |_| {}).1.unwrap();
+    let id = {
+        let mut s = fake.state.lock().unwrap();
+        let id = *s
+            .pages
+            .iter()
+            .find(|(_, p)| p.title == "Flint — design document")
+            .unwrap()
+            .0;
+        s.edit(id, "<p>Someone fixed a typo here.</p>");
+        id
+    };
+    let (p, applied) = publish(&fake, false, &source, "spec", |_| {});
+    assert_eq!(kinds_of(&p), ["Drift doc"]);
+    assert!(
+        p.refusals[0].contains("edited by alice"),
+        "{:?}",
+        p.refusals
+    );
+    assert!(applied.is_err());
+    assert_eq!(
+        fake.state.lock().unwrap().pages[&id].body,
+        "<p>Someone fixed a typo here.</p>",
+        "nothing written"
+    );
+    let (p, _) = publish(&fake, false, &source, "spec", |o| {
+        o.on_drift = OnDrift::Skip
+    });
+    assert_eq!(kinds_of(&p), ["Drift doc"]);
+    let (p, applied) = publish(&fake, false, &source, "spec", |o| o.force = true);
+    assert_eq!(kinds_of(&p), ["Update doc"]);
+    applied.unwrap();
+    assert!(fake.state.lock().unwrap().pages[&id]
+        .body
+        .contains("REQ-002"));
+    let (p, _) = publish(&fake, false, &source, "spec", |_| {});
+    assert_eq!(kinds_of(&p), ["Unchanged doc"]);
+}
+
+#[test]
+fn conflicts_are_retried_once_and_oversized_pages_are_named() {
+    let (_, source) = project();
+    let fake = Fake::start(empty_space(), true);
+    publish(&fake, true, &source, "spec", |_| {}).1.unwrap();
+    let mut changed = source.clone();
+    changed.insert(
+        "design/ADR-001-toml.md",
+        item(
+            "ADR-001",
+            "decision",
+            "TOML front matter, really",
+            "accepted",
+            "",
+        ),
+    );
+    let id = *fake
+        .state
+        .lock()
+        .unwrap()
+        .pages
+        .iter()
+        .find(|(_, p)| p.title == "Flint — design document")
+        .unwrap()
+        .0;
+    fake.state.lock().unwrap().conflict_once.push(id);
+    let (p, applied) = publish(&fake, true, &changed, "spec", |_| {});
+    // Without git history every item has the same commit, so the change
+    // shows as content rather than as an item.
+    assert_eq!(
+        p.ops[0].reasons,
+        ["content changed (template, layout or references)"]
+    );
+    assert_eq!(applied.unwrap().updated, 1, "the 409 was retried");
+
+    let fake = Fake::start(empty_space(), false);
+    fake.state.lock().unwrap().max_body = Some(500);
+    let (_, applied) = publish(&fake, false, &source, "spec", |_| {});
+    let e = applied.unwrap_err().to_string();
+    assert!(
+        e.contains("is too large for the server; use layout = \"sections\""),
+        "{e}"
+    );
+}
+
+#[test]
+fn an_interrupted_publish_finishes_on_the_next_run() {
+    let (_, source) = project();
+    let clean = Fake::start(empty_space(), false);
+    publish(&clean, false, &source, "browse", |_| {}).1.unwrap();
+    for fail_after in [1, 3, 6, 10, 15] {
+        let fake = Fake::start(empty_space(), false);
+        fake.state.lock().unwrap().writes_left = Some(fail_after);
+        let (_, applied) = publish(&fake, false, &source, "browse", |_| {});
+        assert!(applied.is_err(), "failing after {fail_after} writes");
+        fake.state.lock().unwrap().writes_left = None;
+        {
+            let (p, a) = publish(&fake, false, &source, "browse", |_| {});
+            if let Err(e) = a {
+                panic!(
+                    "after failing at {fail_after}: {e} {:?} {:?}",
+                    p.refusals,
+                    kinds_of(&p)
+                );
+            }
+        }
+        assert_eq!(
+            end_state(&fake.state.lock().unwrap()),
+            end_state(&clean.state.lock().unwrap()),
+            "after failing at {fail_after}"
+        );
+        let (p, _) = publish(&fake, false, &source, "browse", |_| {});
+        assert!(
+            !p.changes(),
+            "after failing at {fail_after}: {:?}",
+            kinds_of(&p)
+        );
+    }
+}
+
+#[test]
+fn changing_layout_retires_pages_and_restrictions_apply() {
+    let (_, source) = project();
+    let fake = Fake::start(empty_space(), false);
+    publish(&fake, false, &source, "browse", |_| {}).1.unwrap();
+    // The same target as one document now.
+    let mut as_document = source.clone();
+    let config =
+        String::from_utf8(kiln_index::FileSource::read(&source, "kiln.toml").unwrap()).unwrap();
+    as_document.insert(
+        "kiln.toml",
+        config
+            .replace("layout = \"tree\"\n", "")
+            .replace("[confluence]\n", "[confluence]\nrestrict_edits = true\n"),
+    );
+    let (p, applied) = publish(&fake, false, &as_document, "browse", |_| {});
+    let kinds = kinds_of(&p);
+    assert!(
+        kinds.contains(&"Update doc".to_owned())
+            && kinds.iter().filter(|k| k.starts_with("Retire")).count() == 3,
+        "{kinds:?}"
+    );
+    assert_eq!(applied.unwrap().retired, 3);
+
+    let fresh = Fake::start(empty_space(), true);
+    publish(&fresh, true, &as_document, "spec", |_| {})
+        .1
+        .unwrap();
+    let s = fresh.state.lock().unwrap();
+    let (id, _) = s
+        .pages
+        .iter()
+        .find(|(_, p)| p.title == "Flint — design document")
+        .unwrap();
+    assert_eq!(s.extra[id].restricted_to.as_deref(), Some("acc-kiln"));
 }

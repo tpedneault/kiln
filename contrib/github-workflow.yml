@@ -1,0 +1,64 @@
+# Kiln in GitHub Actions (docs/CONFLUENCE.md, "Running it in CI"). Save as
+# .github/workflows/kiln.yml.
+#
+# Repository secrets:
+#   KILN_CONFLUENCE_TOKEN   a personal access token (Data Center) or API token (Cloud)
+#   KILN_CONFLUENCE_USER    Cloud only: the account e-mail the token belongs to
+# Pull requests from forks get no secrets, so their plan job is skipped.
+#
+# Kiln has no release binaries yet; each job builds it. Pin the actions to
+# commit hashes as your policy requires.
+
+name: Kiln
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history: links name the commit that last changed a file
+      - run: cargo install --locked --git https://github.com/tpedneault/kiln kiln
+      - run: kiln check --format github
+
+  plan:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: cargo install --locked --git https://github.com/tpedneault/kiln kiln
+      - run: kiln export --dry-run --format json > export-plan.json
+        env:
+          KILN_CONFLUENCE_TOKEN: ${{ secrets.KILN_CONFLUENCE_TOKEN }}
+          KILN_CONFLUENCE_USER: ${{ secrets.KILN_CONFLUENCE_USER }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: export-plan
+          path: export-plan.json
+
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-24.04
+    # Publishes of one target must not overlap (CONFLUENCE.md, "Serial publishes").
+    concurrency: confluence
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: cargo install --locked --git https://github.com/tpedneault/kiln kiln
+      - run: kiln export --require-clean --yes
+        env:
+          KILN_CONFLUENCE_TOKEN: ${{ secrets.KILN_CONFLUENCE_TOKEN }}
+          KILN_CONFLUENCE_USER: ${{ secrets.KILN_CONFLUENCE_USER }}

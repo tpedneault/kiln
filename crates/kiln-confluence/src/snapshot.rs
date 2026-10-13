@@ -6,6 +6,7 @@ use std::collections::HashSet;
 
 use kiln_model::ExportTarget;
 
+use crate::cache::PageCache;
 use crate::client::{ClientError, Confluence};
 use crate::model::{RemotePage, Snapshot};
 use crate::normalise::body_hash;
@@ -18,7 +19,14 @@ pub fn take_snapshot(
     project: &str,
     space: &str,
     wanted_titles: &[String],
+    cache: &PageCache,
 ) -> Result<Snapshot, ClientError> {
+    let property = |id: u64, version: u64| -> Result<_, ClientError> {
+        match cache.property(id, version) {
+            Some(known) => Ok(known),
+            None => client.property(id),
+        }
+    };
     let ours = |p: &RemotePage| {
         p.property
             .as_ref()
@@ -29,7 +37,7 @@ pub fn take_snapshot(
         snapshot.anchor_page = page_id;
         let mut root = client
             .page(page_id)?
-            .ok_or_else(|| ClientError { message: format!("Confluence page {page_id} (export `{}`, page =) doesn't exist or the token can't see it", target.name) })?;
+            .ok_or_else(|| ClientError::new(format!("Confluence page {page_id} (export `{}`, page =) doesn't exist or the token can't see it", target.name)))?;
         root.property = client.property(page_id)?;
         if root.property.is_none() {
             root.empty = client.body(page_id)?.trim().is_empty();
@@ -38,10 +46,10 @@ pub fn take_snapshot(
     } else if let Some(parent) = target.confluence.parent {
         snapshot.anchor_page = parent;
         if client.page(parent)?.is_none() {
-            return Err(ClientError { message: format!("Confluence page {parent} (export `{}`, parent =) doesn't exist or the token can't see it", target.name) });
+            return Err(ClientError::new(format!("Confluence page {parent} (export `{}`, parent =) doesn't exist or the token can't see it", target.name)));
         }
         for mut child in client.children(parent)? {
-            child.property = client.property(child.id)?;
+            child.property = property(child.id, child.version)?;
             if ours(&child) && child.property.as_ref().is_some_and(|k| k.key == "doc") {
                 snapshot.root = Some(child);
                 break;
@@ -49,9 +57,14 @@ pub fn take_snapshot(
         }
     }
     if let Some(root) = &snapshot.root {
-        if target.layout != kiln_model::Layout::Document {
+        // Every layout: pages left from an earlier layout (a tree turned
+        // into a document) are retired, so they must be seen.
+        {
             for mut page in client.descendants(root.id)? {
-                page.property = client.property(page.id)?;
+                page.property = property(page.id, page.version)?;
+                if page.property.is_none() {
+                    page.leftover = client.body(page.id)? == crate::apply::PLACEHOLDER;
+                }
                 snapshot.descendants.push(page);
             }
         }
@@ -75,7 +88,7 @@ pub fn take_snapshot(
     }
     let own_titles: HashSet<String> = snapshot
         .pages()
-        .filter(|p| ours(p))
+        .filter(|p| ours(p) || p.leftover)
         .map(|p| p.title.clone())
         .collect();
     let mut taken = Vec::new();

@@ -5,11 +5,11 @@ Where Kiln's code lives and which way its dependencies point.
 map of the workspace that does it, and is updated whenever a crate gains
 a role or a dependency.
 
-Status: K2. The format crates (`kiln-model`, `kiln-parse`, `kiln-index`,
-`kiln-check`), the export crates (`kiln-render`, `kiln-export`, and
-`kiln-confluence` without writes), `kiln-git`, `kiln-secrets` (environment
-variables), `kiln-fenix` (opening a file) and the binary's K1 and K2
-commands are built. `kiln-lsp` and `kiln-flint` are shells with their
+Status: K3. The format crates (`kiln-model`, `kiln-parse`, `kiln-index`,
+`kiln-check`), the export crates (`kiln-render`, `kiln-export`,
+`kiln-confluence` with publishing), `kiln-git`, `kiln-secrets` (environment
+variables and the OS credential store through `keyring`), `kiln-fenix`
+(opening a file) and the binary's K1–K3 commands are built. `kiln-lsp` and `kiln-flint` are shells with their
 module header (what each is for, what it deliberately doesn't do, the
 milestone that fills it in).
 
@@ -153,9 +153,17 @@ kiln export
   ├─ resolve references across pages and link_to targets         kiln-export
   └─ per target:
        markdown/html → render_files → plan_files → apply         kiln-export
-       confluence    → snapshot (client or --snapshot) →
-                       desired pages (storage, renderHash) → plan  kiln-confluence
+       confluence    → snapshot (client or --snapshot; page cache) →
+                       desired pages (storage, renderHash) → plan →
+                       confirm (--yes or a prompt) → apply      kiln-confluence
 ```
+
+`apply` takes the client as a `&dyn Confluence` and the attachment bytes
+as a function, so the binary hands it `FenixPictures` and the disk while
+the tests hand it the fake server and `FakePictures`. The fake server is
+`kiln_confluence::fake`, compiled for the crate's own tests and, behind
+the `fake` feature, for the binary's end-to-end tests; nothing else
+enables it.
 
 Assembly gets the revision as data (`Revision`: commit, date, whether
 the output is in-tree), and back ends get repository links as data

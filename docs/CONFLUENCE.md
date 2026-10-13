@@ -14,9 +14,13 @@ nothing the second time.
 
 Implemented in `kiln-confluence`, on top of `kiln-export`'s assembly and
 layouts. Endpoint details marked **verify** were checked against
-Atlassian's documentation and community answers on 2026-10-12 but must be
-confirmed against live Cloud and Data Center instances in K2/K3 before
-being relied on; record what was found here.
+Atlassian's documentation and community answers on 2026-10-12. K3
+implements every one of them against the in-process fake server (which
+follows the same reading of the documentation), and none has been
+confirmed against a live instance yet: `dev/confluence/README.md` sets up
+both flavours and `crates/kiln/tests/live.rs` exercises them. Record what
+a live instance did next to each **verify**, with flavour, version and
+date.
 
 ## What readers get
 
@@ -98,7 +102,7 @@ jira_macro = true           # the Jira macro for `jira` keys (needs a Jira appli
 jira_server_id = ""         # Data Center with several Jira links (see "Jira")
 restrict_edits = false      # restrict editing of published pages to the publishing account
 on_drift = "stop"           # stop | skip | overwrite (see "Drift")
-concurrency = 4             # requests in flight
+concurrency = 4             # requests in flight (read, not yet used: K3 sends one at a time)
 diagrams = "image"          # image | source (EXPORT.md, "Diagrams")
 max_page_kib = 1024         # warn above this storage size; refuse above 4× (see "Size")
 
@@ -127,8 +131,7 @@ keys.
 | Data Center, no PATs | username + password (only with `auth = "basic"`) | Basic |
 | Cloud | account e-mail (`user`) + API token | Basic |
 
-Looked up in this order (K2 reads only the first; the credential store
-arrives with `kiln auth confluence` in K3):
+Looked up in this order:
 
 1. `KILN_CONFLUENCE_TOKEN` (and `KILN_CONFLUENCE_USER` overriding `user`):
    for CI, set as masked protected variables.
@@ -136,7 +139,11 @@ arrives with `kiln auth confluence` in K3):
    (Flint's F12, already implemented by Flint): service `fenix-suite`,
    account `confluence:<url>` with the URL exactly as configured, trailing
    slash removed. `kiln auth confluence` prompts without echo, checks the
-   token against the server (`whoami`), then stores it.
+   token against the server (`whoami`), then stores it; `kiln auth
+   confluence --forget` removes it. On Cloud it needs `user` set first:
+   the e-mail is configuration, not a secret, so it isn't stored with the
+   token. On a headless Linux machine without a Secret Service the store
+   can't be read; the error says so and names `KILN_CONFLUENCE_TOKEN`.
 
 A token is never written to a file, a log, the plan output or an error
 message. A 401 says "Confluence refused the token for <url> (run `kiln
@@ -212,16 +219,24 @@ Kiln never looks at or touches other pages:
 1. Find the root page: among `parent`'s children, the one whose `kiln`
    property names this project and export with key `doc` (the local cache
    remembers its id); with `page =`, that page. First publish: absent.
-2. For `sections` and `tree`: list the root's descendants with id, title,
-   parent id, version number and version author.
+2. List the root's descendants with id, title, parent id, version number
+   and version author. Every layout does, `document` too: after a change
+   from `tree` to `document` the old item pages are still there to retire.
 3. Read each page's `kiln` property, but only when its version differs
    from the local cache (state folder,
    `confluence/<space>-<project>-<export>.json`: page id → version,
-   property). In CI there is no cache and every property is read; at
-   concurrency 4 that is a few seconds for hundreds of pages, and one call
-   for a document.
+   property). In CI there is no cache and every property is read: one
+   call for a document, one per page for a tree (K3 reads them one at a
+   time; a tree of hundreds of pages takes tens of seconds in CI, and a
+   desktop's cache makes the second run cost a call per changed page).
+   The cache is written after every snapshot and every publish; failing to
+   write it is not an error.
 4. Pages under the root without this target's property are **foreign**:
-   never modified, moved or deleted, and listed in the plan.
+   never modified, moved or deleted, and listed in the plan. One
+   exception: a page with no property whose body is exactly Kiln's
+   placeholder (see "Apply") was created by a publish that stopped before
+   writing its property; it is a **leftover**, not foreign, and the next
+   publish takes it over instead of creating a second page of that title.
 5. Bodies are read only for pages whose version is past the property's
    `publishedVersion` (a possible edit), to compare their normalised hash.
 6. Each title a page would take is looked up in the space; a title held
@@ -246,7 +261,13 @@ For each desired page, matched to a remote page by its key:
 | remote exists, something differs, no drift | `update` (and `move`, `label`, `attach`, `unattach` as needed) |
 | remote exists, drift (below) | per `on_drift`: `stop` refuses the whole plan; `skip` leaves that page; `overwrite` (or `--force`) updates it |
 | a remote page of this target with no desired page (`tree`: a removed item; any layout: a section that went away) | `retire`: move under "Removed from the repository" (created on demand under the root), replace the body with a banner and the last published content, label `kiln-removed` |
+| a retired page of this target that is desired again | `update`, "back in the repository": moved back, its banner gone |
+| a retired page older than `--prune-removed DAYS` | `prune`: sent to the space's trash (restorable there by a space admin) |
 | title collides and can't be disambiguated | error naming the pages; nothing applied |
+
+Each written page gets a version message naming the commit and why, in
+the page history: `kiln 9f8e7d6: REQ-014 changed; REQ-031 new` (at most
+250 characters).
 
 For `document` the plan is a single line: `unchanged`, or `update` with
 the items that changed.
@@ -256,7 +277,10 @@ reason ("REQ-014 changed: status, body", "parent REQ-002 → REQ-003",
 "drift: edited by alice at 2026-10-10 14:02, version 7"), then totals and
 each page's size. `--format json` gives the plan as data, for CI
 artifacts. Without `--yes`, an interactive run shows the totals and asks
-before applying; non-interactive runs without `--yes` stop after the plan.
+before applying; non-interactive runs without `--yes` stop after the plan
+and exit 1, so a CI job that forgot `--yes` doesn't pass green having
+published nothing. A refused plan (drift with `on_drift = "stop"`, a page
+too large, `--adopt` needed) publishes nothing of that target and exits 1.
 
 ### 4. Apply
 
@@ -270,6 +294,28 @@ After each create or update, read the page's storage body back, normalise
 it (see "Drift") and store its hash in the property as `remoteHash`. That
 makes drift detection independent of whatever Confluence does to storage
 on save.
+
+A new page is created with a placeholder body (`<p>Kiln is publishing
+this page.</p>`) and, at once, a minimal `kiln` property naming its key,
+so children have a parent and a publish that stops right there leaves a
+page the next run recognises as its own. Every attachment's bytes
+(diagrams drawn, images read) are produced before the first write: a
+machine that can't draw a diagram fails before touching the space.
+
+A publish that stops half-way (a network error, a 500, Ctrl-C) leaves
+what it applied applied; the next run's plan picks up from there and ends
+in the same state as an uninterrupted run (tested by failing after 1, 3,
+6, 10 and 15 writes). A page whose body Kiln wrote but whose property it
+didn't is not drift: a body that already equals what Kiln would write now
+is recognised as Kiln's own and its property is written. The page cache
+is updated only after a publish succeeds.
+
+Retiring creates "Removed from the repository" under the root on demand
+(key `removed`; titled "Removed from the repository (<target title>)"
+when another target already has that title in the space). A retired page
+keeps its last content below a warning banner, gets the label
+`kiln-removed`, and its property records `retired` and `retiredAt`
+(`YYYY-MM-DD`), which `--prune-removed DAYS` compares against.
 
 `--yes` on a plan whose snapshot is older than 2 minutes re-snapshots
 first.
@@ -306,13 +352,18 @@ current version is newer than `publishedVersion` **and** the normalised
 hash of its current body differs from `remoteHash` (a version bump with an
 identical body, e.g. a page move by an admin or a property-only change,
 is not drift). **verify**: whether writing a content property, adding a
-label or uploading an attachment bumps the page version on each flavour;
-`publishedVersion` must be the version after Kiln's last write of any
-kind to the page.
+label or uploading an attachment bumps the page version on each flavour.
+`publishedVersion` is read back after the body is written and the labels
+and attachments are done, before the property is written. If writing the
+property bumps the version too, nothing breaks: the next snapshot sees a
+version past `publishedVersion`, reads the body (one call), finds its hash
+equal to `remoteHash`, and reports no drift; recording which is the case
+saves that call.
 
-- The plan names the page, the version and its author and time, and links
-  to Confluence's comparison of that version with Kiln's last, so the edit
-  can be read and carried into the repository by hand.
+- The plan names the page, the version and its author and time, so the
+  edit can be read in the page history and carried into the repository by
+  hand. (A link to Confluence's comparison of that version with Kiln's
+  last is not in K3: its URL differs by flavour and is unverified.)
 - `on_drift = "stop"` (the default) refuses to publish anything until the
   edit is dealt with: re-run with `--force` after copying it into the repo,
   or set `skip` to publish everything else.
@@ -333,9 +384,12 @@ drop whitespace-only text between elements; treat CDATA as text and
 decode entities (XML's, numeric, and the HTML ones Confluence writes such
 as `&nbsp;`); serialise canonically. The normaliser is tested on bodies
 captured from both flavours (K3). **Verify** which other attributes
-Confluence adds on save (`ac:schema-version` on macros is likely): any
-not dropped here would count every page as drifted after its first
-publish, so K3 adds them to the list from captured bodies.
+Confluence adds on save (`ac:schema-version` on macros is likely). Because
+`remoteHash` is the hash of the body read back after saving, attributes
+added on save don't make a page look edited; they matter only where Kiln
+compares a saved body with what it would write (recognising its own
+write after an interrupted publish), where an attribute not dropped here
+turns that page into drift for `--force` to settle.
 
 ## Comments
 
@@ -455,7 +509,9 @@ Notes:
 - **429 Too Many Requests** and **503**: wait for `Retry-After` (seconds)
   when present, otherwise exponential backoff from 1 s with jitter, at most
   6 attempts per call, then fail with the endpoint named.
-- Concurrency: at most `concurrency` requests in flight (default 4).
+- Concurrency: at most `concurrency` requests in flight (default 4). K3
+  sends one request at a time; reads in parallel are the next step when a
+  large tree's CI snapshot proves slow.
 - Timeouts: 10 s connect, 60 s per request (120 s for attachments and for
   bodies over 1 MiB).
 - Any 4xx other than these fails the publish with the server's message.
@@ -547,8 +603,14 @@ Ship these as `contrib/gitlab-ci.yml` and `contrib/github-workflow.yml`.
   against a recorded snapshot file (`--snapshot <file>`, `--save-snapshot
   <file>`). Every layout. No endpoint marked **verify** has been confirmed
   against a live instance yet; each still is.
-- **K3 (writes)**: apply, properties, labels, attachments, adopting a page,
-  retires, drift, `restrict_edits`, size limits, retries, `auth
-  confluence`, CI recipes, the fake server's write half, live tests on
-  both flavours. Fill in every **verify** in this document with what the
-  live instances did.
+- **K3 (writes)**, done: apply, properties, labels, attachments, adopting
+  a page, retires and `--prune-removed`, drift, `restrict_edits`, size
+  limits, retries, the page cache, `kiln auth confluence`, the CI recipes
+  (`contrib/gitlab-ci.yml`, `contrib/github-workflow.yml`), the fake
+  server's write half (both flavours, 409, 413, interrupted publishes),
+  `kiln export --yes` tested end to end against it, and the live tests
+  (`crates/kiln/tests/live.rs`, `#[ignore]`) with
+  `dev/confluence/README.md`. Still open: every **verify** in this
+  document awaits a run against live Cloud and Data Center instances;
+  requests are serial (`concurrency` unused); the normaliser has no
+  bodies captured from a live save yet.

@@ -165,7 +165,7 @@ enum Command {
         #[arg(long, value_enum, default_value_t = TraceFormat::Text)]
         format: TraceFormat,
     },
-    /// Render export targets and write file targets that changed (Confluence: --dry-run only, until K3).
+    /// Render export targets: write file targets that changed, publish Confluence targets.
     Export {
         /// Targets to export (default: all).
         names: Vec<String>,
@@ -187,14 +187,41 @@ enum Command {
         /// Write the live snapshot a Confluence dry run read to FILE.
         #[arg(long, value_name = "FILE")]
         save_snapshot: Option<String>,
+        /// Publish Confluence targets without asking (needed when not interactive).
+        #[arg(long)]
+        yes: bool,
+        /// Overwrite pages edited in Confluence.
+        #[arg(long)]
+        force: bool,
+        /// Publish into a `page =` that already has content, replacing it.
+        #[arg(long)]
+        adopt: bool,
+        /// Send pages retired more than DAYS days ago to the trash.
+        #[arg(long, value_name = "DAYS")]
+        prune_removed: Option<u32>,
         #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
         format: TextOrJson,
+    },
+    /// Store a token in the OS credential store, prompting without echo.
+    Auth {
+        #[command(subcommand)]
+        service: AuthService,
     },
     /// Everything that reaches an item by links or parents, transitively.
     Impact {
         id: String,
         #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
         format: TextOrJson,
+    },
+}
+
+#[derive(Subcommand)]
+enum AuthService {
+    /// The token for `[confluence] url`, checked against the server first.
+    Confluence {
+        /// Remove the stored token instead.
+        #[arg(long)]
+        forget: bool,
     },
 }
 
@@ -238,6 +265,10 @@ fn main() -> ExitCode {
             allow_shallow,
             snapshot,
             save_snapshot,
+            yes,
+            force,
+            adopt,
+            prune_removed,
             format,
         } => cmd::export::run(
             project,
@@ -249,9 +280,16 @@ fn main() -> ExitCode {
                 allow_shallow,
                 snapshot,
                 save_snapshot,
+                yes,
+                force,
+                adopt,
+                prune_removed,
                 format,
             },
         ),
+        Command::Auth {
+            service: AuthService::Confluence { forget },
+        } => cmd::auth::confluence(project, forget),
     };
     match result {
         Ok(code) => ExitCode::from(code),

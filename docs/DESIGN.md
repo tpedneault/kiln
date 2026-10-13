@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0–K2 done (the format, `kiln check`, the editing commands, exports to Markdown and HTML, Confluence planning without writes, this repository's own `design/` and generated design document); K3 next. Pinned against Fenix
+Status: K0–K3 done (the format, `kiln check`, the editing commands, exports to Markdown and HTML, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, this repository's own `design/` and generated design document); K4 next. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 

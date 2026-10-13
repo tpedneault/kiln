@@ -30,6 +30,13 @@ pub struct KilnProperty {
     pub published_version: u64,
     #[serde(default)]
     pub attachments: BTreeMap<String, String>,
+    /// Moved under "Removed from the repository": nothing produces it any
+    /// more.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub retired: bool,
+    /// When it was retired, `YYYY-MM-DD`, for `--prune-removed`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub retired_at: String,
 }
 
 /// One page as Confluence has it.
@@ -57,6 +64,10 @@ pub struct RemotePage {
     /// Whether the body is empty (for adopting a page).
     #[serde(default)]
     pub empty: bool,
+    /// A page an interrupted publish created and never finished: no
+    /// property, the placeholder body. Not foreign; apply finishes it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub leftover: bool,
 }
 
 /// What a target's place in Confluence looks like.

@@ -1,6 +1,6 @@
 # Command line
 
-How to run `kiln`, as it stands (K2). The commands planned for later
+How to run `kiln`, as it stands (K3). The commands planned for later
 milestones are in [DESIGN.md](DESIGN.md), "Command line"; each is
 documented here when it ships. The file format is
 [FORMAT.md](FORMAT.md); `kiln.toml` is summed up in
@@ -141,25 +141,54 @@ design-md (markdown, document) → docs/generated/DESIGN.md
 | `--allow-shallow` | exports from a shallow clone; files older than its boundary link at the exported commit |
 | `--snapshot FILE` | Confluence: plans against a recorded snapshot instead of the live space |
 | `--save-snapshot FILE` | Confluence: writes the snapshot a live dry run read |
+| `--yes` | Confluence: publishes without asking (needed when not on a terminal, as in CI) |
+| `--force` | Confluence: overwrites pages edited in Confluence (after their edit is in the repository) |
+| `--adopt` | Confluence: publishes into a `page =` that already has content, replacing it |
+| `--prune-removed DAYS` | Confluence: sends pages retired more than DAYS days ago to the space's trash |
 | `--format json` | the outcome per target as JSON (the Confluence plan included) |
 
 File targets write atomically and only what changed, and remove the files
 they wrote earlier and no longer produce. "leaves out" lists open items
 no part of the document placed: an omission should be a decision.
 
-Confluence targets only plan until K3: `kiln export --dry-run` reads the
-space with `KILN_CONFLUENCE_TOKEN` (and `KILN_CONFLUENCE_USER` on Cloud)
-and prints each page's operation and why:
+A Confluence target reads the space with `KILN_CONFLUENCE_TOKEN` (and
+`KILN_CONFLUENCE_USER` on Cloud), or the token `kiln auth confluence`
+stored, prints each page's operation and why, and then publishes:
 
 ```
+$ kiln export --yes
 spec (confluence, document) → space FLINT, page 123456789
   update    "Flint — design document": REQ-014 changed; REQ-031 new (42 KiB)
   0 create, 1 update, 0 unchanged, 0 drift, 0 retire
+spec: published 0 created, 1 updated, 0 retired, 0 pruned
 ```
 
-Without `--dry-run` or `--check`, a Confluence target is refused (exit 2).
-A plan that would be refused (a page edited in Confluence, a page too
-large) exits 1; a server or network error exits 3.
+`--dry-run` stops after the plan. Without `--yes`, a run on a terminal
+asks before publishing each target; a run that isn't on a terminal stops
+after the plan and exits 1. `--snapshot FILE` plans offline and works
+only with `--dry-run` or `--check`. A plan that is refused (a page edited
+in Confluence, a page too large, an adopted page with content) publishes
+nothing of that target and exits 1; a server or network error exits 3,
+and the next run finishes what the failed one started. `--format json`
+adds what was published under `applied` (publishing with JSON output
+needs `--yes`). CONFLUENCE.md has the details: drift, retired pages, the
+page cache.
+
+### `kiln auth confluence [--forget]`
+
+Asks for the token for `[confluence] url` without echoing it, checks it
+against the server and stores it in the OS credential store (Windows
+Credential Manager; the Secret Service on Linux) as service
+`fenix-suite`, account `confluence:<url>`, where Flint finds it too.
+`--forget` removes it. On Cloud, set `[confluence] user` (your account
+e-mail) first. `KILN_CONFLUENCE_TOKEN`, when set, is used instead of the
+stored token; CI sets that rather than running `kiln auth`.
+
+```
+$ kiln auth confluence
+Token for https://confluence.example.com:
+stored the token for https://confluence.example.com (signed in as Thomas) in the credential store as fenix-suite/confluence:https://confluence.example.com
+```
 
 ## Editing
 

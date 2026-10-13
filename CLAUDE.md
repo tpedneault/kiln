@@ -7,8 +7,10 @@ document on one Confluence page) for people who don't use Kiln. It is
 part of a suite with Fenix (editor, https://github.com/tpedneault/fenix)
 and Flint (launcher, https://github.com/tpedneault/flint). The design is settled; K0 (the
 workspace and CI), K1 (the format, `kiln check`, the editing commands,
-this repository's own `design/`) and K2 (exports; Confluence planning
-without writes; the committed design document) are done.
+this repository's own `design/`), K2 (exports; Confluence planning
+without writes; the committed design document) and K3 (Confluence
+publishing, `kiln auth confluence`; every **verify** still unconfirmed
+live) are done.
 
 ## Read first, in this order
 

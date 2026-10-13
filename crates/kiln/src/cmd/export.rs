@@ -1,18 +1,25 @@
 //! `kiln export`: renders every (or the named) export target and writes
 //! file targets whose bytes changed; `--dry-run` shows what would change,
-//! `--check` also exits 1 if anything would. Confluence targets are
-//! read-only in K2: `--dry-run` reads the space (or a snapshot file) and
-//! prints the plan; publishing arrives in K3.
+//! `--check` also exits 1 if anything would. A Confluence target reads the
+//! space (or a snapshot file), prints the plan, and without `--dry-run`
+//! publishes it: after `--yes`, or a "y" at an interactive prompt.
+//!
+//! A non-interactive run without `--yes` stops after the plan and exits 1,
+//! so a CI job that forgot `--yes` is red rather than green and silent.
 
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::io::{IsTerminal, Write};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use kiln_confluence::{
-    desired_pages, plan, take_snapshot, titles, DesiredContext, OpKind, Plan, PlanOptions, Snapshot,
+    desired_pages, plan, take_snapshot, titles, Applied, ApplyOptions, Attachment,
+    AttachmentSource, Confluence, DesiredContext, DesiredPage, OpKind, PageCache, Plan,
+    PlanOptions, Snapshot,
 };
 use kiln_export::{
-    plan_files, prepare, render_files, resolve_all, Assembly, FenixPictures, FilePlan, Prepared,
-    RepoLinks, Revision,
+    plan_files, prepare, render_files, resolve_all, Assembly, FenixPictures, FilePlan, Pictures,
+    Prepared, RepoLinks, Revision,
 };
 use kiln_index::FileSource;
 use kiln_model::{ExportFormat, ExportTarget, Severity};
@@ -30,17 +37,43 @@ pub struct Options {
     pub allow_shallow: bool,
     pub snapshot: Option<String>,
     pub save_snapshot: Option<String>,
+    /// Publish without asking.
+    pub yes: bool,
+    /// Overwrite pages edited in Confluence.
+    pub force: bool,
+    /// Publish into a `page =` that already has content.
+    pub adopt: bool,
+    /// Trash retired pages older than this many days.
+    pub prune_removed: Option<u32>,
     pub format: TextOrJson,
 }
+
+/// A snapshot older than this is read again before publishing
+/// (CONFLUENCE.md, "Apply").
+const FRESH: Duration = Duration::from_secs(120);
 
 /// What exporting one target came to.
 enum Outcome {
     Files(FilePlan),
-    Confluence {
-        plan: Plan,
-        space: String,
-        anchor: u64,
-    },
+    Confluence(Box<ConfluenceRun>),
+}
+
+/// A Confluence target's plan and what publishing it needs.
+struct ConfluenceRun {
+    plan: Plan,
+    space: String,
+    anchor: u64,
+    desired: Vec<DesiredPage>,
+    snapshot: Snapshot,
+    options: PlanOptions,
+    /// `None` when planning from `--snapshot`.
+    client: Option<Box<dyn Confluence>>,
+    /// The page cache file; `None` without a state folder.
+    cache: Option<PathBuf>,
+    read_at: Instant,
+    restrict_edits: bool,
+    /// What publishing did, once it has.
+    applied: Option<Applied>,
 }
 
 pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
@@ -84,12 +117,16 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
             "{first} (`kiln check` lists every problem)"
         )));
     }
+    let publishing = !(o.dry_run || o.check);
     if selected
         .iter()
         .any(|t| t.format == ExportFormat::Confluence)
-        && !(o.dry_run || o.check)
+        && publishing
+        && o.snapshot.is_some()
     {
-        return Err(Fail::usage("publishing to Confluence arrives in K3; `kiln export --dry-run` shows the plan without writing"));
+        return Err(Fail::usage(
+            "--snapshot plans offline; publishing reads the live space (add --dry-run)",
+        ));
     }
 
     let commit = kiln_git::head_commit(&root).ok();
@@ -190,27 +227,44 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
             );
             Outcome::Files(plan_files(t, files, &loaded.source))
         } else {
-            confluence_plan(
-                prep,
-                &prepared,
-                p,
-                &loaded.source,
-                &o,
-                &Revision {
+            let planning = Planning {
+                all: &prepared,
+                project: p,
+                source: &loaded.source,
+                o: &o,
+                revision: &Revision {
                     commit: commit.clone(),
                     date: date.clone(),
                     in_tree: false,
                 },
-                &last_commits,
-                &web(false),
-            )?
+                last_commits: &last_commits,
+                repo: &web(false),
+            };
+            Outcome::Confluence(Box::new(confluence_plan(prep, &planning)?))
         };
         results.push((prep, outcome));
     }
 
     let mut changed = false;
     let mut refused = false;
-    if !(o.dry_run || o.check) {
+    // JSON output can't ask, so it publishes (with --yes) before printing.
+    let mut stopped = false;
+    if publishing && o.format == TextOrJson::Json {
+        for (prep, outcome) in &mut results {
+            if let Outcome::Confluence(run) = outcome {
+                stopped |= publish(
+                    prep,
+                    run,
+                    &o,
+                    &pictures,
+                    &loaded.source,
+                    commit.as_deref(),
+                    false,
+                )?;
+            }
+        }
+    }
+    if publishing {
         for (_, outcome) in &results {
             if let Outcome::Files(plan) = outcome {
                 kiln_export::apply(&root, plan)
@@ -265,17 +319,21 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
                     println!("  leaves out: {}", left_out.join(", "));
                 }
             }
-            Outcome::Confluence {
-                plan,
-                space,
-                anchor,
-            } => {
+            Outcome::Confluence(run) => {
+                let ConfluenceRun {
+                    plan,
+                    space,
+                    anchor,
+                    applied,
+                    ..
+                } = run.as_ref();
                 changed |= plan.changes();
                 refused |= !plan.refusals.is_empty();
                 if o.format == TextOrJson::Json {
                     json_targets.push(json!({
                         "name": t.name, "format": "confluence", "layout": t.layout.as_str(), "space": space,
                         "parent": anchor, "plan": plan, "leftOut": left_out,
+                        "applied": applied.as_ref().map(applied_json),
                     }));
                     continue;
                 }
@@ -291,6 +349,7 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
                         OpKind::Unchanged => "unchanged",
                         OpKind::Drift => "drift",
                         OpKind::Retire => "retire",
+                        OpKind::Prune => "prune",
                     };
                     let reasons = if op.reasons.is_empty() {
                         String::new()
@@ -308,12 +367,16 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
                     println!("  foreign   \"{title}\" (not Kiln's; left alone)");
                 }
                 println!(
-                    "  {} create, {} update, {} unchanged, {} drift, {} retire",
+                    "  {} create, {} update, {} unchanged, {} drift, {} retire{}",
                     plan.count(OpKind::Create),
                     plan.count(OpKind::Update),
                     plan.count(OpKind::Unchanged),
                     plan.count(OpKind::Drift),
-                    plan.count(OpKind::Retire)
+                    plan.count(OpKind::Retire),
+                    match plan.count(OpKind::Prune) {
+                        0 => String::new(),
+                        n => format!(", {n} prune"),
+                    }
                 );
                 for w in &plan.warnings {
                     println!("  warning: {w}");
@@ -329,6 +392,23 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
     }
     if o.format == TextOrJson::Json {
         print!("{}", json_out(&Value::Array(json_targets)));
+    } else if publishing {
+        for (prep, outcome) in &mut results {
+            if let Outcome::Confluence(run) = outcome {
+                stopped |= publish(
+                    prep,
+                    run,
+                    &o,
+                    &pictures,
+                    &loaded.source,
+                    commit.as_deref(),
+                    true,
+                )?;
+            }
+        }
+    }
+    if stopped {
+        return Ok(EXIT_FINDINGS);
     }
     if o.check && changed {
         eprintln!("kiln: exports are out of date; run `kiln export` and commit the result");
@@ -340,18 +420,20 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
     Ok(0)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn confluence_plan(
-    prep: &Prepared,
-    all: &[Prepared],
-    project: &kiln_index::Project,
-    source: &kiln_index::DiskSource,
-    o: &Options,
-    revision: &Revision,
-    last_commits: &HashMap<String, String>,
-    repo: &RepoLinks,
-) -> Result<Outcome, Fail> {
+/// What planning a Confluence target needs besides the target.
+struct Planning<'a> {
+    all: &'a [Prepared],
+    project: &'a kiln_index::Project,
+    source: &'a kiln_index::DiskSource,
+    o: &'a Options,
+    revision: &'a Revision,
+    last_commits: &'a HashMap<String, String>,
+    repo: &'a RepoLinks,
+}
+
+fn confluence_plan(prep: &Prepared, ctx: &Planning) -> Result<ConfluenceRun, Fail> {
     let t = &prep.target;
+    let (project, o) = (ctx.project, ctx.o);
     let config = project
         .config
         .confluence
@@ -364,24 +446,53 @@ fn confluence_plan(
         .unwrap_or_else(|| config.space.clone());
     let anchor = t.confluence.page.or(t.confluence.parent).unwrap_or(0);
     let wanted: Vec<String> = titles(prep, &HashSet::new()).into_values().collect();
-    let snapshot: Snapshot = match &o.snapshot {
+    let cache = crate::project::folders().map(|f| {
+        f.state
+            .join("confluence")
+            .join(cache_name(&space, &project.config.name, &t.name))
+    });
+    let read_at = Instant::now();
+    let (snapshot, client): (Snapshot, Option<Box<dyn Confluence>>) = match &o.snapshot {
         Some(path) => {
             let text =
                 std::fs::read_to_string(path).map_err(|e| Fail::usage(format!("{path}: {e}")))?;
-            serde_json::from_str(&text)
-                .map_err(|e| Fail::usage(format!("{path}: not a Kiln snapshot: {e}")))?
+            let snapshot = serde_json::from_str(&text)
+                .map_err(|e| Fail::usage(format!("{path}: not a Kiln snapshot: {e}")))?;
+            (snapshot, None)
         }
         None => {
-            let token = kiln_secrets::confluence_token().ok_or_else(|| {
-                Fail::usage(format!(
-                    "a dry run reads Confluence and needs {} (or --snapshot FILE)",
-                    kiln_secrets::CONFLUENCE_TOKEN
-                ))
-            })?;
+            let (token, _) = kiln_secrets::confluence_token_for(&config.url)
+                .map_err(Fail::usage)?
+                .ok_or_else(|| {
+                    Fail::usage(format!(
+                        "no token for {}: run `kiln auth confluence`, or set {}{}",
+                        config.url,
+                        kiln_secrets::CONFLUENCE_TOKEN,
+                        if o.dry_run || o.check {
+                            " (or plan offline with --snapshot FILE)"
+                        } else {
+                            ""
+                        }
+                    ))
+                })?;
             let user = kiln_secrets::confluence_user().unwrap_or_else(|| config.user.clone());
             let client = kiln_confluence::connect(config, &token, &user);
-            take_snapshot(client.as_ref(), t, &project.config.name, &space, &wanted)
-                .map_err(|e| Fail::new(EXIT_NETWORK, e.to_string()))?
+            let known = cache
+                .as_deref()
+                .and_then(|path| std::fs::read_to_string(path).ok())
+                .map(|text| PageCache::parse(&text))
+                .unwrap_or_default();
+            let snapshot = take_snapshot(
+                client.as_ref(),
+                t,
+                &project.config.name,
+                &space,
+                &wanted,
+                &known,
+            )
+            .map_err(|e| Fail::new(EXIT_NETWORK, e.to_string()))?;
+            save_cache(cache.as_deref(), &PageCache::from_snapshot(&snapshot));
+            (snapshot, Some(client))
         }
     };
     if let Some(path) = &o.save_snapshot {
@@ -391,35 +502,194 @@ fn confluence_plan(
     }
     let taken: HashSet<String> = snapshot.taken_titles.iter().cloned().collect();
     let image_hash = |path: &str| {
-        source.read(path).ok().map(|b| {
+        ctx.source.read(path).ok().map(|b| {
             kiln_confluence::hash(&b)
                 .trim_start_matches("sha256:")
                 .to_owned()
         })
     };
-    let ctx = DesiredContext {
+    let desired_ctx = DesiredContext {
         config,
         project,
-        revision,
-        last_commits,
-        repo,
+        revision: ctx.revision,
+        last_commits: ctx.last_commits,
+        repo: ctx.repo,
         image_hash: &image_hash,
-        all,
+        all: ctx.all,
         taken_titles: &taken,
     };
-    let desired = desired_pages(prep, &ctx);
+    let desired = desired_pages(prep, &desired_ctx);
     let options = PlanOptions {
         project: project.config.name.clone(),
         export: t.name.clone(),
         on_drift: config.on_drift,
-        force: false,
+        force: o.force,
         max_page_kib: config.max_page_kib,
         adopting: t.confluence.page.is_some(),
-        adopt: false,
+        adopt: o.adopt,
+        commit: ctx.revision.commit.clone().unwrap_or_default(),
+        prune_after_days: o.prune_removed,
+        today: today(),
     };
-    Ok(Outcome::Confluence {
+    Ok(ConfluenceRun {
         plan: plan(&desired, &snapshot, &options),
         space,
         anchor,
+        desired,
+        snapshot,
+        options,
+        client,
+        cache,
+        read_at,
+        restrict_edits: config.restrict_edits,
+        applied: None,
+    })
+}
+
+/// `<space>-<project>-<export>.json`, with anything but letters, digits,
+/// `-` and `_` replaced, so a project name can't make a path.
+fn cache_name(space: &str, project: &str, export: &str) -> String {
+    let clean = |s: &str| -> String {
+        s.chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect()
+    };
+    format!("{}-{}-{}.json", clean(space), clean(project), clean(export))
+}
+
+/// The cache only saves reads, so failing to write it is not an error.
+fn save_cache(path: Option<&Path>, cache: &PageCache) {
+    if let Some(path) = path {
+        if let Some(dir) = path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let _ = fenix_storage::write(path, format!("{}\n", cache.to_text()).as_bytes());
+    }
+}
+
+/// Publishes one Confluence target's plan, asking first unless `--yes`.
+/// `Ok(true)` when it stopped after the plan (refused, declined, or
+/// non-interactive without `--yes`).
+fn publish(
+    prep: &Prepared,
+    run: &mut ConfluenceRun,
+    o: &Options,
+    pictures: &FenixPictures,
+    source: &kiln_index::DiskSource,
+    commit: Option<&str>,
+    text: bool,
+) -> Result<bool, Fail> {
+    let t = &prep.target;
+    if !run.plan.refusals.is_empty() {
+        // Already reported with the plan; exit 1 follows.
+        return Ok(false);
+    }
+    if !run.plan.changes() {
+        return Ok(false);
+    }
+    let Some(client) = run.client.as_deref() else {
+        return Ok(false);
+    };
+    if !o.yes {
+        let interactive = text && std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
+        if !interactive {
+            eprintln!(
+                "kiln: `{}` not published: pass --yes to publish without asking",
+                t.name
+            );
+            return Ok(true);
+        }
+        print!("Publish `{}` to space {}? [y/N] ", t.name, run.space);
+        let _ = std::io::stdout().flush();
+        let mut answer = String::new();
+        let _ = std::io::stdin().read_line(&mut answer);
+        if !matches!(answer.trim(), "y" | "Y" | "yes") {
+            println!("  not published");
+            return Ok(true);
+        }
+    }
+    // The space may have moved on while the plan was read or confirmed.
+    if run.read_at.elapsed() > FRESH {
+        let cache = PageCache::from_snapshot(&run.snapshot);
+        let wanted: Vec<String> = titles(prep, &HashSet::new()).into_values().collect();
+        let fresh = take_snapshot(client, t, &run.options.project, &run.space, &wanted, &cache)
+            .map_err(|e| Fail::new(EXIT_NETWORK, e.to_string()))?;
+        let again = plan(&run.desired, &fresh, &run.options);
+        let shape = |p: &Plan| -> Vec<(OpKind, String)> {
+            p.ops.iter().map(|op| (op.kind, op.key.clone())).collect()
+        };
+        if shape(&again) != shape(&run.plan) || !again.refusals.is_empty() {
+            return Err(Fail::new(
+                EXIT_FINDINGS,
+                format!(
+                    "`{}`: the space changed since the plan was read; run again to see the new plan",
+                    t.name
+                ),
+            ));
+        }
+        run.snapshot = fresh;
+        run.plan = again;
+    }
+    let bytes = |a: &Attachment| match &a.source {
+        AttachmentSource::Diagram(src) => pictures.diagram(src).map(|p| p.png),
+        AttachmentSource::File(path) => source.read(path).map_err(|e| format!("{path}: {e}")),
+    };
+    let config = run.options.clone();
+    let apply_options = ApplyOptions {
+        space: &run.space,
+        anchor: run.anchor,
+        adopting: config.adopting,
+        project: &config.project,
+        export: &config.export,
+        target_title: &t.title,
+        commit: commit.unwrap_or_default(),
+        restrict_edits: run.restrict_edits,
+        restrict_adopted: t.confluence.restrict_adopted,
+        on_drift: config.on_drift,
+        force: o.force,
+        today: config.today,
+    };
+    let result = kiln_confluence::apply(
+        client,
+        &run.desired,
+        &run.plan,
+        &run.snapshot,
+        &bytes,
+        &apply_options,
+    );
+    let mut cache = PageCache::from_snapshot(&run.snapshot);
+    let applied = result.map_err(|e| {
+        Fail::new(
+            EXIT_NETWORK,
+            format!("publishing `{}` stopped: {e}; run again to finish", t.name),
+        )
+    })?;
+    for (id, (version, property)) in &applied.pages {
+        cache.remember(*id, *version, Some(property.clone()));
+    }
+    save_cache(run.cache.as_deref(), &cache);
+    if text {
+        println!(
+            "{}: published {} created, {} updated, {} retired, {} pruned",
+            t.name, applied.created, applied.updated, applied.retired, applied.pruned
+        );
+        for why in &applied.skipped {
+            println!("  skipped: {why}");
+        }
+    }
+    run.applied = Some(applied);
+    Ok(false)
+}
+
+fn applied_json(a: &Applied) -> Value {
+    json!({
+        "created": a.created, "updated": a.updated, "retired": a.retired,
+        "pruned": a.pruned, "skipped": a.skipped,
     })
 }

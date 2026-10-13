@@ -1,5 +1,6 @@
 //! One module per command, and the helpers they share.
 
+pub mod auth;
 pub mod check;
 pub mod edit;
 pub mod export;

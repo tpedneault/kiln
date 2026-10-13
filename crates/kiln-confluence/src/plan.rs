@@ -23,6 +23,8 @@ pub enum OpKind {
     Drift,
     /// A page of this target that nothing produces any more.
     Retire,
+    /// A retired page older than `--prune-removed` days: to the trash.
+    Prune,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -35,6 +37,9 @@ pub struct Op {
     pub reasons: Vec<String>,
     /// The storage body's size in bytes (desired pages).
     pub size: usize,
+    /// The page version's message: `kiln 9f8e7d6: REQ-014 changed`.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
@@ -54,9 +59,12 @@ impl Plan {
 
     /// Whether applying would change anything.
     pub fn changes(&self) -> bool {
-        self.ops
-            .iter()
-            .any(|o| matches!(o.kind, OpKind::Create | OpKind::Update | OpKind::Retire))
+        self.ops.iter().any(|o| {
+            matches!(
+                o.kind,
+                OpKind::Create | OpKind::Update | OpKind::Retire | OpKind::Prune
+            )
+        })
     }
 }
 
@@ -71,8 +79,13 @@ pub struct PlanOptions {
     pub max_page_kib: u64,
     /// The target writes into an existing page (`page =`).
     pub adopting: bool,
-    /// `--adopt` (K3).
+    /// `--adopt`.
     pub adopt: bool,
+    /// The commit being published, for version messages.
+    pub commit: String,
+    /// `--prune-removed DAYS`.
+    pub prune_after_days: Option<u32>,
+    pub today: kiln_model::Date,
 }
 
 /// Plans `desired` against `snapshot`.
@@ -89,7 +102,11 @@ pub fn plan(desired: &[DesiredPage], snapshot: &Snapshot, options: &PlanOptions)
         .filter_map(|p| p.property.as_ref().map(|k| (k.key.as_str(), p)))
         .collect();
     let key_of_id: HashMap<u64, &str> = by_key.iter().map(|(k, p)| (p.id, *k)).collect();
-    for page in snapshot.descendants.iter().filter(|p| !own(p)) {
+    for page in snapshot
+        .descendants
+        .iter()
+        .filter(|p| !own(p) && !p.leftover)
+    {
         out.foreign.push(page.title.clone());
     }
 
@@ -111,11 +128,12 @@ pub fn plan(desired: &[DesiredPage], snapshot: &Snapshot, options: &PlanOptions)
                 options.max_page_kib
             ));
         }
-        let op = |kind, page_id, reasons| Op {
+        let op = |kind, page_id, reasons: Vec<String>| Op {
             kind,
             key: d.key.clone(),
             title: d.title.clone(),
             page_id,
+            message: version_message(&options.commit, &reasons),
             reasons,
             size,
         };
@@ -151,11 +169,21 @@ pub fn plan(desired: &[DesiredPage], snapshot: &Snapshot, options: &PlanOptions)
             continue;
         };
         let property = remote.property.as_ref().expect("own pages have a property");
+        if property.retired {
+            out.ops.push(op(
+                OpKind::Update,
+                Some(remote.id),
+                vec!["back in the repository".into()],
+            ));
+            continue;
+        }
+        // A body that is already what Kiln would write isn't an edit to
+        // lose: it is Kiln's own write whose property an interrupted
+        // publish never recorded.
         let edited = remote.version > property.published_version
-            && remote
-                .body_hash
-                .as_ref()
-                .is_some_and(|h| *h != property.remote_hash);
+            && remote.body_hash.as_ref().is_some_and(|h| {
+                *h != property.remote_hash && *h != crate::normalise::body_hash(&d.body)
+            });
         if edited {
             let who = format!(
                 "drift: edited by {} at {}, version {}",
@@ -259,16 +287,53 @@ pub fn plan(desired: &[DesiredPage], snapshot: &Snapshot, options: &PlanOptions)
         .collect();
     retired.sort_by_key(|(k, _)| *k);
     for (key, page) in retired {
+        let property = page.property.as_ref().expect("own pages have a property");
+        let (kind, reasons) = if property.retired {
+            let age = kiln_model::Date::parse(&property.retired_at)
+                .map(|d| options.today.to_unix_days() - d.to_unix_days());
+            match (options.prune_after_days, age) {
+                (Some(days), Some(age)) if age >= i64::from(days) => (
+                    OpKind::Prune,
+                    vec![format!(
+                        "retired {} ({age} days ago): to the trash",
+                        property.retired_at
+                    )],
+                ),
+                _ => continue,
+            }
+        } else {
+            (
+                OpKind::Retire,
+                vec!["no longer produced: moved under \"Removed from the repository\"".into()],
+            )
+        };
         out.ops.push(Op {
-            kind: OpKind::Retire,
+            kind,
             key: key.to_owned(),
             title: page.title.clone(),
             page_id: Some(page.id),
-            reasons: vec!["no longer produced: moved under \"Removed from the repository\"".into()],
+            message: version_message(&options.commit, &["removed from the repository".to_owned()]),
+            reasons,
             size: 0,
         });
     }
     out
+}
+
+/// `kiln 9f8e7d6: REQ-014, ADR-004 changed; REQ-031 new (+3 more)`.
+fn version_message(commit: &str, reasons: &[String]) -> String {
+    let short = &commit[..commit.len().min(7)];
+    let what = if reasons.is_empty() {
+        "published".to_owned()
+    } else {
+        reasons.join("; ")
+    };
+    let message = if short.is_empty() {
+        format!("kiln: {what}")
+    } else {
+        format!("kiln {short}: {what}")
+    };
+    message.chars().take(250).collect()
 }
 
 /// `REQ-014, ADR-004` or `REQ-014, ADR-004, REQ-031 (+3 more)`.

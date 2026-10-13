@@ -41,7 +41,7 @@ K201 = "error"
 
 | Variable | Effect |
 |---|---|
-| `KILN_CONFLUENCE_TOKEN` | the Confluence token (a personal access token on Data Center, an API token on Cloud); never put it in a file |
+| `KILN_CONFLUENCE_TOKEN` | the Confluence token (a personal access token on Data Center, an API token on Cloud); never put it in a file. When unset, the token `kiln auth confluence` stored in the OS credential store is used |
 | `KILN_CONFLUENCE_USER` | Cloud: the account e-mail the token belongs to (overrides `[confluence] user`) |
 | `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, `NO_PROXY` | the proxy for Confluence calls, honouring `NO_PROXY` (CONFLUENCE.md, "The API, by flavour") |
 | `KILN_HOME` | puts Kiln's own folders (settings, state, logs) in one folder |
@@ -51,6 +51,18 @@ K201 = "error"
 
 Settings in `%AppData%\kiln` / `~/.config/kiln`; state in
 `%LocalAppData%\kiln\state` / `~/.local/state/kiln/state`, logs beside it;
-all three under `KILN_HOME` when it is set. K2 keeps one thing there: the
+all three under `KILN_HOME` when it is set. Two things live there: the
 cache of rasterised diagrams (`state/diagrams`), which CI may cache
-between runs.
+between runs, and one Confluence page cache per target
+(`state/confluence/<space>-<project>-<export>.json`: page id → version and
+`kiln` property), which saves a call per unchanged page. Either can be
+deleted at any time; Kiln reads the space again.
+
+## Credentials
+
+Tokens are never in a file Kiln reads or writes. `kiln auth confluence`
+stores one in the OS credential store (Windows Credential Manager; the
+Secret Service on Linux, as KDE Wallet and GNOME Keyring provide) under
+service `fenix-suite`, account `confluence:<url>`, the URL as configured
+without a trailing slash: the same entry Flint reads, so storing it once
+serves both. `KILN_CONFLUENCE_TOKEN` takes precedence when set.

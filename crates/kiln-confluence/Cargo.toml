@@ -10,6 +10,10 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# The in-process fake Confluence, for the `kiln` binary's tests.
+fake = []
+
 [dependencies]
 kiln-model.workspace = true
 kiln-index.workspace = true

@@ -1,0 +1,49 @@
+# Kiln in GitLab CI (docs/CONFLUENCE.md, "Running it in CI"). Copy the jobs
+# you want into your .gitlab-ci.yml.
+#
+# Set as masked, protected CI/CD variables:
+#   KILN_CONFLUENCE_TOKEN   a personal access token (Data Center) or API token (Cloud)
+#   KILN_CONFLUENCE_USER    Cloud only: the account e-mail the token belongs to
+# A merge request's dry run only reads; consider a separate read-only token
+# for it (an unprotected variable that the publish job doesn't use).
+#
+# Kiln has no release binaries yet; the image builds it once per job. Put
+# `kiln` in your own CI image to skip that.
+
+.kiln:
+  image: rust:1-bookworm
+  before_script:
+    - cargo install --locked --git https://github.com/tpedneault/kiln kiln
+  variables:
+    GIT_DEPTH: 0              # full history: links name the commit that last changed a file
+
+kiln-check:
+  extends: .kiln
+  stage: test
+  script:
+    - kiln check --format gitlab > gl-code-quality.json || true
+    - kiln check
+  artifacts:
+    when: always
+    reports:
+      codequality: gl-code-quality.json
+
+export-plan:
+  extends: .kiln
+  stage: test
+  rules: [{ if: $CI_PIPELINE_SOURCE == "merge_request_event" }]
+  script:
+    - kiln export --dry-run --format json > export-plan.json
+    - kiln export --dry-run
+  artifacts:
+    when: always
+    paths: [export-plan.json]
+
+export-publish:
+  extends: .kiln
+  stage: deploy
+  rules: [{ if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH }]
+  # Publishes of one target must not overlap (CONFLUENCE.md, "Serial publishes").
+  resource_group: confluence
+  script:
+    - kiln export --require-clean --yes
