@@ -229,7 +229,8 @@ pub fn parse_item(path: &str, text: &str, options: &ItemOptions) -> (Option<Item
         return (None, w.findings);
     };
     let (body_start, body_end) = sections.body;
-    let (mentions, relative_links) = body_references(text, body_start, body_end, &lines, options);
+    let (mentions, relative_links, diagrams) =
+        body_references(text, body_start, body_end, &lines, options);
     let item = Item {
         path: path.to_owned(),
         id,
@@ -248,23 +249,29 @@ pub fn parse_item(path: &str, text: &str, options: &ItemOptions) -> (Option<Item
         links,
         mentions,
         relative_links,
+        diagrams,
+        body: text[body_start..body_end].to_owned(),
+        body_line: lines.span(body_start, body_start).line,
     };
     (Some(item), w.findings)
 }
 
+type BodyRefs = (Vec<Mention>, Vec<RelativeLink>, Vec<(String, Span)>);
+
 /// References (`[[ID]]`, `[[ID|text]]`, and bare IDs with a configured
-/// prefix when `link_bare_ids`) outside code, and relative link and image
-/// destinations.
+/// prefix when `link_bare_ids`) outside code, relative link and image
+/// destinations, and Mermaid blocks.
 fn body_references(
     text: &str,
     start: usize,
     end: usize,
     lines: &LineIndex,
     options: &ItemOptions,
-) -> (Vec<Mention>, Vec<RelativeLink>) {
+) -> BodyRefs {
     let body = &text[start..end];
     let mut code: Vec<(usize, usize)> = Vec::new();
     let mut relative = Vec::new();
+    let mut diagrams = Vec::new();
     let mut opts = Options::empty();
     opts.insert(Options::ENABLE_TABLES);
     opts.insert(Options::ENABLE_TASKLISTS);
@@ -274,7 +281,23 @@ fn body_references(
             Event::Code(_) | Event::Html(_) | Event::InlineHtml(_) => {
                 code.push((range.start, range.end))
             }
-            Event::Start(Tag::CodeBlock(_)) => code.push((range.start, range.end)),
+            Event::Start(Tag::CodeBlock(kind)) => {
+                code.push((range.start, range.end));
+                if let pulldown_cmark::CodeBlockKind::Fenced(info) = &kind {
+                    if info.split_whitespace().next() == Some("mermaid") {
+                        let block = &body[range.clone()];
+                        // The source starts on the line after the fence.
+                        let first = block.find('\n').map(|i| i + 1).unwrap_or(block.len());
+                        let inner = &block[first..];
+                        let close = inner.trim_end().rfind('\n').map(|i| i + 1).unwrap_or(0);
+                        let fence_closed =
+                            inner.trim_end().ends_with("```") || inner.trim_end().ends_with("~~~");
+                        let source = if fence_closed { &inner[..close] } else { inner };
+                        let at = start + range.start + first;
+                        diagrams.push((source.to_owned(), lines.span(at, at + source.len())));
+                    }
+                }
+            }
             Event::Start(Tag::Link { dest_url, .. })
             | Event::Start(Tag::Image { dest_url, .. }) => {
                 if let Some(dest) = relative_destination(&dest_url) {
@@ -333,19 +356,33 @@ fn body_references(
         }
     }
     mentions.sort_by_key(|m| m.target.span.start);
-    (mentions, relative)
+    (mentions, relative, diagrams)
 }
 
+// Compiled once per process (per prefix set for bare IDs): compiling them
+// for every item cost more than parsing the item. `Regex` clones share the
+// compiled program.
 fn explicit_regex() -> Regex {
-    // Compiled per item; cheap next to parsing, and keeps this crate free
-    // of global state. A literal, so it can't fail.
-    Regex::new(r"\[\[([^\]\|\n]+)(?:\|[^\]\n]*)?\]\]").expect("a valid literal regex")
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r"\[\[([^\]\|\n]+)(?:\|[^\]\n]*)?\]\]").expect("a valid literal regex")
+    })
+    .clone()
 }
 
 fn bare_regex(prefixes: &[String]) -> Regex {
-    let alternatives: Vec<String> = prefixes.iter().map(|p| regex::escape(p)).collect();
-    Regex::new(&format!(r"\b(?:{})-\d+\b", alternatives.join("|")))
-        .expect("prefixes are validated letters and digits")
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    static CACHE: OnceLock<Mutex<HashMap<Vec<String>, Regex>>> = OnceLock::new();
+    let compile = || {
+        let alternatives: Vec<String> = prefixes.iter().map(|p| regex::escape(p)).collect();
+        Regex::new(&format!(r"\b(?:{})-\d+\b", alternatives.join("|")))
+            .expect("prefixes are validated letters and digits")
+    };
+    match CACHE.get_or_init(|| Mutex::new(HashMap::new())).lock() {
+        Ok(mut map) => map.entry(prefixes.to_vec()).or_insert_with(compile).clone(),
+        Err(_) => compile(),
+    }
 }
 
 /// A bare ID is a whole word: not part of `X-REQ-014`, `REQ-014-foo` or a
@@ -479,6 +516,18 @@ REQ-098 in code
         assert_eq!(item.relative_links.len(), 1);
         assert_eq!(item.relative_links[0].dest, "../img/flow chart.png");
         assert_eq!(item.relative_links[0].span.line, 22);
+        assert_eq!(item.body_line, 14);
+        assert!(item.body.starts_with("\nMeasured"));
+    }
+
+    #[test]
+    fn mermaid_blocks_are_kept_with_their_line() {
+        let text = "+++\nid = \"REQ-001\"\ntype = \"requirement\"\ntitle = \"t\"\nstatus = \"draft\"\n+++\n\n```mermaid\nflowchart TD\n  a --> b\n```\n";
+        let (item, _) = parse(text);
+        let item = item.unwrap();
+        assert_eq!(item.diagrams.len(), 1);
+        assert_eq!(item.diagrams[0].0, "flowchart TD\n  a --> b\n");
+        assert_eq!(item.diagrams[0].1.line, 9);
     }
 
     #[test]

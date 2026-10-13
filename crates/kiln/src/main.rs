@@ -25,6 +25,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 pub const EXIT_FINDINGS: u8 = 1;
 /// Usage or configuration error.
 pub const EXIT_USAGE: u8 = 2;
+/// Network or server error.
+pub const EXIT_NETWORK: u8 = 3;
 
 /// Why a command stopped: an exit code and one line for stderr.
 #[derive(Debug)]
@@ -163,6 +165,31 @@ enum Command {
         #[arg(long, value_enum, default_value_t = TraceFormat::Text)]
         format: TraceFormat,
     },
+    /// Render export targets and write file targets that changed (Confluence: --dry-run only, until K3).
+    Export {
+        /// Targets to export (default: all).
+        names: Vec<String>,
+        /// Show what would change; write nothing.
+        #[arg(long, conflicts_with = "check")]
+        dry_run: bool,
+        /// Like --dry-run, and exit 1 if anything would change.
+        #[arg(long)]
+        check: bool,
+        /// Refuse when the working tree has uncommitted changes.
+        #[arg(long)]
+        require_clean: bool,
+        /// Export from a shallow clone, linking older files at the exported commit.
+        #[arg(long)]
+        allow_shallow: bool,
+        /// Plan Confluence targets against a recorded snapshot instead of the live space.
+        #[arg(long, value_name = "FILE")]
+        snapshot: Option<String>,
+        /// Write the live snapshot a Confluence dry run read to FILE.
+        #[arg(long, value_name = "FILE")]
+        save_snapshot: Option<String>,
+        #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
+        format: TextOrJson,
+    },
     /// Everything that reaches an item by links or parents, transitively.
     Impact {
         id: String,
@@ -203,6 +230,28 @@ fn main() -> ExitCode {
         }
         Command::Trace { type_name, format } => cmd::trace::run(project, type_name, format),
         Command::Impact { id, format } => cmd::impact::run(project, &id, format),
+        Command::Export {
+            names,
+            dry_run,
+            check,
+            require_clean,
+            allow_shallow,
+            snapshot,
+            save_snapshot,
+            format,
+        } => cmd::export::run(
+            project,
+            cmd::export::Options {
+                names,
+                dry_run,
+                check,
+                require_clean,
+                allow_shallow,
+                snapshot,
+                save_snapshot,
+                format,
+            },
+        ),
     };
     match result {
         Ok(code) => ExitCode::from(code),

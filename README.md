@@ -17,9 +17,11 @@ navigation through Kiln's language server) and
 [Flint](https://github.com/tpedneault/flint) (the launcher, where any item
 is a few keystrokes away).
 
-**Status:** the file format, `kiln check` and the editing commands work
-(K1); Kiln's own requirements and decisions live in [design/](design/).
-Exports (K2) come next.
+**Status:** the file format, `kiln check`, the editing commands and
+exports to Markdown and HTML work (K1, K2); Confluence targets plan
+without publishing until K3. Kiln's own requirements and decisions live
+in [design/](design/), and its generated design document in
+[docs/generated/DESIGN.md](docs/generated/DESIGN.md).
 
 - [Design](docs/DESIGN.md)
 - [File format](docs/FORMAT.md)

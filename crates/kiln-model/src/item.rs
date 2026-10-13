@@ -104,6 +104,13 @@ pub struct Item {
     pub links: Vec<LinkEntry>,
     pub mentions: Vec<Mention>,
     pub relative_links: Vec<RelativeLink>,
+    /// Mermaid blocks in the body: the source, and the span of its first
+    /// line (for K111).
+    pub diagrams: Vec<(String, Span)>,
+    /// The body, after the closing `+++` line, normalised.
+    pub body: String,
+    /// The 1-based line the body starts on.
+    pub body_line: u32,
 }
 
 /// A code reference: a source line matching a code pattern, which makes

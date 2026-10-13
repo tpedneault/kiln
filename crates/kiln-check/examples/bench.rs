@@ -1,6 +1,9 @@
-//! The `kiln check` benchmark (DESIGN.md, "Performance"): a generated
-//! project of 2,000 items and 50,000 source files, loaded and checked the
-//! way `kiln check` does it.
+//! The `kiln check` and `kiln export --dry-run` benchmarks (DESIGN.md,
+//! "Performance"): a generated project of 2,000 items and 50,000 source
+//! files, loaded and checked the way `kiln check` does it, then exported
+//! as one 2,000-item Markdown document the way `kiln export --dry-run`
+//! does it (assembly, layout, references, back end, comparing with disk;
+//! no diagrams, which the budget excludes).
 //!
 //! ```text
 //! cargo run --release -p kiln-check --example bench            # report
@@ -29,6 +32,8 @@ const ITEMS: usize = 2_000;
 const SOURCE_FILES: usize = 50_000;
 const BUDGET: Duration = Duration::from_secs(2);
 const GATE: Duration = Duration::from_secs(3);
+const EXPORT_BUDGET: Duration = Duration::from_secs(3);
+const EXPORT_GATE: Duration = Duration::from_millis(4500);
 /// Bump when the generated project changes, so stale copies regenerate.
 const GENERATOR: &str = "1";
 
@@ -197,7 +202,65 @@ fn run(root: &Path) -> (Duration, usize, usize, usize) {
     )
 }
 
-// verifies: REQ-007
+/// `kiln export --dry-run` of the whole project as one document.
+fn export(root: &Path) -> (Duration, usize) {
+    let start = Instant::now();
+    let source = DiskSource::new(root);
+    let project = Project::load(&source).expect("the benchmark project loads");
+    let findings = kiln_check::check(
+        &project,
+        &source,
+        Date {
+            year: 2026,
+            month: 1,
+            day: 1,
+        },
+    );
+    let target = kiln_model::ExportTarget {
+        name: "bench".into(),
+        format: kiln_model::ExportFormat::Markdown,
+        layout: kiln_model::Layout::Document,
+        title: "Bench".into(),
+        template: None,
+        types: project
+            .config
+            .types
+            .iter()
+            .map(|t| t.name.clone())
+            .collect(),
+        exclude_status: None,
+        reports: vec!["traceability".into(), "findings".into()],
+        numbering: true,
+        item_style: None,
+        link_to: vec![],
+        path: Some("out/bench.md".into()),
+        markdown: Default::default(),
+        html: Default::default(),
+        confluence: Default::default(),
+    };
+    let revision = kiln_export::Revision::default();
+    let assembly = kiln_export::Assembly {
+        project: &project,
+        findings: &findings,
+        revision: &revision,
+    };
+    let all = vec![kiln_export::prepare(&target, None, &assembly)];
+    let mut resolved = all.clone();
+    kiln_export::resolve_all(&mut resolved, &all, &project);
+    let files = kiln_export::render_files(
+        &resolved[0],
+        &resolved,
+        &kiln_export::RepoLinks::Relative,
+        None,
+        &kiln_export::FakePictures,
+        &source,
+    );
+    let bytes = files.iter().map(|(_, b)| b.len()).sum();
+    let _plan = kiln_export::plan_files(&target, files, &source);
+    (start.elapsed(), bytes)
+}
+
+// verifies: REQ-007, REQ-010
 fn main() {
     let gate = std::env::args().any(|a| a == "--gate");
     let root = root();
@@ -214,16 +277,60 @@ fn main() {
     for i in 0..4 {
         let (elapsed, items, code_refs, errors) = run(&root);
         assert_eq!(errors, 0, "the generated project has no errors");
-        println!("run {i}: {elapsed:.0?} ({items} items, {code_refs} code references)");
+        println!(
+            "run {i}: {} ms ({items} items, {code_refs} code references)",
+            elapsed.as_millis()
+        );
         if i > 0 {
             times.push(elapsed);
         }
     }
     times.sort();
     let median = times[times.len() / 2];
-    println!("median of the warm runs: {median:.0?} (budget {BUDGET:?}, gate {GATE:?})");
+    println!(
+        "median of the warm runs: {} ms (budget {} ms, gate {} ms)",
+        median.as_millis(),
+        BUDGET.as_millis(),
+        GATE.as_millis()
+    );
+    let mut export_times = Vec::new();
+    for i in 0..4 {
+        let (elapsed, bytes) = export(&root);
+        println!(
+            "export run {i}: {} ms ({} KiB of Markdown)",
+            elapsed.as_millis(),
+            bytes / 1024
+        );
+        if i > 0 {
+            export_times.push(elapsed);
+        }
+    }
+    export_times.sort();
+    let export_median = export_times[export_times.len() / 2];
+    println!(
+        "export median of the warm runs: {} ms (budget {} ms, gate {} ms)",
+        export_median.as_millis(),
+        EXPORT_BUDGET.as_millis(),
+        EXPORT_GATE.as_millis()
+    );
+    let mut failed = false;
     if gate && median > GATE {
-        eprintln!("bench: kiln check took {median:.0?}, over the {GATE:?} gate");
+        eprintln!(
+            "bench: kiln check took {} ms, over the {} ms gate",
+            median.as_millis(),
+            GATE.as_millis()
+        );
+        failed = true;
+    }
+    if gate && export_median > EXPORT_GATE {
+        eprintln!(
+            "bench: kiln export --dry-run took {} ms, over the {} ms gate",
+            export_median.as_millis(),
+            EXPORT_GATE.as_millis()
+        );
+        failed = true;
+    }
+    if failed {
         std::process::exit(1);
     }
 }

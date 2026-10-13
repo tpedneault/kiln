@@ -182,3 +182,98 @@ fn renumber_moves_an_id_everywhere() {
     );
     assert_eq!(kiln_in(d, &["check"]).status.code(), Some(0));
 }
+
+#[test]
+fn export_writes_markdown_and_check_notices_staleness() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    std::fs::write(
+        d.join("kiln.toml"),
+        format!("{config}\n[[export]]\nname = \"doc\"\nformat = \"markdown\"\npath = \"docs/DESIGN.md\"\n\n[[export]]\nname = \"page\"\nformat = \"html\"\nlayout = \"sections\"\npath = \"out/html\"\n"),
+    )
+    .unwrap();
+    ok(d, &["new", "requirement", "--title", "Fast"]);
+
+    let dry = ok(d, &["export", "--dry-run"]);
+    assert!(dry.contains("would create docs/DESIGN.md"), "{dry}");
+    assert!(
+        !d.join("docs/DESIGN.md").exists(),
+        "a dry run writes nothing"
+    );
+    let check = kiln_in(d, &["export", "--check"]);
+    assert_eq!(check.status.code(), Some(1));
+    assert!(stderr(&check).contains("exports are out of date"));
+
+    ok(d, &["export"]);
+    let md = std::fs::read_to_string(d.join("docs/DESIGN.md")).unwrap();
+    assert!(md.starts_with("# Demo\n"), "{md}");
+    assert!(md.contains("### 1.1 REQ-001 Fast"), "{md}");
+    assert!(d.join("out/html/index.html").is_file() && d.join("out/html/.kiln-export").is_file());
+    assert_eq!(kiln_in(d, &["export", "--check"]).status.code(), Some(0));
+
+    ok(d, &["set", "REQ-001", "status=approved"]);
+    assert_eq!(
+        kiln_in(d, &["export", "--check", "doc"]).status.code(),
+        Some(1)
+    );
+    let unknown = kiln_in(d, &["export", "nope"]);
+    assert_eq!(unknown.status.code(), Some(2));
+    assert!(stderr(&unknown).contains("no export target `nope` (doc, page)"));
+}
+
+#[test]
+fn confluence_targets_plan_from_a_snapshot_and_never_write() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    std::fs::write(
+        d.join("kiln.toml"),
+        format!("{config}\n[confluence]\nurl = \"https://confluence.example.com\"\nspace = \"DEMO\"\n\n[[export]]\nname = \"spec\"\nformat = \"confluence\"\ntitle = \"Demo design\"\n[export.confluence]\nparent = 42\n"),
+    )
+    .unwrap();
+    ok(d, &["new", "requirement", "--title", "Fast"]);
+    std::fs::write(d.join("snapshot.json"), "{\"anchorPage\": 42}\n").unwrap();
+
+    let refused = kiln_in(d, &["export"]);
+    assert_eq!(refused.status.code(), Some(2));
+    assert!(stderr(&refused).contains("publishing to Confluence arrives in K3"));
+
+    let plan = ok(d, &["export", "--dry-run", "--snapshot", "snapshot.json"]);
+    assert!(
+        plan.contains("spec (confluence, document) → space DEMO, page 42"),
+        "{plan}"
+    );
+    assert!(plan.contains("create    \"Demo design\": new"), "{plan}");
+    assert!(
+        plan.contains("1 create, 0 update, 0 unchanged, 0 drift, 0 retire"),
+        "{plan}"
+    );
+
+    let json: serde_json::Value = serde_json::from_str(&ok(
+        d,
+        &[
+            "export",
+            "--dry-run",
+            "--snapshot",
+            "snapshot.json",
+            "--format",
+            "json",
+        ],
+    ))
+    .unwrap();
+    assert_eq!(json[0]["plan"]["ops"][0]["kind"], "create");
+
+    // Without a token or snapshot a dry run says what it needs.
+    let out = Command::new(env!("CARGO_BIN_EXE_kiln"))
+        .args(["export", "--dry-run"])
+        .current_dir(d)
+        .env_remove("KILN_CONFLUENCE_TOKEN")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&out.stderr)
+        .contains("needs KILN_CONFLUENCE_TOKEN (or --snapshot FILE)"));
+}

@@ -453,3 +453,22 @@ fn severities_are_overridable() {
     let findings = check(&project, &source, TODAY);
     assert!(crate::has_errors(&findings));
 }
+
+#[test]
+fn k111_diagrams_that_dont_draw() {
+    let f = files(vec![req("REQ-001", "draft", "+++\n\n```mermaid\nflowchart TD\n  a --> b\n```\n\n```mermaid\nflowchart TD\n  a -->\n```\n")]);
+    assert_eq!(run("", &f), ["design/REQ-001.md:16:3 K111"]);
+}
+
+#[test]
+fn k112_templates_and_k005_targets() {
+    let config = "\n[[export]]\nname = \"spec\"\nformat = \"markdown\"\npath = \"out/spec.md\"\ntemplate = \"design/templates/spec.md\"\n\n[[export]]\nname = \"other\"\nformat = \"html\"\npath = \"out/o.html\"\ntemplate = \"design/templates/missing.md\"\n";
+    let f = files(vec![
+        req("REQ-001", "draft", ""),
+        ("design/templates/spec.md".into(), "# Requirements\n\n<!-- kiln:items type=\"requirement\" -->\n<!-- kiln:items type=\"epic\" -->\n".into()),
+    ]);
+    assert_eq!(
+        run(config, &f),
+        ["design/templates/spec.md:4:1 K112", "kiln.toml:1:1 K112"]
+    );
+}

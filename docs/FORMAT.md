@@ -150,8 +150,10 @@ Rules:
   else can be read without the file.
 - An invalid type, role or pattern is reported and left out; the rest of
   the file still applies, so one mistake doesn't hide the others.
-- `[confluence]` and `[[export]]` are known keys; their contents are
-  checked from K2 (K005).
+- `[confluence]` and `[[export]]` are described in EXPORT.md and
+  CONFLUENCE.md. A bad value in `[confluence]` is K002; an `[[export]]`
+  that can't work is K005 and is left out, so the other targets still
+  export.
 - An unknown key is a finding (K003), not ignored silently: typos in
   configuration should be loud.
 - `kiln.toml` never contains secrets (K004 if a key looks like
@@ -343,8 +345,10 @@ Severities: `error` (exit 1), `warning`, `off`, overridable in `[check]`.
 | K206 | warning | a milestone past its `due` date (compared with today, UTC) and neither done nor closed |
 | K207 | off | a work item `done` whose linked Jira ticket isn't resolved, or the reverse (needs the Jira mirror, K8; INTEGRATION.md) |
 
-K005, K111 and K112 are checked from K2 (exports, Mermaid, templates) and
-K207 from K8; `[check]` may name them before then.
+K207 is checked from K8 (the Jira mirror); `[check]` may name it before
+then. K111 parses each diagram with `fenix-diagram`, the renderer exports
+draw with, so a diagram that passes draws. K112 checks each target's
+template once, even when several targets share it.
 
 Output formats: `text` (`path:line:col: K102 error: REQ-099 doesn't
 exist`), `json` (an array of findings with all fields), `gitlab` (GitLab

@@ -21,6 +21,10 @@ kiln-git.workspace = true
 kiln-fenix.workspace = true
 fenix-storage.workspace = true
 serde_json.workspace = true
+kiln-export.workspace = true
+kiln-confluence.workspace = true
+kiln-secrets.workspace = true
+dirs.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

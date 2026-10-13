@@ -11,3 +11,9 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+kiln-model.workspace = true
+kiln-index.workspace = true
+pulldown-cmark.workspace = true
+regex.workspace = true
+fenix-diagram.workspace = true
+

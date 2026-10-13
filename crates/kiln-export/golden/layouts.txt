@@ -1,0 +1,18 @@
+== doc (Document)
+doc | Flint — design document | parent None | base 1 | items ["REQ-002", "REQ-001", "REQ-003", "ADR-001", "ADR-002"]
+== sections (Sections)
+doc | Flint | parent None | base 1 | items []
+section:introduction | 1 Introduction | parent Some("doc") | base 2 | items []
+section:requirements | 2 Requirements | parent Some("doc") | base 2 | items ["REQ-002", "REQ-001", "REQ-003"]
+section:decisions | 3 Decisions | parent Some("doc") | base 2 | items ["ADR-001", "ADR-002"]
+section:appendix-traceability | 4 Appendix: traceability | parent Some("doc") | base 2 | items []
+== tree (Tree)
+doc | Flint | parent None | base 1 | items []
+section:requirements | 1 Requirements | parent Some("doc") | base 2 | items []
+item:REQ-001 | REQ-001 Flint is a launcher | parent Some("section:requirements") | base 3 | items []
+item:REQ-002 | REQ-002 Fast enough to be a reflex | parent Some("item:REQ-001") | base 4 | items []
+item:REQ-003 | REQ-003 Themes follow Fenix | parent Some("item:REQ-001") | base 4 | items []
+section:decisions | 2 Decisions | parent Some("doc") | base 2 | items []
+item:ADR-002 | ADR-002 TOML front matter | parent Some("section:decisions") | base 3 | items []
+report:traceability | A Traceability | parent Some("doc") | base 2 | items []
+report:findings | B Findings | parent Some("doc") | base 2 | items []

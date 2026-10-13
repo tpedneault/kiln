@@ -57,6 +57,17 @@ pub fn load(project: Option<&Path>) -> Result<Loaded, Fail> {
     Ok(Loaded { source, project })
 }
 
+/// Kiln's own folders: `KILN_HOME`, else the platform's.
+pub fn folders() -> Option<kiln_model::Folders> {
+    let home = std::env::var_os("KILN_HOME").map(std::path::PathBuf::from);
+    let platform = kiln_model::Platform {
+        config_dir: dirs::config_dir(),
+        state_dir: dirs::state_dir(),
+        data_local_dir: dirs::data_local_dir(),
+    };
+    kiln_model::Folders::resolve(home.as_deref(), &platform)
+}
+
 /// Today in UTC, for the rules that compare dates.
 pub fn today() -> Date {
     let secs = std::time::SystemTime::now()

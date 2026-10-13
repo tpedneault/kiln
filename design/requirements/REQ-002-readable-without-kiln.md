@@ -2,7 +2,7 @@
 id = "REQ-002"
 type = "requirement"
 title = "Readable without Kiln"
-status = "approved"
+status = "implemented"
 +++
 
 The files are Markdown a person can read on GitLab or GitHub, and exports

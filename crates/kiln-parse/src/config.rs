@@ -193,6 +193,15 @@ pub fn parse_config(text: &str) -> (Option<Config>, Vec<Finding>) {
         None => BTreeMap::new(),
     };
 
+    let confluence = crate::exports::confluence(&mut w, root.get("confluence"));
+    let exports = crate::exports::exports(
+        &mut w,
+        root.get("export"),
+        &types,
+        &name,
+        confluence.as_ref(),
+    );
+
     let config = Config {
         format,
         name,
@@ -205,6 +214,8 @@ pub fn parse_config(text: &str) -> (Option<Config>, Vec<Finding>) {
         link_bare_ids,
         jira_url,
         severities,
+        confluence,
+        exports,
     };
     (Some(config), w.findings)
 }

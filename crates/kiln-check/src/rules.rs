@@ -25,7 +25,81 @@ pub fn findings(project: &Project, files: &dyn FileSource, today: Date) -> Vec<F
     code_rules(project, &mut out);
     coverage_rules(project, &mut out);
     status_rules(project, today, &mut out);
+    diagram_rules(project, &mut out);
+    template_rules(project, files, &mut out);
     out
+}
+
+/// K111: a Mermaid block that doesn't draw, on its own line.
+fn diagram_rules(project: &Project, out: &mut Vec<Finding>) {
+    for item in &project.items {
+        for (source, span) in &item.diagrams {
+            if let Some((line, column, message)) = kiln_render::diagram_error(source) {
+                let at = kiln_model::Span {
+                    start: span.start,
+                    end: span.end,
+                    line: span.line + line,
+                    column: column + 1,
+                };
+                report(
+                    out,
+                    Rule::K111,
+                    &item.path,
+                    at,
+                    format!("diagram: {message}"),
+                );
+            }
+        }
+    }
+}
+
+/// K112: each export target's template exists and its directives are
+/// valid. A template shared by several targets is checked once.
+fn template_rules(project: &Project, files: &dyn FileSource, out: &mut Vec<Finding>) {
+    let mut seen = HashSet::new();
+    for target in &project.config.exports {
+        let Some(path) = &target.template else {
+            continue;
+        };
+        if !seen.insert(path.clone()) {
+            continue;
+        }
+        let at_line = |line: u32| kiln_model::Span {
+            start: 0,
+            end: 0,
+            line,
+            column: 1,
+        };
+        let text = match files
+            .read(path)
+            .ok()
+            .and_then(|b| kiln_parse::normalize(&b))
+        {
+            Some(text) => text,
+            None => {
+                report(
+                    out,
+                    Rule::K112,
+                    kiln_parse::CONFIG_FILE,
+                    at_line(1),
+                    format!(
+                        "export `{}`: template {path} doesn't exist or isn't UTF-8",
+                        target.name
+                    ),
+                );
+                continue;
+            }
+        };
+        for problem in kiln_render::template_problems(&text, project) {
+            report(
+                out,
+                Rule::K112,
+                path,
+                at_line(problem.line),
+                problem.message,
+            );
+        }
+    }
 }
 
 fn report(out: &mut Vec<Finding>, rule: Rule, path: &str, span: kiln_model::Span, message: String) {

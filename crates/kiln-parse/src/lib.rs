@@ -21,6 +21,7 @@
 mod code;
 mod config;
 mod edit;
+mod exports;
 mod item;
 mod text;
 mod toml_walk;
