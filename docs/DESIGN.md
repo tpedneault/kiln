@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0 done (workspace, crate shells, CI); K1 next. Pinned against Fenix
+Status: K0 and K1 done (the format, `kiln check`, the editing commands, this repository's own `design/`); K2 next. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -182,8 +182,8 @@ nearest `kiln.toml` (`--project <dir>` overrides).
 | `kiln list [--type T] [--status S] [--tag X] [--format text\|json]` | items, filtered | K1 |
 | `kiln show <ID>` | one item with its computed links | K1 |
 | `kiln check [--format text\|json\|gitlab\|github]` | the rules; exit 1 on any error | K1 |
-| `kiln set <ID> status=<S>` / `link <ID> <role> <ID>` / `unlink …` | comment-preserving front-matter edits | K1 |
-| `kiln renumber <ID> --to <ID>` | moves an ID and rewrites every reference (the cure for two branches allocating the same number) | K1 |
+| `kiln set <ID> status=<S>` (also `title`, `parent`, `owner`, `due`) / `link <ID> <role> <ID>` / `unlink …` | comment-preserving front-matter edits | K1 |
+| `kiln renumber <ID> --to <ID> [--file PATH]` | moves an ID and rewrites every reference (the cure for two branches allocating the same number; `--file` picks which copy of a duplicate moves) | K1 |
 | `kiln trace [--type requirement] [--format text\|json\|csv]` | coverage: what implements and verifies each item, and the gaps | K1 |
 | `kiln impact <ID>` | everything that links to it, transitively, by path | K1 |
 | `kiln export [NAME…] --dry-run` / `--check` | renders every (or the named) export target and shows what would change; `--check` exits 1 if anything would | K2 |
@@ -220,7 +220,9 @@ in detail when K6 is done; nothing before it depends on it.
 | `kiln export --dry-run` of a 2,000-item document | ≤ 3 s, excluding diagram rasterisation, which is cached by source hash |
 
 A benchmark on a generated project runs in CI from K1, as Flint's index
-benchmark does.
+benchmark does: `crates/kiln-check/examples/bench.rs`, gating at 50% over
+the `kiln check` budget (CI.md). It measures with a warm file cache; the
+cold figure is for a person to check on a laptop.
 
 ## Security
 

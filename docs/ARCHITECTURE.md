@@ -5,10 +5,11 @@ Where Kiln's code lives and which way its dependencies point.
 map of the workspace that does it, and is updated whenever a crate gains
 a role or a dependency.
 
-Status: K0. Every crate below exists with its module header (what it is
-for, what it deliberately doesn't do, the milestone that fills it in)
-and no code yet, except the `kiln` binary, which has `--help` and
-`--version`.
+Status: K1. The format crates (`kiln-model`, `kiln-parse`, `kiln-index`,
+`kiln-check`), `kiln-git` (the commit id), `kiln-fenix` (opening a file)
+and the binary's K1 commands are built. The other crates are shells with
+their module header (what each is for, what it deliberately doesn't do,
+the milestone that fills it in).
 
 ## Layout
 
@@ -17,18 +18,18 @@ Cargo.toml            the workspace: members, shared package metadata,
                       every external dependency (and later the Fenix and
                       Flint pins), lints
 clippy.toml           test-only lint relaxations
+kiln.toml, design/    Kiln's own Kiln project, checked in CI (K1 dogfooding)
 crates/kiln-*/        library crates, one role each
-crates/kiln/          the binary
+crates/kiln/          the binary: src/cmd/ has one module per command
+crates/kiln-check/examples/bench.rs   the benchmark gate
 scripts/ci.ps1        the gates, locally and in CI (CI.md)
 .github/workflows/    CI on Windows and Linux
 docs/                 design (DESIGN, FORMAT, EXPORT, CONFLUENCE,
                       INTEGRATION) and user docs (CLI, later CONFIGURATION)
 ```
 
-From K1 the repository also holds its own Kiln project (`kiln.toml`,
-`design/`), checked by `kiln check` in CI; from K2 a template under
-`design/templates/` and a committed Markdown export kept current by
-`kiln export --check`.
+From K2 the repository also holds a template under `design/templates/`
+and a committed Markdown export kept current by `kiln export --check`.
 
 ## Crates
 
@@ -37,21 +38,21 @@ tests; logic in pure crates, I/O only in the crates whose role is I/O.
 "Pure" means no file system, network, process, clock or environment
 access except through a value or trait the caller passes in.
 
-| Crate | Role | Pure? | Filled in |
+| Crate | Role | Pure? | Built in |
 |---|---|---|---|
-| `kiln-model` | `kiln.toml` schema, `ItemId`, `Item`, `Link`, `Finding`; Kiln's folders | yes | K1 |
-| `kiln-parse` | front matter and `kiln.toml` with spans (`toml_edit`), references in bodies and code | yes | K1 |
-| `kiln-index` | the loaded project: walk, parse, graph, queries, incremental update | yes, given a file-source trait | K1 |
+| `kiln-model` | `kiln.toml` schema, `ItemId`, `Item`, `Ref`, `CodeRef`, `Finding`, the rules; Kiln's folders | yes | K1 (folders when something keeps state, K3) |
+| `kiln-parse` | front matter and `kiln.toml` with spans (`toml_edit`), references in bodies (`pulldown-cmark`) and code (`regex`), comment-preserving edits | yes | K1 |
+| `kiln-index` | the loaded project: walk (`ignore`), parse in parallel (`rayon`), graph, queries, renumber plans; incremental update | yes, given a file-source trait | K1 (incremental, K4) |
 | `kiln-check` | the FORMAT.md rules and their output formats | yes | K1 |
 | `kiln-render` | Markdown → document tree; report builders | yes | K2 |
 | `kiln-export` | targets, templates, assembly, layouts, diagrams, Markdown and HTML | yes, except writing files | K2 |
 | `kiln-confluence` | storage emitter, normaliser, planner, client, apply | emitter and planner yes; client no | K2 (read), K3 (write) |
-| `kiln-git` | commits, dirty state, last commit per file, shallow detection, revisions | no (shells out to `git`) | K1, K2, K6 |
+| `kiln-git` | the current commit; later dirty state, last commit per file, shallow detection, revisions | no (shells out to `git`) | K1, K2, K6 |
 | `kiln-lsp` | `kiln lsp` | no | K4 |
 | `kiln-flint` | `kiln provider` | no | K5 |
 | `kiln-fenix` | Fenix control channel: open at a line, agenda | no | K1 (`new --open`), K5 |
 | `kiln-secrets` | tokens from the environment or the OS credential store | no | K3 |
-| `kiln` | the binary: `clap` CLI, exit codes, project discovery | no | K0 onward |
+| `kiln` | the binary: `clap` CLI, exit codes, project discovery, reading and writing files | no | K0 onward |
 | `kiln-gui` | the GUI | no | K7 (not in the workspace until then) |
 
 `kiln-gui` is deliberately absent rather than an empty shell: it is the
@@ -111,14 +112,34 @@ crate nothing compiles:
 
 | Crate | Used by | From |
 |---|---|---|
-| `fenix-storage` | atomic writes (`kiln set`, `new`, exports) | K1 |
-| `fenix-control` | `kiln-fenix` | K1 |
+| `fenix-storage` | atomic writes (`kiln`: `set`, `new`, `link`, `renumber`; exports from K2) | K1, added |
+| `fenix-control` | `kiln-fenix` (`kiln new --open`) | K1, added |
 | `fenix-diagram` | `kiln-export` | K2 |
 | `flint-protocol` | `kiln-flint` | K5 |
 | `fenix-keymap` | `kiln-gui` | K7 |
 | `fenix-jira` | the Jira mirror | K8 |
 
 Never `fenix-gui`, `fenix-project` or `fenix-notebook`.
+
+## How a command runs
+
+```
+kiln <command>
+  └─ project::load ── find_root (walk up to kiln.toml)
+       └─ Project::load(DiskSource)           kiln-index
+            ├─ parse_config                   kiln-parse   → K001–K004
+            ├─ list + parse_item, in parallel kiln-parse   → K100, K104
+            └─ list + scan_code, in parallel  kiln-parse
+  └─ query or check                           kiln-index / kiln-check
+  └─ edit: plan (pure) → read, check stamp, splice/toml_edit, write atomically
+```
+
+Every producer emits findings at its rule's default severity;
+`kiln_check::check` applies `[check]` once and sorts. Edits are pure
+text-to-text functions in `kiln-parse` (or plans in `kiln-index`); only
+the binary touches the disk, through `project::write_back`, which refuses
+a file whose length or modification time changed since it was read and
+restores the file's line ending and byte-order mark.
 
 ## Lints and conventions in code
 

@@ -21,7 +21,8 @@ paths = ["design"]               # where items live (relative, inside the projec
 # Where source code is scanned for code references (see below).
 [code]
 paths = ["crates", "examples"]
-patterns = ["(?:implements|verifies|satisfies):\\s*(?P<ids>[A-Z][A-Z0-9]*-\\d+(?:\\s*,\\s*[A-Z][A-Z0-9]*-\\d+)*)"]
+exclude = ["crates/*/tests/fixtures"]   # optional; gitignore-style globs
+patterns = ["(?:implements|verifies):\\s*(?P<ids>[A-Z][A-Z0-9]*-\\d+(?:\\s*,\\s*[A-Z][A-Z0-9]*-\\d+)*)"]
 
 # How a file in the repo is linked on the web; {commit}, {path}, {line}.
 [repository]
@@ -29,13 +30,14 @@ web = "https://gitlab.example.com/team/flint/-/blob/{commit}/{path}#L{line}"
 
 [types.requirement]
 prefix = "REQ"
-title = "Requirement"            # display name; plural adds "s" unless `plural` is set
+title = "Requirement"            # display name; default: the name, capitalised
+plural = "Requirements"          # default: `title` plus "s"
 statuses = ["draft", "proposed", "approved", "implemented", "verified", "obsolete"]
-initial = "draft"
+initial = "draft"                # what `kiln new` writes; default: the first status
 done = ["verified"]              # statuses that count as finished for progress
 closed = ["obsolete"]            # statuses excluded from coverage and progress
 parents = ["requirement"]        # types allowed as `parent`
-template = "templates/requirement.md"   # optional; relative to the project
+template = "templates/requirement.md"   # optional: the body of a new item (`kiln new`)
 
 [types.design]
 prefix = "DES"
@@ -130,13 +132,26 @@ format = "confluence"
 
 Rules:
 
-- `format`, `name` and at least one `[types.*]` are required. `kiln init`
-  writes the defaults above.
+- `format`, `name` and at least one `[types.*]` are required. `paths`
+  defaults to `["design"]`; a listed folder that doesn't exist is K002.
+  `kiln init` writes the defaults above (without `[code]`, which only the
+  project knows).
+- A newer `format` than Kiln reads is refused, naming the fix ("update
+  Kiln"); nothing else is read from that file.
 - A type name, a link role and a status are lowercase ASCII words with
   `-`. `code` is a reserved pseudo-type for code references; it can only
   appear in `from`.
 - Prefixes are uppercase ASCII letters and digits, starting with a letter,
   unique across types.
+- Paths (`paths`, `code.paths`, `template`) are relative and stay inside
+  the project: an absolute path or any `..` is K002.
+- `[check]` keys are rule codes; an unknown code or a severity other than
+  `error`, `warning`, `off` is K002. K001 can't be turned off: nothing
+  else can be read without the file.
+- An invalid type, role or pattern is reported and left out; the rest of
+  the file still applies, so one mistake doesn't hide the others.
+- `[confluence]` and `[[export]]` are known keys; their contents are
+  checked from K2 (K005).
 - An unknown key is a finding (K003), not ignored silently: typos in
   configuration should be loud.
 - `kiln.toml` never contains secrets (K004 if a key looks like
@@ -186,8 +201,8 @@ the rest of the suite; and because it has no implicit typing surprises.
 
 | Key | Type | Required | Meaning |
 |---|---|---|---|
-| `id` | string | yes | `PREFIX-N`, N a positive integer without leading zeros. Authoritative: the file name is not. |
-| `type` | string | yes | a `[types.*]` name; must match the ID's prefix |
+| `id` | string | yes | `PREFIX-N`, N a positive integer written with at least three digits, zero-padded (`REQ-007`, `REQ-014`, `REQ-1000`). Exactly one spelling per number: `REQ-7` and `REQ-0014` are not IDs (see "IDs"). Authoritative: the file name is not. |
+| `type` | string | yes | a `[types.*]` name (else K104); must match the ID's prefix (else K106) |
 | `title` | string | yes | one line, ≤ 200 characters |
 | `status` | string | yes | one of the type's statuses |
 | `parent` | string | no | an item ID of an allowed parent type |
@@ -216,10 +231,10 @@ CommonMark plus GitHub tables, task lists and strikethrough
 |---|---|
 | `[[REQ-014]]` | a reference to an item, rendered as its ID and title, linked |
 | `[[REQ-014\|custom text]]` | the same with custom text |
-| a bare `REQ-014` in prose | a reference too, when `[render] link_bare_ids = true` (default `true`); never inside code |
+| a bare `REQ-014` in prose | a reference too, when `[render] link_bare_ids = true` (default `true`): only with a prefix declared in `kiln.toml` (so `UTF-8` or a Jira key is not one), only as a whole word (not inside `X-REQ-014` or `REQ-014-title.md`), never inside code spans, code blocks or HTML |
 | ` ```mermaid ` fenced block | a diagram, rendered with `fenix-diagram` |
 | `> [!NOTE]`, `[!TIP]`, `[!WARNING]`, `[!CAUTION]`, `[!IMPORTANT]` | a callout (GitHub's syntax) |
-| relative link or image (`../img/x.png`) | a file in the repo; must exist (K110) |
+| relative link or image (`../img/x.png`) | a file in the repo, relative to the item's folder (`/x` is from the project root); must exist and stay inside the project (K110). URLs, `mailto:` and `#anchors` are not checked |
 
 Raw HTML in a body is shown as text, never passed through.
 
@@ -230,6 +245,11 @@ reference, which are deliberate.
 
 ## IDs
 
+- Written with at least three digits, zero-padded, and exactly one
+  spelling per number: `REQ-007`, `REQ-014`, `REQ-999`, `REQ-1000`. An ID
+  found by `grep` is the ID in the file, and IDs sort the same as text and
+  as numbers up to 999. Another spelling (`REQ-7`, `REQ-0014`) in front
+  matter is K104 and in a reference K102, each naming the right one.
 - Allocated by `kiln new` as the highest existing number for that prefix
   plus one, across all items including obsolete ones (IDs are never
   reused).
@@ -244,11 +264,14 @@ reference, which are deliberate.
 
 ## Code references
 
-Source files under `[code] paths` (respecting `.gitignore`) are scanned for
-the configured `patterns`. Each pattern must have a named group `ids`
-holding one or more IDs separated by commas; the word before the colon
-must be a link role whose `from` includes `code`. A match makes the code
-location (`path:line`) the source of that link:
+Source files under `[code] paths` (respecting `.gitignore`, minus the
+`exclude` globs) are scanned for the configured `patterns`. Each pattern
+must have a named group `ids` holding one or more IDs separated by
+commas; the word just before the colon that precedes `ids` is the link
+role, which must be one whose `from` includes `code` (else K108). Without
+`patterns`, the default matches `<role>: ID[, ID…]` for every role whose
+`from` includes `code`. A match makes the code location (`path:line`) the
+source of that link:
 
 ```rust
 // implements: REQ-014
@@ -267,8 +290,11 @@ proc test_tm_rate {} { … }
 Only comment text is meaningful to people, but Kiln matches whole lines
 and does not parse languages: a match inside a string literal counts. That
 keeps the scanner language-agnostic and fast; the pattern's role word and
-colon make accidental matches rare. Binary files and files over 2 MiB are
-skipped.
+colon make accidental matches rare. Binary files (a NUL byte in the first
+8 KiB) and files over 2 MiB are skipped; item files under `paths` are never
+scanned as code. A file that isn't UTF-8 is scanned with invalid bytes
+replaced, and `kiln renumber` leaves its references alone. `exclude` is
+for files holding code references on purpose, such as test fixtures.
 
 ## The model Kiln computes
 
@@ -279,9 +305,10 @@ skipped.
   links to it with that role. Children count: a requirement is covered
   when it is covered itself or all its non-closed children are.
 - **Progress** of a milestone: done ÷ (all − closed) over items that are
-  `part-of` it, recursively through `depends-on` milestones.
+  `part-of` it or any milestone it `depends-on`, transitively.
 - **Impact** of an item: every item and code location that reaches it by
-  any link or parent edge, with the path, breadth first.
+  any link or parent edge (a child reaches its parent), with the path,
+  breadth first.
 
 ## Check rules
 
@@ -296,30 +323,34 @@ Severities: `error` (exit 1), `warning`, `off`, overridable in `[check]`.
 | K004 | error | something that looks like a secret in `kiln.toml` |
 | K005 | error | an `[[export]]` target is invalid: unknown format or layout, duplicate name, `page =` with a layout other than `document`, a file format without `path`, a Confluence target without the `[confluence]` keys it needs, a `link_to` naming no target |
 | K100 | error | front matter can't be parsed |
-| K101 | error | duplicate ID |
-| K102 | error | reference to an ID that doesn't exist (front matter, body, code) |
+| K101 | error | duplicate ID (on every copy, naming the others and the `kiln renumber` that fixes it) |
+| K102 | error | reference to an ID that doesn't exist, or that isn't written as an ID (front matter, body, code) |
 | K103 | error | `parent` cycle |
-| K104 | error | unknown front-matter key, missing required key, wrong value type |
+| K104 | error | unknown front-matter key, missing required key, wrong value type, a `type` not in `kiln.toml`, an `id` not spelt as an ID, a title over 200 characters or on several lines, a tag with uppercase letters |
 | K105 | warning | file name doesn't start with the ID |
 | K106 | warning | ID prefix doesn't match `type` |
 | K107 | error | status not allowed for the type |
-| K108 | error | link role not allowed from this type or to the target's type; `parent` of a disallowed type |
+| K108 | error | link role not declared, not allowed from this type (or from code) or to the target's type; `parent` of a disallowed type |
 | K109 | warning | a link is written on its inverse side (e.g. `verified-by` in a requirement) |
 | K110 | error | relative link or image to a file that doesn't exist |
 | K111 | error | a Mermaid block fails to parse (the diagram's own line and message) |
 | K112 | error | an export template is invalid: unknown directive or attribute, unknown type, status or ID, a template file that doesn't exist |
-| K201 | warning | a non-draft requirement with no `verifies` coverage |
-| K202 | warning | a non-draft requirement with no `implements` coverage |
+| K201 | warning | a requirement past its type's `initial` status (non-draft, by default) and not closed, with no `verifies` coverage |
+| K202 | warning | the same with no `implements` coverage |
 | K203 | warning | a non-closed item links to a closed one (e.g. implements an obsolete requirement) |
 | K204 | warning | a decision with status `superseded` that nothing `supersedes` |
 | K205 | warning | status `verified` but no passing `verifies` source (a test item with status `passing`, or a code reference) |
-| K206 | warning | a milestone past its `due` date and not done |
+| K206 | warning | a milestone past its `due` date (compared with today, UTC) and neither done nor closed |
 | K207 | off | a work item `done` whose linked Jira ticket isn't resolved, or the reverse (needs the Jira mirror, K8; INTEGRATION.md) |
+
+K005, K111 and K112 are checked from K2 (exports, Mermaid, templates) and
+K207 from K8; `[check]` may name them before then.
 
 Output formats: `text` (`path:line:col: K102 error: REQ-099 doesn't
 exist`), `json` (an array of findings with all fields), `gitlab` (GitLab
 Code Quality report JSON, so findings show on merge requests), `github`
-(`::error file=…,line=…::` workflow commands).
+(`::error file=…,line=…::` workflow commands). Findings are sorted by
+file, line, column and rule.
 
 ## Edits Kiln makes
 
@@ -328,11 +359,16 @@ Flint provider are the only writers. They:
 
 - change only the front-matter keys they are about, through `toml_edit`,
   so comments, ordering and spacing survive;
-- write atomically (`fenix_storage::write`);
+- write atomically (`fenix_storage::write`), with the file's own line
+  ending (judged by its first line) and byte-order mark;
 - refuse when the file changed on disk since it was read (mtime and
   length), so an editor's unsaved buffer and Kiln never silently fight;
-- never touch the body, except `renumber`, which rewrites the ID text and
-  nothing else.
+- never touch the body, except `renumber`, which rewrites the ID text of
+  every reference Kiln counts (front matter, mentions, code references)
+  and nothing else; text inside code spans isn't a reference and stays.
+  When the ID is duplicated, references can't say which item they meant:
+  only the chosen file's own ID and name change, and the references are
+  listed for a person to check.
 
 ## Versioning
 

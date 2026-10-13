@@ -11,3 +11,10 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+kiln-model.workspace = true
+kiln-parse.workspace = true
+ignore.workspace = true
+rayon.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

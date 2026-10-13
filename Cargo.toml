@@ -33,7 +33,26 @@ publish = false
 # `rev`, only those DESIGN.md lists, added by the milestone that first uses
 # them (DESIGN.md, "Dependencies on Fenix and Flint crates").
 [workspace.dependencies]
+kiln-model = { path = "crates/kiln-model" }
+kiln-parse = { path = "crates/kiln-parse" }
+kiln-index = { path = "crates/kiln-index" }
+kiln-check = { path = "crates/kiln-check" }
+kiln-git = { path = "crates/kiln-git" }
+kiln-fenix = { path = "crates/kiln-fenix" }
+
 clap = { version = "4.5", features = ["derive"] }
+ignore = "0.4"
+pulldown-cmark = { version = "0.13", default-features = false }
+rayon = "1"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+# The same minor as `fenix-storage`, so the build carries one copy.
+toml_edit = "0.22"
+
+fenix-storage = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
+fenix-control = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
 
 [workspace.lints.rust]
 # Nothing Kiln does needs `unsafe`. Denied rather than forbidden so a
