@@ -480,3 +480,51 @@ fn lsp_speaks_the_protocol_on_stdio() {
     drop(stdin);
     assert!(child.wait().unwrap().success());
 }
+
+#[test]
+fn provider_says_hello_and_registers_the_items() {
+    use std::io::{BufRead, BufReader, Read, Write};
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["new", "requirement", "--title", "Fast"]);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_kiln"))
+        .args(["provider", "--project"])
+        .arg(d)
+        .current_dir(d)
+        .env("KILN_HOME", d.join("kiln-home"))
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("kiln provider starts");
+    let mut stdin = child.stdin.take().unwrap();
+    let mut out = BufReader::new(child.stdout.take().unwrap());
+    let mut read = || -> serde_json::Value {
+        let mut length = 0;
+        loop {
+            let mut line = String::new();
+            out.read_line(&mut line).unwrap();
+            if line == "\r\n" {
+                break;
+            }
+            if let Some(n) = line.strip_prefix("Content-Length: ") {
+                length = n.trim().parse().unwrap();
+            }
+        }
+        let mut body = vec![0; length];
+        out.read_exact(&mut body).unwrap();
+        serde_json::from_slice(&body).unwrap()
+    };
+    let hello = read();
+    assert_eq!(hello["method"], "hello");
+    assert_eq!(hello["params"]["name"], "kiln");
+    let answer = serde_json::json!({"jsonrpc": "2.0", "id": hello["id"], "result": {"protocol": 1, "host": {"name": "flint", "version": "0.1.0", "pid": 1}}}).to_string();
+    write!(stdin, "Content-Length: {}\r\n\r\n{answer}", answer.len()).unwrap();
+    stdin.flush().unwrap();
+    let register = read();
+    assert_eq!(register["method"], "provider/register");
+    assert_eq!(register["params"]["items"][0]["title"], "REQ-001 Fast");
+    // Flint closes stdin when it stops: the provider exits.
+    drop(stdin);
+    assert!(child.wait().unwrap().success());
+}

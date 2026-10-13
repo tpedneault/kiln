@@ -77,23 +77,14 @@ pub fn today() -> Date {
     Date::from_unix_days((secs / 86_400) as i64)
 }
 
-/// A file read for editing: its bytes and stamp at the time.
-pub struct ReadFile {
-    pub bytes: Vec<u8>,
-    pub stamp: Stamp,
-}
+pub use kiln_index::ReadFile;
 
 pub fn read_for_edit(path: &Path) -> Result<ReadFile, Fail> {
-    let stamp = Stamp::of(path).map_err(|e| Fail::usage(format!("{}: {e}", path.display())))?;
-    let bytes = std::fs::read(path).map_err(|e| Fail::usage(format!("{}: {e}", path.display())))?;
-    Ok(ReadFile { bytes, stamp })
+    kiln_index::read_for_edit(path).map_err(|e| Fail::usage(e.to_string()))
 }
 
-/// Writes `text` (normalised `\n` text for item files, or raw text for
-/// code files) over `path` atomically, with the file's own line ending
-/// and byte-order mark, refusing when the file changed since `stamp`
+/// [`kiln_index::write_back`], with a file changed on disk exiting 1
 /// (FORMAT.md, "Edits Kiln makes").
-// implements: REQ-013
 pub fn write_back(
     path: &Path,
     rel: &str,
@@ -102,25 +93,10 @@ pub fn write_back(
     text: &str,
     normalised: bool,
 ) -> Result<(), Fail> {
-    let now = Stamp::of(path).map_err(|e| Fail::usage(format!("{rel}: {e}")))?;
-    if now != stamp {
-        return Err(Fail::new(
-            EXIT_FINDINGS,
-            format!("{rel} changed on disk since Kiln read it (an editor's save?); nothing was written to it, run the command again"),
-        ));
-    }
-    let mut out = Vec::new();
-    if normalised {
-        if original.starts_with(b"\xef\xbb\xbf") {
-            out.extend_from_slice(b"\xef\xbb\xbf");
-        }
-        out.extend_from_slice(
-            kiln_parse::denormalize(text, kiln_parse::uses_crlf(original)).as_bytes(),
-        );
-    } else {
-        out.extend_from_slice(text.as_bytes());
-    }
-    fenix_storage::write(path, &out).map_err(|e| Fail::usage(format!("{rel}: can't write it: {e}")))
+    kiln_index::write_back(path, rel, original, stamp, text, normalised).map_err(|e| match e {
+        kiln_index::WriteError::Changed(m) => Fail::new(EXIT_FINDINGS, m),
+        kiln_index::WriteError::Io(m) => Fail::usage(m),
+    })
 }
 
 /// `path` relative to `root` with `/`, for messages.

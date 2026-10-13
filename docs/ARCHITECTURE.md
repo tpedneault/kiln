@@ -5,14 +5,12 @@ Where Kiln's code lives and which way its dependencies point.
 map of the workspace that does it, and is updated whenever a crate gains
 a role or a dependency.
 
-Status: K4. The format crates (`kiln-model`, `kiln-parse`, `kiln-index`,
+Status: K5. The format crates (`kiln-model`, `kiln-parse`, `kiln-index`,
 `kiln-check`), the export crates (`kiln-render`, `kiln-export`,
 `kiln-confluence` with publishing), `kiln-git`, `kiln-secrets` (environment
 variables and the OS credential store through `keyring`), `kiln-fenix`
-(opening a file), `kiln-lsp` and the binary's K1–K4 commands are built.
-`kiln-flint` is a shell with its
-module header (what each is for, what it deliberately doesn't do, the
-milestone that fills it in).
+(opening a file, clocking in, opening a URL), `kiln-lsp`, `kiln-flint` and
+the binary's K1–K5 commands are built.
 
 ## Layout
 
@@ -52,8 +50,8 @@ access except through a value or trait the caller passes in.
 | `kiln-confluence` | storage emitter, normaliser, desired pages, planner, snapshots, the client (`ureq`); apply | emitter, normaliser and planner yes; client no | K2 (read), K3 (write) |
 | `kiln-git` | the current commit; later dirty state, last commit per file, shallow detection, revisions | no (shells out to `git`) | K1, K2, K6 |
 | `kiln-lsp` | `kiln lsp`: the protocol (`lsp-server`, `lsp-types`), open documents layered over the disk, features as functions of the project and a position, a thread watching the disk | no | K4 |
-| `kiln-flint` | `kiln provider` | no | K5 |
-| `kiln-fenix` | Fenix control channel: open at a line, agenda | no | K1 (`new --open`), K5 |
+| `kiln-flint` | `kiln provider`: items and drill-downs as pure functions of the project (`items`), Confluence page lookup, the protocol loop with project following and polling | no | K5 |
+| `kiln-fenix` | Fenix control channel: open at a line, clock in on an agenda task by Jira key; opening a URL with the OS | no | K1 (`new --open`), K5 |
 | `kiln-secrets` | tokens from the environment (K2) or the OS credential store (K3); a `Token` that never formats | no | K2, K3 |
 | `kiln` | the binary: `clap` CLI, exit codes, project discovery, reading and writing files | no | K0 onward |
 | `kiln-gui` | the GUI | no | K7 (not in the workspace until then) |
@@ -78,7 +76,7 @@ needs it lands):
 | `kiln-confluence` | `kiln-model`, `kiln-index`, `kiln-render`, `kiln-export`, `kiln-secrets` |
 | `kiln-git`, `kiln-secrets`, `kiln-fenix` | `kiln-model` at most |
 | `kiln-lsp` | `kiln-model`, `kiln-parse`, `kiln-index`, `kiln-check` |
-| `kiln-flint` | `kiln-model`, `kiln-index`, `kiln-fenix`, `kiln-confluence` and `kiln-secrets` ("Open in Confluence") |
+| `kiln-flint` | `kiln-model`, `kiln-parse` (the status edit), `kiln-index`, `kiln-fenix`, `kiln-confluence` and `kiln-secrets` ("Open in Confluence") |
 | `kiln` | all of them |
 
 The rules:
@@ -115,10 +113,10 @@ crate nothing compiles:
 
 | Crate | Used by | From |
 |---|---|---|
-| `fenix-storage` | atomic writes (`kiln`: `set`, `new`, `link`, `renumber`; exports from K2) | K1, added |
+| `fenix-storage` | atomic writes (`kiln-index`'s `write_back` for `set`, `link`, `renumber` and the Flint provider; `kiln new`; exports from K2) | K1, added |
 | `fenix-control` | `kiln-fenix` (`kiln new --open`) | K1, added |
 | `fenix-diagram` | `kiln-render` (validation), `kiln-export` (pictures) | K2, added |
-| `flint-protocol` | `kiln-flint` | K5 |
+| `flint-protocol` | `kiln-flint`; the benchmark (`kiln-check`'s example, for the message limit) | K5, added |
 | `fenix-keymap` | `kiln-gui` | K7 |
 | `fenix-jira` | the Jira mirror | K8 |
 

@@ -207,6 +207,15 @@ enum Command {
     },
     /// Language server on stdin and stdout, for Fenix or any LSP editor.
     Lsp,
+    /// Flint provider on stdin and stdout: items, drill-downs, actions.
+    Provider {
+        /// The provider's name in Flint's settings.toml `[[providers]]`.
+        #[arg(long, default_value = "kiln")]
+        name: String,
+        /// The scope keyword to ask Flint for.
+        #[arg(long, default_value = "k")]
+        prefix: String,
+    },
     /// Store a token in the OS credential store, prompting without echo.
     Auth {
         #[command(subcommand)]
@@ -238,6 +247,15 @@ fn main() -> ExitCode {
     let project = cli.project.as_deref();
     let result = match cli.command {
         Command::Init { name, fenix } => cmd::init::run(project, name, fenix),
+        Command::Provider { name, prefix } => kiln_flint::serve_stdio(kiln_flint::Options {
+            name,
+            prefix,
+            pinned: project.map(PathBuf::from),
+            start: std::env::current_dir().ok(),
+            state: project::folders().map(|f| f.state),
+        })
+        .map(|()| 0)
+        .map_err(|e| Fail::new(EXIT_USAGE, format!("provider: {e}"))),
         Command::Lsp => kiln_lsp::serve_stdio(project::today)
             .map(|()| 0)
             .map_err(|e| Fail::new(EXIT_USAGE, format!("lsp: {e}"))),

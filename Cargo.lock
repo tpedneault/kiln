@@ -680,7 +680,7 @@ name = "fenix-control"
 version = "1.0.0"
 source = "git+https://github.com/tpedneault/fenix?rev=ce118a2af1a0b70733d0a2dd426f94365cf5eb1a#ce118a2af1a0b70733d0a2dd426f94365cf5eb1a"
 dependencies = [
- "fenix-rpc",
+ "fenix-rpc 1.0.0 (git+https://github.com/tpedneault/fenix?rev=ce118a2af1a0b70733d0a2dd426f94365cf5eb1a)",
  "libc",
  "serde",
  "serde_json",
@@ -696,6 +696,11 @@ dependencies = [
  "resvg",
  "serde_json",
 ]
+
+[[package]]
+name = "fenix-rpc"
+version = "1.0.0"
+source = "git+https://github.com/tpedneault/fenix?rev=899507281efcb3769cc7f941d1b1c00b8558b96e#899507281efcb3769cc7f941d1b1c00b8558b96e"
 
 [[package]]
 name = "fenix-rpc"
@@ -730,6 +735,16 @@ dependencies = [
  "crc32fast",
  "miniz_oxide 0.9.1",
  "zlib-rs",
+]
+
+[[package]]
+name = "flint-protocol"
+version = "0.1.0"
+source = "git+https://github.com/tpedneault/flint?rev=eb23547eb5939a52b8de06c298271ce4c8604927#eb23547eb5939a52b8de06c298271ce4c8604927"
+dependencies = [
+ "fenix-rpc 1.0.0 (git+https://github.com/tpedneault/fenix?rev=899507281efcb3769cc7f941d1b1c00b8558b96e)",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1124,6 +1139,7 @@ dependencies = [
  "kiln-confluence",
  "kiln-export",
  "kiln-fenix",
+ "kiln-flint",
  "kiln-git",
  "kiln-index",
  "kiln-lsp",
@@ -1138,7 +1154,9 @@ dependencies = [
 name = "kiln-check"
 version = "0.1.0"
 dependencies = [
+ "flint-protocol",
  "kiln-export",
+ "kiln-flint",
  "kiln-index",
  "kiln-model",
  "kiln-parse",
@@ -1188,6 +1206,20 @@ dependencies = [
 [[package]]
 name = "kiln-flint"
 version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "fenix-storage",
+ "flint-protocol",
+ "kiln-confluence",
+ "kiln-fenix",
+ "kiln-index",
+ "kiln-model",
+ "kiln-parse",
+ "kiln-secrets",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
 
 [[package]]
 name = "kiln-git"
@@ -1200,6 +1232,7 @@ dependencies = [
 name = "kiln-index"
 version = "0.1.0"
 dependencies = [
+ "fenix-storage",
  "ignore",
  "kiln-model",
  "kiln-parse",

@@ -20,7 +20,7 @@ workspace; Kiln has no crate that needs a display before K7.
 | tests | `cargo test --locked --workspace --no-fail-fast` |
 | dogfood | `kiln check` on this repository's own `kiln.toml` and `design/` (errors fail; warnings are listed) |
 | dogfood export | `kiln export --check`: `docs/generated/DESIGN.md` is what `kiln export` would write now |
-| benchmark | `cargo run --release -p kiln-check --example bench -- --gate`: `kiln check` on a generated 2,000-item, 50,000-file project, failing above 3 s (50% over the 2 s budget); `kiln export --dry-run` of that project as one document, failing above 4.5 s (50% over 3 s); and a hundred keystrokes in one item file, each re-read alone and the project checked again as `kiln lsp` does, failing when the p95 is above 75 ms (50% over 50 ms) |
+| benchmark | `cargo run --release -p kiln-check --example bench -- --gate`: `kiln check` on a generated 2,000-item, 50,000-file project, failing above 3 s (50% over the 2 s budget); `kiln export --dry-run` of that project as one document, failing above 4.5 s (50% over 3 s); and a hundred keystrokes in one item file, each re-read alone and the project checked again as `kiln lsp` does, failing when the p95 is above 75 ms (50% over 50 ms); and the Flint provider's drill-down answers (`status`, `impact`, `all`), failing when the p95 is above 24 ms (50% over 16 ms) or the 2,000 static items come within 64 KiB of Flint's 4 MiB message limit |
 
 | Job | Runner | Notes |
 |---|---|---|
@@ -39,7 +39,9 @@ are compared byte for byte; after a deliberate change run the tests with
 against an in-process fake server on a local port; nothing in CI talks to
 a real Confluence. The language server is tested through `lsp-server`'s
 in-memory connection, and once as a process over stdio; one test waits
-about 3 s for its disk watcher.
+about 3 s for its disk watcher. The Flint provider is tested with the test
+as Flint over in-process pipes, using `flint-protocol`'s framing and
+types, and once as a process.
 
 ## Run locally
 

@@ -212,10 +212,18 @@ command = ["kiln", "provider"]
 prefix = "k"
 ```
 
-- **Which project**: the one in the query's `context.fenix.project` when it
-  contains a `kiln.toml`; otherwise the last project used (Kiln's state
-  folder); `--project <dir>` pins one. The provider keeps one index per
-  project root and watches it for changes, so items stay current.
+(`kiln provider --name … --prefix …` when the entry uses another name or
+scope keyword: `hello` must repeat the name, and the drill-down actions
+type the keyword.)
+
+- **Which project**: `--project <dir>` pins one. Otherwise the one in the
+  query's `context.fenix.project` (or `file`) when a `kiln.toml` is at or
+  above it, remembered in Kiln's state folder (`flint-project`) for the
+  next start; otherwise the last one remembered; otherwise the folder the
+  provider started in. One project is loaded at a time; following Fenix to
+  another loads it and replaces the items. Item files and `kiln.toml` are
+  checked for changes every 2 s, so items stay current (Flint sends no
+  file events; the provider polls, as `kiln lsp` does).
 - **Items**: registered as **static items** (Flint matches and ranks them,
   so queries cost no round trip), replaced with `provider/setItems` when
   the index changes, at most every 250 ms. The provider is also `dynamic`,
@@ -224,9 +232,13 @@ prefix = "k"
   Flint nothing beyond its own matching. One item per non-closed item
   (closed ones through `k all `): title `REQ-014 Flint appears within 50
   ms…`, subtitle `requirement · approved · under REQ-002`, keywords the
-  tags and Jira keys, icon `task` for work items, `note` for decisions,
-  `ticket` for anything else until Flint has better icons (Flint's icon
-  set is fixed; a `requirement` icon would be a Flint addition).
+  tags and Jira keys, icon `task` for tasks and milestones, `note` for
+  decisions and designs, `ticket` for anything else until Flint has better
+  icons (Flint's icon set is fixed; a `requirement` icon would be a Flint
+  addition). Every item is in one `provider/setItems` message, under
+  Flint's 4 MiB limit: 2,000 items are about 1.6 MiB; past roughly 4,500
+  open items the provider registers the first ones and logs that the rest
+  are behind `all`.
 - **Item ids**: `kiln:<project name>:<ID>`, stable, for Flint's frecency.
 - **Actions**, first is `Enter`:
 
@@ -237,18 +249,27 @@ prefix = "k"
 | Copy reference `[[REQ-014]]` | `copy` |
 | Set status… | `query` drill-down to `k status REQ-014 ` listing the statuses, each `provider` → `execute` → front-matter edit; `message` "REQ-014 → verified" |
 | Show what depends on it | `query` drill-down to `k impact REQ-014 ` listing the impact set as items |
-| Open in Confluence | `provider`: looks the page up by title in the configured space with the user's stored token and opens it; disabled when `[confluence]` or a token is missing |
+| Open in Confluence | `provider`, offered when a Confluence target exists: the page from the local page cache `kiln export` keeps (the item's own page, else the page holding it), else looked up by title in the space with the stored or environment token; opened in the browser at `#<ID>`; an error in the footer names what's missing (no token, not published) |
 | Open in Jira | `open` with `<[jira] url>/browse/<KEY>`, when the item has a `jira` key |
-| Start working on it | `provider` → `fenix/agenda.clockIn` on the matching agenda task (see "Fenix's agenda") |
+| Start working on it | `provider` → `fenix/agenda.clockIn` on the open agenda task with the item's Jira key (see "Fenix's agenda"); offered only for items with a `jira` key; without such a task the footer says "no agenda task for FLINT-88 (needs Fenix G1 to create one)" |
 | Open in Kiln | `run` `["kiln", "--item", ID]`, after K7 |
+
+Drill-down results: `k status REQ-014` lists the type's statuses as
+`status REQ-014 → verified` (the current one marked), each a `provider`
+action that makes the same stamp-checked front-matter edit as `kiln set`
+and answers "REQ-014: approved → verified"; `k impact REQ-014` lists what
+reaches it (items with their usual actions, code locations opening in
+Fenix at the line), as `impact REQ-014 ← TEST-004 …`; `k all text` lists
+every item, closed ones included, whose ID and title contain the text, as
+`all REQ-005 …`. Any other query gets an empty answer at once.
 
 - **Context boost**: Flint already ranks items from the current Fenix
   project first.
 
 ### Gaps in Flint
 
-None blocking. Three small ones worth raising in Flint's own repository
-when K5 lands:
+None blocking. Five small ones worth raising in Flint's own repository
+(recorded with K5; Flint not modified):
 
 - **Drill-down verbs.** Flint matches a provider's static items against
   every query, including a drill-down like `k status REQ-014`, so the
@@ -259,6 +280,16 @@ when K5 lands:
   words, hide my static items", fixes it. Until then, Kiln titles its
   drill-down results so they contain the query text (`status REQ-014 →
   verified`) and therefore match and rank first.
+- **Disabled actions.** An `Action` has no `disabled` reason, so an action
+  that can't work for an item (clock-in without an agenda task, Open in
+  Confluence before a publish) is either left out or fails in the footer
+  when chosen. Kiln offers them where they can work and explains in the
+  footer otherwise. A `disabled: { reason }` field, as LSP code actions
+  have, would let the menu show why up front.
+- **The scope keyword in drill-down text.** A `query` action's text must
+  carry the provider's scope keyword (`k status REQ-014`), but settings may
+  override the keyword. Kiln's `--prefix` has to be kept in step by hand;
+  a placeholder Flint expands (`{scope} status REQ-014`) would remove that.
 - an icon for requirements/specifications in Flint's icon set;
 - `provider/setItems` for a few thousand items is fine at Flint's 250 ms
   re-index cap, but should be measured with Kiln's benchmark project in

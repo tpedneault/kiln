@@ -18,5 +18,7 @@ kiln-render.workspace = true
 kiln-parse.workspace = true
 
 [dev-dependencies]
+kiln-flint.workspace = true
+flint-protocol.workspace = true
 tempfile.workspace = true
 kiln-export.workspace = true

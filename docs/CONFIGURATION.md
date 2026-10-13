@@ -55,8 +55,10 @@ all three under `KILN_HOME` when it is set. Two things live there: the
 cache of rasterised diagrams (`state/diagrams`), which CI may cache
 between runs, and one Confluence page cache per target
 (`state/confluence/<space>-<project>-<export>.json`: page id → version and
-`kiln` property), which saves a call per unchanged page. Either can be
-deleted at any time; Kiln reads the space again.
+`kiln` property), which saves a call per unchanged page and lets the Flint
+provider open an item's page without asking the server; and
+`state/flint-project`, the project the Flint provider last followed Fenix
+to. Any of them can be deleted at any time.
 
 ## Credentials
 

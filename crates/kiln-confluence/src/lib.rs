@@ -31,7 +31,7 @@ mod snapshot;
 mod storage;
 
 pub use apply::{apply, Applied, ApplyOptions};
-pub use cache::{CachedPage, PageCache};
+pub use cache::{cache_file_name, CachedPage, PageCache};
 pub use client::{connect, ClientError, Confluence, Created, ErrorKind, Http, Identity};
 pub use desired::{desired_pages, titles, DesiredContext, DesiredPage, MAX_TITLE};
 pub use model::{KilnProperty, RemotePage, Snapshot};
