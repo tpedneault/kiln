@@ -10,5 +10,6 @@ All notable changes to Kiln are recorded here. The format follows
 
 - The design: [docs/DESIGN.md](docs/DESIGN.md),
   [docs/FORMAT.md](docs/FORMAT.md),
+  [docs/EXPORT.md](docs/EXPORT.md),
   [docs/CONFLUENCE.md](docs/CONFLUENCE.md) and
   [docs/INTEGRATION.md](docs/INTEGRATION.md).

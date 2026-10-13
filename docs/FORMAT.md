@@ -118,8 +118,13 @@ url = "https://jira.example.com"
 K201 = "error"                   # an approved requirement nobody verifies fails CI
 K106 = "off"
 
-# Publishing: see CONFLUENCE.md.
+# Exports: see EXPORT.md and CONFLUENCE.md.
 [confluence]
+# …
+
+[[export]]
+name = "spec"
+format = "confluence"
 # …
 ```
 
@@ -289,6 +294,7 @@ Severities: `error` (exit 1), `warning`, `off`, overridable in `[check]`.
 | K002 | error | `kiln.toml` is invalid (unknown type in `parents`/`from`/`to`, duplicate prefix, bad regex) |
 | K003 | error | unknown key in `kiln.toml` |
 | K004 | error | something that looks like a secret in `kiln.toml` |
+| K005 | error | an `[[export]]` target is invalid: unknown format or layout, duplicate name, `page =` with a layout other than `document`, a file format without `path`, a Confluence target without the `[confluence]` keys it needs, a `link_to` naming no target |
 | K100 | error | front matter can't be parsed |
 | K101 | error | duplicate ID |
 | K102 | error | reference to an ID that doesn't exist (front matter, body, code) |
@@ -301,6 +307,7 @@ Severities: `error` (exit 1), `warning`, `off`, overridable in `[check]`.
 | K109 | warning | a link is written on its inverse side (e.g. `verified-by` in a requirement) |
 | K110 | error | relative link or image to a file that doesn't exist |
 | K111 | error | a Mermaid block fails to parse (the diagram's own line and message) |
+| K112 | error | an export template is invalid: unknown directive or attribute, unknown type, status or ID, a template file that doesn't exist |
 | K201 | warning | a non-draft requirement with no `verifies` coverage |
 | K202 | warning | a non-draft requirement with no `implements` coverage |
 | K203 | warning | a non-closed item links to a closed one (e.g. implements an obsolete requirement) |

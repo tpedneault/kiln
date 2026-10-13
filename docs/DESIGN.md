@@ -4,8 +4,8 @@ Kiln keeps a project's requirements, design decisions, milestones, work
 items, tests and risks as plain Markdown files in the project's own
 repository, links them to each other and to the code, and shows what
 follows from those links: what is unverified, what a change affects, how
-far a milestone has got. It publishes all of it to Confluence for the
-people who don't use Kiln.
+far a milestone has got. It exports all of it, by default as one design document on one
+Confluence page, for the people who don't use Kiln.
 
 Status: design, nothing implemented yet. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
@@ -15,7 +15,8 @@ Status: design, nothing implemented yet. Pinned against Fenix
 |---|---|
 | this one | goals, architecture, crates, CLI, milestones |
 | [FORMAT.md](FORMAT.md) | the item file format, `kiln.toml`, links, code references, the `kiln check` rules |
-| [CONFLUENCE.md](CONFLUENCE.md) | the Confluence publisher |
+| [EXPORT.md](EXPORT.md) | export targets, layouts (one document, sections, a page tree), templates, formats (Confluence, Markdown, HTML; Word later) |
+| [CONFLUENCE.md](CONFLUENCE.md) | the Confluence format: pages, planner, drift, the API |
 | [INTEGRATION.md](INTEGRATION.md) | Fenix, Flint and Jira: what Kiln uses, and what they need to add |
 
 ## Why the name
@@ -39,8 +40,9 @@ decisions are shaped here before the work is fired. It sits beside Fenix
    from files in the repo (plus git history and, read-only, Jira). No
    database, no server. Deleting Kiln loses no information.
 2. **Readable without Kiln.** The files are Markdown a person can read on
-   GitLab or GitHub; the Confluence publisher puts the same content where
-   the rest of the organisation already reads.
+   GitLab or GitHub; exports turn them into a design document where the
+   rest of the organisation already reads: a Confluence page, a file, a
+   printable HTML page.
 3. **Checkable in CI.** `kiln check` fails a merge request that breaks a
    link, duplicates an ID or leaves an approved requirement unverified.
 4. **Fast and keyboard-first**, with the same grammar and themes as Fenix
@@ -95,7 +97,8 @@ FORMAT.md defines all of these precisely.
   ┌────────────────────────────────────────────────────────────────┐
   │ kiln-parse → kiln-model → kiln-index ──► kiln-check            │
   │                              │                                 │
-  │                              ├──► kiln-render ──► kiln-confluence ──► Confluence (REST)
+  │                              ├──► kiln-render ──► kiln-export ──┬─► Markdown / HTML files
+  │                              │                                  └─► kiln-confluence ──► Confluence (REST)
   │                              ├──► kiln-lsp ◄────── Fenix (LSP client, stdio)
   │                              ├──► kiln-flint ◄──── Flint (provider protocol, stdio)
   │                              ├──► kiln-gui (later)
@@ -115,8 +118,9 @@ own unit tests; I/O only where the crate's role is I/O.
 | `kiln-parse` | Splits front matter from body, parses front matter with `toml_edit` (keeping spans for diagnostics and comment-preserving edits), finds references in bodies and in source comments. Every value keeps its byte span. | yes |
 | `kiln-index` | Loads a project: walks configured paths (`ignore` crate, so `.gitignore` is honoured), parses in parallel, builds the graph (forward and inverse links, parent tree), answers queries (children, ancestors, transitive impact, coverage). Incremental update of one file for the LSP. | yes, given a file source trait |
 | `kiln-check` | The rules in FORMAT.md, each with a code, a severity (overridable in `kiln.toml`) and a span. Output as text, JSON, GitLab Code Quality and GitHub annotations. | yes |
-| `kiln-render` | Markdown body → a small intermediate document tree (`pulldown-cmark`), with item references resolved, callouts, tables, code blocks and Mermaid diagrams as distinct nodes. Report builders (traceability, roadmap, findings, changes) produce the same tree. Every output (Confluence, HTML, the GUI) is a back end for this tree. | yes |
-| `kiln-confluence` | Storage-format emitter, the publish planner (pure), the client trait with Cloud and Data Center implementations (`ureq`), and apply. See CONFLUENCE.md. | planner and emitter yes; client no |
+| `kiln-render` | Markdown body → a small intermediate document tree (`pulldown-cmark`), with item references, callouts, tables, code blocks and Mermaid diagrams as distinct nodes. Report builders (traceability, findings, roadmap, risks, changes) produce the same tree. | yes |
+| `kiln-export` | Export targets: selection, templates and directives, assembly into one numbered document with anchors, the three layouts (splitting into pages and resolving links across them), diagram rasterising and its cache, and the Markdown and HTML back ends with their file destination. See EXPORT.md. | yes, except writing files |
+| `kiln-confluence` | The Confluence back end: storage-format emitter, normaliser, planner (pure), the client trait with Cloud and Data Center implementations (`ureq`), and apply. See CONFLUENCE.md. | emitter and planner yes; client no |
 | `kiln-git` | Current commit, dirty state, file contents at a revision, tags. Shells out to `git`, as `fenix-git` does. | no |
 | `kiln-lsp` | Language server over stdio (`lsp-server` + `lsp-types`, synchronous, as rust-analyzer). | no |
 | `kiln-flint` | Flint provider over stdio, built on `flint-protocol`. | no |
@@ -181,15 +185,14 @@ nearest `kiln.toml` (`--project <dir>` overrides).
 | `kiln renumber <ID> --to <ID>` | moves an ID and rewrites every reference (the cure for two branches allocating the same number) | K1 |
 | `kiln trace [--type requirement] [--format text\|json\|csv]` | coverage: what implements and verifies each item, and the gaps | K1 |
 | `kiln impact <ID>` | everything that links to it, transitively, by path | K1 |
-| `kiln publish confluence --dry-run` | renders and prints the plan; no network writes | K2 |
-| `kiln publish confluence [--yes] [--force] [--since REV]` | applies the plan; all flags in CONFLUENCE.md | K3 |
+| `kiln export [NAME…] --dry-run` / `--check` | renders every (or the named) export target and shows what would change; `--check` exits 1 if anything would | K2 |
+| `kiln export [NAME…]` | writes file targets (K2) and publishes Confluence targets (K3); all flags in EXPORT.md and CONFLUENCE.md | K2 / K3 |
 | `kiln confluence comments` | unresolved footer comments on published pages, per item, with links | K6 |
 | `kiln auth confluence` / `auth jira` | stores a token in the OS credential store, prompting without echo | K3 / K8 |
 | `kiln lsp` | language server on stdio | K4 |
 | `kiln provider` | Flint provider on stdio | K5 |
 | `kiln diff <REV>[..<REV>]` | item-level changes between revisions | K6 |
 | `kiln` (no arguments) | the GUI | K7 |
-| `kiln export html <dir>` / `export markdown <dir>` | a static site / a single document, from the same render tree | K8 |
 
 Errors are one line on stderr naming what failed and why, with the file
 and line when there is one. Exit codes: 0 fine, 1 findings or a refused
@@ -213,7 +216,7 @@ in detail when K6 is done; nothing before it depends on it.
 | `kiln check` on 2,000 items + 50k source files | ≤ 2 s cold on a laptop |
 | LSP response after a keystroke in an item file | ≤ 50 ms p95 (incremental re-index of that file only) |
 | Flint provider query | ≤ 16 ms for 2,000 items (static items; Flint matches them) |
-| `kiln publish --dry-run` render of 2,000 items | ≤ 3 s, excluding diagram rasterisation, which is cached by source hash |
+| `kiln export --dry-run` of a 2,000-item document | ≤ 3 s, excluding diagram rasterisation, which is cached by source hash |
 
 A benchmark on a generated project runs in CI from K1, as Flint's index
 benchmark does.
@@ -262,13 +265,13 @@ changelog line.
 |---|---|---|
 | K0 | Workspace, crates as shells with their doc comments, licences, CI on both OSes, `docs/ARCHITECTURE.md` | — |
 | K1 | The format: `kiln-model`, `kiln-parse`, `kiln-index`, `kiln-check`, `kiln-git` (commit id only); `init`, `new`, `list`, `show`, `check`, `set`/`link`/`unlink`, `renumber`, `trace`, `impact`; this repository's own `design/` folder describing Kiln (dogfooding); benchmark gate | — |
-| K2 | `kiln-render` and the Confluence emitter and planner: `publish confluence --dry-run` works offline against a recorded snapshot and against a live space (read-only calls); diagrams rendered and cached | — |
-| K3 | Confluence apply on Cloud and Data Center: create, update, move, labels, attachments, properties, drift detection, removed items, rate limiting, `auth confluence`, CI recipes | — (G2 for fonts in slim CI images) |
+| K2 | Exports without writes to Confluence: `kiln-render`, `kiln-export` (targets, templates, the three layouts, reports, diagrams), the Markdown and HTML formats end to end, and the Confluence emitter and planner with `--dry-run` against a recorded snapshot and a live space (read-only calls) | — |
+| K3 | Confluence publishing on Cloud and Data Center: create, update, move, adopt a page, labels, attachments, properties, drift detection, retired pages, size limits, rate limiting, `auth confluence`, CI recipes | — (G2 for fonts in slim CI images) |
 | K4 | `kiln lsp`: completion, hover, definition, references, rename, diagnostics, code actions, for item files | — (G3 for code files) |
 | K5 | `kiln provider` for Flint: items, open in Fenix at a line, copy, set status, open in Confluence | — (G1 for clock-in) |
-| K6 | `kiln diff` and baselines; `publish --since` change pages | — |
+| K6 | `kiln diff` and baselines; `export --since` (the changes report and the in-place markers); `kiln confluence comments` | — |
 | K7 | GUI: Tree, Trace, Impact first; Board, Roadmap, Decisions, Changes after | — |
-| K8 | HTML and Markdown export; Jira mirror (status of linked tickets, read-only, through `fenix-jira`) | — |
+| K8 | The `docx` format (EXPORT.md); the Jira mirror (status of linked tickets, read-only, through `fenix-jira`) | — |
 
 Everything through K6 needs nothing new from Fenix or Flint. INTEGRATION.md
 lists the changes (G1–G6) that make the integration better and which
@@ -283,4 +286,5 @@ milestone notices their absence.
 | Two branches allocate the same ID | `kiln check` finds duplicates; `kiln renumber` and LSP rename fix them |
 | The model becomes a second Jira | non-goals above; work items have no assignees or sprints |
 | The format is wrong and costly to change | K1 dogfoods it on Kiln's own design before anything depends on it; `format = 1` in `kiln.toml` allows a migration later |
-| Diagram text missing in CI images without fonts | `publish` refuses to rasterise when no fonts are found, naming the fix; G2 |
+| Diagram text missing in CI images without fonts | exports refuse to rasterise when no fonts are found, naming the fix; G2 |
+| A one-page document outgrows what Confluence handles well | size measured on every export, warning and refusal thresholds, `sections` layout as the remedy (CONFLUENCE.md, "Size") |

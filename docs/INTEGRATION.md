@@ -71,8 +71,8 @@ the file, and the message says so.
 ### Diagrams: `fenix-diagram` (K2)
 
 `fenix_diagram::render(source, &Themes, theme)` → SVG, then
-`fenix_diagram::png(svg, scale, Background::White)` for Confluence and
-HTML export. The same renderer Fenix shows in its notebook and diagram
+`fenix_diagram::png(svg, scale, Background::White)` for the Confluence
+and HTML formats (EXPORT.md, "Diagrams"). The same renderer Fenix shows in its notebook and diagram
 pages, so a diagram looks the same everywhere. Checked: builds with the
 pins in DESIGN.md and renders a flowchart.
 
@@ -109,7 +109,7 @@ In a slim CI container with no fonts, diagrams rasterise without text and
 no error. Either bundle one small open font (e.g. DejaVu Sans, behind a
 default feature) loaded when the system has none, or expose
 `fn font_count() -> usize` and an API to add font data. Kiln guards
-against this meanwhile (CONFLUENCE.md, "Fonts"). Fenix itself would
+against this meanwhile (EXPORT.md, "Diagrams"). Fenix itself would
 benefit on minimal Linux installs.
 
 #### G3. More than one language server per file <a id="g3"></a>

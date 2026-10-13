@@ -1,0 +1,378 @@
+# Exporting
+
+How Kiln turns a project into documents for people who don't use Kiln.
+Every export is a **target** declared in `kiln.toml`: what to include, how
+to arrange it (a **layout**), and what to write it as (a **format**). The
+default is the simplest useful thing: the whole design as **one
+document**, on one Confluence page or in one file.
+
+Implemented in `kiln-export` (assembly, layouts, the Markdown and HTML
+back ends) and `kiln-confluence` (the Confluence back end, see
+[CONFLUENCE.md](CONFLUENCE.md)).
+
+## The pipeline
+
+```
+index ──► select ──► assemble ──► split (layout) ──► back end ──► destination
+          which      one document   into pages       storage /      Confluence
+          items      tree, ordered  (or not)         Markdown /     pages, or
+                     and numbered                    HTML           files
+```
+
+1. **Select** the items the target includes (by template directives, or
+   by `types` and status when there's no template).
+2. **Assemble** a single document tree: sections, items in their place
+   with their properties and bodies, report sections, numbering, and an
+   anchor for every item.
+3. **Split** it according to the layout: not at all (`document`), at each
+   top-level section (`sections`), or at each section and each item
+   (`tree`). Links between items resolve after the split: same page →
+   anchor, other page → page link (plus anchor).
+4. **Back end** renders each page in its format.
+5. **Destination**: Confluence pages through the planner (CONFLUENCE.md),
+   or files written only when their content changed.
+
+Every target goes through the same five steps, so a layout or a format is
+added once and works with every other choice.
+
+## Targets
+
+```toml
+[[export]]
+name = "spec"                         # `kiln export spec`
+format = "confluence"                 # confluence | markdown | html
+layout = "document"                   # document (default) | sections | tree
+title = "Flint — design document"
+template = "design/templates/design-document.md"   # optional; see "Templates"
+
+[export.confluence]                   # format-specific settings
+parent = 123456789                    # create the page under this page…
+# page = 987654321                    # …or write into this existing page (document layout only)
+
+[[export]]
+name = "design-tree"
+format = "confluence"
+layout = "tree"                       # the one-page-per-item layout
+title = "Flint — design (browse)"
+types = ["design", "decision"]
+[export.confluence]
+parent = 123456789
+
+[[export]]
+name = "spec-md"
+format = "markdown"
+title = "Flint — design document"
+template = "design/templates/design-document.md"
+path = "docs/generated/DESIGN.md"     # file formats: a file (document) or a folder (sections, tree)
+
+[[export]]
+name = "spec-html"
+format = "html"
+title = "Flint — design document"
+path = "target/kiln/design.html"
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `name` | required | unique; what `kiln export <name>` runs; part of every published page's identity |
+| `format` | required | `confluence`, `markdown`, `html` (`docx` later, K8) |
+| `layout` | `document` | `document`, `sections`, `tree` |
+| `title` | the project `name` | the document's title; for Confluence, the (root) page title |
+| `template` | none | a Markdown file in the repo that arranges the document |
+| `types` | every type, in `kiln.toml` order | without a template: which types get a section |
+| `exclude_status` | each type's `closed` statuses | items left out |
+| `reports` | `["traceability", "findings"]` | without a template: report sections appended as appendices |
+| `numbering` | `true` | section numbers (`2.1.3`) on headings |
+| `item_style` | `line` for `document` and `sections`, `table` for `tree` | how an item's properties are shown (see "Items in a document") |
+| `link_to` | `[]` | other exports to link into for items this one doesn't contain, in order |
+| `path` | required for file formats | output file (`document`) or folder (`sections`, `tree`), relative to the project |
+| `[export.<format>]` | — | settings only that format reads |
+
+`kiln check` validates `[[export]]` (K005) and every template (K112), so a
+broken export fails the merge request, not the publish after it.
+
+## Layouts
+
+| Layout | Confluence | Markdown / HTML |
+|---|---|---|
+| **`document`** | one page holding the whole document | one file |
+| **`sections`** | a page with the opening material and a list of its child pages; one child page per top-level section (each type section, each report) | `index.md` / `index.html` plus one file per section |
+| **`tree`** | as `sections`, and each item its own page under its section, nested by `parent` | a folder per section, a file per item |
+
+`document` is the default because it is what a design document is: one
+thing to read top to bottom, print, review in one sitting, and link to.
+Every change to the project lands as one new version of one page, so
+Confluence's page history becomes the document's revision history, and
+"compare versions" shows a reviewer what changed.
+
+Choose `sections` when the document grows past what one page carries well
+(see "Size" in CONFLUENCE.md; Kiln warns), and `tree` when people browse
+and link to individual items more than they read the whole: a requirement
+database rather than a specification.
+
+A project can have several targets: a one-page specification for review
+and a browsable tree of the same items, or one document per audience.
+
+## Templates
+
+Without a template, a document is: the title, a short summary (the commit,
+counts by type and status, coverage, milestone progress), a table of
+contents, one section per type in `types`, then the `reports` as
+appendices.
+
+A template is a Markdown file in the repository that gives the document
+its own shape and prose: an introduction, scope, definitions, the order
+of sections. **Directives** are HTML comments, so the template still reads
+as a plain outline on GitLab or GitHub:
+
+~~~markdown
+# Introduction
+
+<!-- kiln:summary -->
+
+This document describes Flint, a keyboard-first launcher…
+
+<!-- kiln:toc -->
+
+# Scope
+
+Flint covers Windows and Linux (KDE Plasma 6 on Wayland). It does not…
+
+# Requirements
+
+## Performance
+
+<!-- kiln:items type="requirement" tag="performance" -->
+
+## Everything else
+
+<!-- kiln:items type="requirement" -->
+
+# Design
+
+<!-- kiln:items type="design" root="DES-001" -->
+
+# Decisions
+
+<!-- kiln:items type="decision" status="accepted,superseded" style="row" -->
+
+# Appendix: traceability
+
+<!-- kiln:report traceability type="requirement" -->
+
+# Appendix: open findings
+
+<!-- kiln:report findings -->
+~~~
+
+| Directive | Places |
+|---|---|
+| `<!-- kiln:items … -->` | the selected items, nested by `parent`, under the heading it sits in |
+| `<!-- kiln:item REQ-014 -->` | one item |
+| `<!-- kiln:report traceability\|findings\|roadmap\|changes\|risks … -->` | a report (see "Reports") |
+| `<!-- kiln:summary -->` | the commit, its date, counts, coverage, progress |
+| `<!-- kiln:toc -->` | a table of contents (Confluence's `toc` macro; a generated list in files) |
+| `<!-- kiln:value name\|commit\|date\|since -->` | a value, inline |
+
+`kiln:items` attributes, all optional and combined with AND:
+
+| Attribute | Selects / does |
+|---|---|
+| `type="requirement,design"` | by type |
+| `status="approved"` / `status="!obsolete"` | by status, or excluding |
+| `tag="performance"` | by tag |
+| `root="REQ-002"` | that item and its descendants |
+| `jira="FLINT-*"` | items with a matching Jira key |
+| `style="full\|row"` | `full` (default): each item as a heading with its properties and body; `row`: all of them as one table (ID, title, status, links), bodies left out, which suits many small items such as tests |
+| `split="auto\|no"` | in `tree`, `no` keeps these items inline in their section page instead of a page each |
+
+Rules:
+
+- An item appears **once** per document. A later directive that selects
+  an item an earlier one placed skips it (so "Everything else" above
+  really is everything else). An item selected by none is simply not in
+  that document; `kiln export --dry-run` lists what each target leaves
+  out, so an omission is a decision, not an accident.
+- Items keep their `parent` nesting within a directive. An item whose
+  parent isn't placed by the same directive starts at the directive's
+  level.
+- The template's own headings are the document's sections and are
+  numbered with everything else. Template prose is rendered like any item
+  body: references, diagrams and callouts all work.
+- Unknown directives, unknown attributes, unknown types and IDs are K112
+  errors with the template's line.
+
+## Items in a document
+
+An item placed with `style="full"` becomes:
+
+```
+2.1.3  REQ-014 Flint appears within 50 ms of the hotkey        ← heading, with an anchor "REQ-014"
+approved · under REQ-002 · verified by TEST-031 · Jira FLINT-88 ← properties (item_style = "line")
+<body>
+  2.1.3.1  REQ-031 …                                           ← children, one level deeper
+```
+
+`item_style`:
+
+- `line` (default for `document` and `sections`): one line of properties
+  under the heading: status lozenge, parent, outgoing links, inverses
+  ("verified by", "implemented by" with code locations), Jira. Compact
+  enough for a long document.
+- `table`: the full properties table (default for `tree`, where each item
+  is a page of its own).
+- `none`: heading and body only, for documents meant to read as prose.
+
+Headings: the document's sections and items use levels 1–6 by depth.
+Below level 6, items keep their number (`2.1.3.1.2.1`) on a level-6
+heading. An item body's own headings are moved under the item's level,
+and those that would pass level 6 become bold paragraphs.
+
+## Reports
+
+| Report | Content |
+|---|---|
+| `traceability` | per non-closed item of `type` (default requirement): implemented by, verified by, gaps marked |
+| `findings` | `kiln check` warnings and errors, by rule, linked to the repository |
+| `roadmap` | milestones in `due` order, status, progress, included items |
+| `risks` | open risks and what mitigates them |
+| `changes` | with `--since REV`: items added, removed and changed (status, title, links, body) between REV and the published commit |
+
+With `--since REV`, every item that changed since REV is also marked in
+place with a "Changed" or "New" lozenge next to its heading, so a reviewer
+reading the document finds the changes where they are, not only in the
+appendix.
+
+Reports in `tree` and `sections` get their own page or file; a report
+whose table passes `max_rows` (default 300) is split by top-level item.
+
+## Formats
+
+The back ends render the same split pages. Each gets the document tree
+from `kiln-render` with references already resolved to "same page,
+anchor X" or "page P, anchor X".
+
+### `confluence`
+
+Storage format, published through the planner with drift detection. All
+of it is in [CONFLUENCE.md](CONFLUENCE.md).
+
+### `markdown`
+
+CommonMark with GitHub tables, readable on GitLab and GitHub.
+
+```toml
+[export.markdown]
+flavour = "gitlab"         # gitlab | github | commonmark: how heading anchors are formed
+diagrams = "source"        # source: keep ```mermaid blocks (GitLab and GitHub draw them) | image: PNG files beside the document
+```
+
+- Item anchors: headings start with the ID, so the anchor is predictable;
+  Kiln computes it with the flavour's own slug rules (GitLab's and
+  GitHub's differ) and links with it. `commonmark` adds an explicit
+  `<a id="REQ-014"></a>` before the heading.
+- Useful committed in the repository (a generated `docs/DESIGN.md`) with
+  `kiln export --check` in CI to fail when it is stale, or attached to a
+  release.
+
+### `html`
+
+One self-contained file per page: styles inline, images as `data:` URIs,
+no scripts, no network fetches. A print stylesheet (page breaks before
+top-level sections, link URLs shown, no navigation) makes the browser's
+"Print to PDF" a decent PDF, which covers the PDF case without a PDF
+engine. Light theme by default; `[export.html] theme = "<Fenix theme
+name>"` uses one of the suite's palettes.
+
+### Later: `docx` (K8)
+
+Word, for organisations whose formal reviews run on Word documents:
+headings as Word's own Heading 1–6 styles (so Word's table of contents and
+navigation pane work), tables, images embedded, numbering as text, an
+optional reference `.docx` for styles (`[export.docx] reference =
+"templates/company.docx"`). Built on the `docx-rs` crate. Designed here so
+nothing earlier assumes three formats; built after K7.
+
+### Adding a format
+
+A back end implements one trait: render a split page (the document tree
+plus resolved links) into bytes and attachments. Layouts, templates,
+selection, reports, numbering and link resolution come with it.
+Destinations are separate: files, or Confluence's planner.
+
+## Running exports
+
+```
+kiln export [NAME…] [--dry-run | --check] [--yes] [--force] [--since REV]
+            [--require-clean] [--allow-shallow] [--format text|json]
+```
+
+- No names: every target. Names: those.
+- `--dry-run`: render everything, print what would change (Confluence: the
+  plan; files: which files would be written), write nothing.
+- `--check`: like `--dry-run`, and exit 1 if anything would change. For
+  committed file exports in CI.
+- File targets write a file only when its bytes change, atomically
+  (`fenix_storage::write`), and remove files they wrote earlier that are
+  no longer produced (tracked in a `.kiln-export` list beside them; files
+  Kiln didn't write are never removed).
+- Confluence targets: see CONFLUENCE.md for `--yes`, `--force`, drift.
+- Exit codes as in DESIGN.md: 1 means `--check` found changes or a plan
+  was refused.
+
+## Determinism
+
+The same project at the same commit exports byte-identical output, on
+Windows and on Linux. Everything without an inherent order is sorted;
+line endings are normalised; the time of the export never appears (the
+summary shows the published commit and that commit's date).
+
+### Which commit a link names
+
+Every link into the repository (an item's source, a code location, a
+relative link) names **the last commit that changed that file**, not the
+commit being exported. Otherwise every merge would change every page that
+links to code, and Confluence page history would fill with versions that
+change nothing a reader cares about. With this rule, output changes only
+when something it shows changed; the summary, which names the exported
+commit, is the one place that changes on every new commit.
+
+`kiln-git` gets these in one pass (`git log --format=%H --name-only` over
+the paths involved). A shallow clone can't answer for files older than
+its boundary, so exports check `git rev-parse --is-shallow-repository`
+and fail with "the clone is shallow: fetch full history (GitLab:
+GIT_DEPTH: 0; GitHub: fetch-depth: 0)" unless `--allow-shallow`, which
+falls back to the exported commit for those files.
+
+## Diagrams
+
+Mermaid blocks are rendered with `fenix-diagram` (`render` in the
+`default` theme, then `png` at scale 2 on a white background) when the
+format wants pictures: Confluence always, HTML always (as `data:` URIs),
+Markdown only with `diagrams = "image"`. The source follows each picture
+in a collapsed block ("Diagram source").
+
+**Fonts.** Rasterising needs fonts. `fenix-diagram` loads system fonts
+only, and slim CI images may have none, which produces diagrams without
+text and no error. Before rasterising, Kiln checks the font database is
+non-empty and otherwise fails with "no fonts found for diagrams: install
+fonts-dejavu (Debian/Ubuntu), or set diagrams = "source"" (which shows the
+source as a code block instead). INTEGRATION.md G2 asks `fenix-diagram`
+for a bundled fallback font.
+
+**Caching.** PNGs are cached in Kiln's state folder by
+`sha256(source + fenix-diagram rev + scale)`; CI can cache that folder.
+
+## Testing
+
+- **Assembly**: fixture projects × templates → golden document trees
+  (as a readable text dump): placement, "appears once", nesting, numbering,
+  heading demotion past level 6, `--since` markers.
+- **Layouts**: one golden split per layout for the same document; link
+  resolution across pages (same page → anchor; other page → page + anchor;
+  not exported → `link_to` target or repository link).
+- **Back ends**: golden output per construct and for a whole sample
+  document, per format; Markdown anchors checked against GitLab's and
+  GitHub's slug rules; HTML checked for no external references.
+- **Determinism**: export twice, and on both CI operating systems, and
+  compare bytes.

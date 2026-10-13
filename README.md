@@ -6,7 +6,8 @@ files in the repository they describe.
 Kiln links requirements to the design, tasks, tests and code that answer
 them, checks those links in CI (an approved requirement nothing verifies,
 a broken reference, a duplicate ID), shows what a change affects, and
-publishes everything to Confluence for the people who don't use Kiln. It
+exports a design document (one Confluence page by default, or a page
+tree, Markdown or printable HTML) for the people who don't use Kiln. It
 edits nothing you don't ask it to, keeps no database, and needs no
 server: the repository is the source of truth.
 
@@ -20,6 +21,7 @@ is a few keystrokes away).
 
 - [Design](docs/DESIGN.md)
 - [File format](docs/FORMAT.md)
+- [Exporting](docs/EXPORT.md): one design document, sections or a page tree; Confluence, Markdown or HTML
 - [Publishing to Confluence](docs/CONFLUENCE.md)
 - [Fenix, Flint and Jira](docs/INTEGRATION.md)
 

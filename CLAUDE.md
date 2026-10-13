@@ -2,10 +2,10 @@
 
 Kiln keeps a project's requirements, design decisions, milestones, work
 items, tests and risks as Markdown files in the repository, checks the
-links between them in CI, and publishes them to Confluence for people who
-don't use Kiln. It is part of a suite with Fenix (editor,
-https://github.com/tpedneault/fenix) and Flint (launcher,
-https://github.com/tpedneault/flint). Nothing is implemented yet; the
+links between them in CI, and exports them (by default as one design
+document on one Confluence page) for people who don't use Kiln. It is
+part of a suite with Fenix (editor, https://github.com/tpedneault/fenix)
+and Flint (launcher, https://github.com/tpedneault/flint). Nothing is implemented yet; the
 design is settled.
 
 ## Read first, in this order
@@ -14,9 +14,13 @@ design is settled.
    budgets and milestones K0–K8.
 2. `docs/FORMAT.md` — the item file format and `kiln.toml`; the contract.
    `kiln-model`/`kiln-parse` implement exactly this; change both together.
-3. `docs/CONFLUENCE.md` — the publisher: page tree, rendering, planner,
-   drift, the API by flavour, retries, CI, testing.
-4. `docs/INTEGRATION.md` — Fenix, Flint and Jira: what Kiln uses and the
+3. `docs/EXPORT.md` — export targets, the three layouts (one document is
+   the default), templates, reports, formats (Confluence, Markdown, HTML;
+   Word later), determinism, diagrams.
+4. `docs/CONFLUENCE.md` — the Confluence format: pages and their
+   identity, planner, drift, storage format, the API by flavour, retries,
+   CI, testing.
+5. `docs/INTEGRATION.md` — Fenix, Flint and Jira: what Kiln uses and the
    gaps G1–G6.
 
 ## How to work
@@ -30,8 +34,14 @@ design is settled.
   sequential IDs, one-way publishing…), and `kiln check` runs on it in CI.
   If the format feels wrong while doing that, change FORMAT.md *then*,
   before anything else depends on it.
-- **K2 makes no writes to Confluence.** Read-only calls and `--dry-run`
-  only. K3 adds writes.
+- **K2 makes no writes to Confluence.** K2 delivers exports end to end
+  for the file formats (Markdown, HTML) and only read-only calls and
+  `--dry-run` for Confluence; K3 adds Confluence writes. Build the
+  `document` layout first in each step: it is the default and the
+  simplest, and `sections` and `tree` are splits of the same document.
+  K2 dogfoods exports the way K1 dogfoods the format: this repository gets
+  a template under `design/templates/` and a committed Markdown export of
+  its own design document, kept current by `kiln export --check` in CI.
 - **Endpoints marked "verify" in CONFLUENCE.md** must be confirmed
   against live instances in K2/K3 (see "What only Thomas can verify"), and
   the document updated with what was found. Don't build on an unverified
@@ -65,7 +75,7 @@ design is settled.
   one line naming what failed and why, with file and line when known.
 - Secrets never in files, logs, plan output, errors or command lines.
 - Rendering is deterministic; golden files change only deliberately.
-- User docs (`docs/CONFIGURATION.md`, `docs/CLI.md`, and the four design
+- User docs (`docs/CONFIGURATION.md`, `docs/CLI.md`, and the five design
   documents where behaviour changes) are updated in the same pull request.
 - Licence: MIT OR Apache-2.0.
 
@@ -85,14 +95,22 @@ with exact steps and the expected result, rather than reporting it done:
   rename preview, diagnostics, code actions;
 - the Flint provider (K5): drill-downs, opening in Fenix, clock-in;
 - diagrams in Confluence: legibility at the chosen scale, fonts in the CI
-  image used at work.
+  image used at work;
+- the one-page document (K2/K3): item anchors reachable from a URL
+  (`…#REQ-014`) and from links on other pages, the table of contents, how a
+  large document opens and edits (find the size where it gets slow and
+  record it in CONFLUENCE.md, "Size"), "compare versions" between two
+  publishes;
+- the Markdown export rendered on the GitLab used at work (anchors, Mermaid)
+  and the HTML export printed to PDF.
 
 ## Where things are
 
 ```
 docs/DESIGN.md        the design
 docs/FORMAT.md        the file format (the contract)
-docs/CONFLUENCE.md    the Confluence publisher
+docs/EXPORT.md        exports: targets, layouts, templates, formats
+docs/CONFLUENCE.md    the Confluence format
 docs/INTEGRATION.md   Fenix, Flint, Jira (G1–G6)
 CHANGELOG.md          Keep a Changelog; add under Unreleased
 ```
