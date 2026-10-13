@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0–K3 done (the format, `kiln check`, the editing commands, exports to Markdown and HTML, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, this repository's own `design/` and generated design document); K4 next. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
+Status: K0–K4 done (the format, `kiln check`, the editing commands, exports to Markdown and HTML, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, this repository's own `design/` and generated design document); K5 next. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -221,7 +221,9 @@ in detail when K6 is done; nothing before it depends on it.
 
 A benchmark on a generated project runs in CI from K1, as Flint's index
 benchmark does: `crates/kiln-check/examples/bench.rs`, gating at 50% over
-the `kiln check` budget and (from K2) the `kiln export --dry-run` budget
+the `kiln check` budget, (from K2) the `kiln export --dry-run` budget and
+(from K4) the keystroke budget: a hundred edits to one item file, each
+re-read alone and the whole project checked again, gated on the p95
 (CI.md). It measures with a warm file cache; the
 cold figure is for a person to check on a laptop.
 
@@ -271,7 +273,7 @@ changelog line.
 | K1 | The format: `kiln-model`, `kiln-parse`, `kiln-index`, `kiln-check`, `kiln-git` (commit id only); `init`, `new`, `list`, `show`, `check`, `set`/`link`/`unlink`, `renumber`, `trace`, `impact`; this repository's own `design/` folder describing Kiln (dogfooding); benchmark gate | — |
 | K2 | Exports without writes to Confluence: `kiln-render`, `kiln-export` (targets, templates, the three layouts, reports, diagrams), the Markdown and HTML formats end to end, and the Confluence emitter and planner with `--dry-run` against a recorded snapshot and a live space (read-only calls) | — |
 | K3 | Confluence publishing on Cloud and Data Center: create, update, move, adopt a page, labels, attachments, properties, drift detection, retired pages, size limits, rate limiting, `auth confluence`, CI recipes | — (G2 for fonts in slim CI images) |
-| K4 | `kiln lsp`: completion, hover, definition, references, rename, diagnostics, code actions, for item files | — (G3 for code files) |
+| K4 | `kiln lsp`: completion, hover, definition, references, rename, diagnostics, code actions, formatting, for item files | — (G3 for code files; G7 for file renames and creation, G8 for file notifications, both worked around) |
 | K5 | `kiln provider` for Flint: items, open in Fenix at a line, copy, set status, open in Confluence | — (G1 for clock-in) |
 | K6 | `kiln diff` and baselines; `export --since` (the changes report and the in-place markers); `kiln confluence comments` | — |
 | K7 | GUI: Tree, Trace, Impact first; Board, Roadmap, Decisions, Changes after | — |

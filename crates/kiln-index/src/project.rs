@@ -90,10 +90,74 @@ pub struct Project {
     pub lossy_code_files: HashSet<String>,
     /// Findings from loading: configuration, parsing, missing folders.
     pub findings: Vec<Finding>,
+    /// Markdown files under `paths` that start with `+++`, items or not
+    /// (a broken one is still not code).
+    item_files: HashSet<String>,
+    /// Files the code listing found, scanned for code references.
+    code_files: HashSet<String>,
+    patterns: Vec<CodePattern>,
     by_id: HashMap<ItemId, Vec<usize>>,
     inbound: HashMap<ItemId, Vec<Inbound>>,
     children: HashMap<ItemId, Vec<usize>>,
     mentioned_by: HashMap<ItemId, Vec<usize>>,
+}
+
+/// One Markdown file read: its item (if usable), its findings, and
+/// whether it is an item file at all.
+struct Parsed {
+    item: Option<Item>,
+    findings: Vec<Finding>,
+    is_item: bool,
+}
+
+fn parse_file(path: &str, bytes: std::io::Result<Vec<u8>>, options: &ItemOptions) -> Parsed {
+    match bytes {
+        Err(e) => Parsed {
+            item: None,
+            findings: vec![Finding::new(
+                Rule::K100,
+                path,
+                Span::default(),
+                format!("can't read it: {e}"),
+            )],
+            is_item: false,
+        },
+        Ok(bytes) => match normalize(&bytes) {
+            None => {
+                let is_item = bytes.starts_with(b"+++");
+                let f = Finding::new(Rule::K100, path, Span::default(), "the file isn't UTF-8");
+                Parsed {
+                    item: None,
+                    findings: if is_item { vec![f] } else { vec![] },
+                    is_item,
+                }
+            }
+            Some(text) => {
+                let is_item = kiln_parse::sections(&text).is_some();
+                let (item, findings) = parse_item(path, &text, options);
+                Parsed {
+                    item,
+                    findings,
+                    is_item,
+                }
+            }
+        },
+    }
+}
+
+/// Code references in one file; `None` for a file that isn't text. The
+/// flag says it wasn't UTF-8 and was read lossily.
+fn scan_file(path: &str, bytes: &[u8], patterns: &[CodePattern]) -> Option<(Vec<CodeRef>, bool)> {
+    if !is_scannable(bytes) {
+        return None;
+    }
+    match std::str::from_utf8(bytes) {
+        Ok(text) => Some((scan_code(path, text, patterns), false)),
+        Err(_) => Some((
+            scan_code(path, &String::from_utf8_lossy(bytes), patterns),
+            true,
+        )),
+    }
 }
 
 impl Project {
@@ -142,47 +206,24 @@ impl Project {
             prefixes: &prefixes,
             link_bare_ids: config.link_bare_ids,
         };
-        let parsed: Vec<(Option<Item>, Vec<Finding>, bool)> = item_listing
+        let parsed: Vec<Parsed> = item_listing
             .files
             .par_iter()
-            .map(|path| match source.read(path) {
-                Err(e) => (
-                    None,
-                    vec![Finding::new(
-                        Rule::K100,
-                        path,
-                        Span::default(),
-                        format!("can't read it: {e}"),
-                    )],
-                    false,
-                ),
-                Ok(bytes) => match normalize(&bytes) {
-                    None => {
-                        let is_item = bytes.starts_with(b"+++");
-                        let f =
-                            Finding::new(Rule::K100, path, Span::default(), "the file isn't UTF-8");
-                        (None, if is_item { vec![f] } else { vec![] }, is_item)
-                    }
-                    Some(text) => {
-                        let is_item = kiln_parse::sections(&text).is_some();
-                        let (item, f) = parse_item(path, &text, &options);
-                        (item, f, is_item)
-                    }
-                },
-            })
+            .map(|path| parse_file(path, source.read(path), &options))
             .collect();
-        let mut item_files: HashSet<&str> = HashSet::new();
+        let mut item_files: HashSet<String> = HashSet::new();
         let mut items = Vec::new();
-        for ((item, f, is_item), path) in parsed.into_iter().zip(&item_listing.files) {
-            findings.extend(f);
-            if is_item {
-                item_files.insert(path);
+        for (parsed, path) in parsed.into_iter().zip(&item_listing.files) {
+            findings.extend(parsed.findings);
+            if parsed.is_item {
+                item_files.insert(path.clone());
             }
-            items.extend(item);
+            items.extend(parsed.item);
         }
 
         let mut code_refs = Vec::new();
         let mut lossy_code_files = HashSet::new();
+        let mut code_files = HashSet::new();
         let patterns: Vec<CodePattern> = config
             .code_patterns()
             .iter()
@@ -198,50 +239,27 @@ impl Project {
                 )),
                 Ok(listing) => {
                     findings.extend(listing.missing.iter().map(|d| missing_dir(d, "code.paths")));
-                    let scanned: Vec<(Vec<CodeRef>, Option<String>)> = listing
+                    let scanned: Vec<(Vec<CodeRef>, bool)> = listing
                         .files
                         .par_iter()
                         .filter(|path| !item_files.contains(path.as_str()))
-                        .filter_map(|path| {
-                            let bytes = source.read(path).ok()?;
-                            if !is_scannable(&bytes) {
-                                return None;
-                            }
-                            match std::str::from_utf8(&bytes) {
-                                Ok(text) => Some((scan_code(path, text, &patterns), None)),
-                                Err(_) => {
-                                    let text = String::from_utf8_lossy(&bytes);
-                                    let refs = scan_code(path, &text, &patterns);
-                                    let lossy = (!refs.is_empty()).then(|| path.clone());
-                                    Some((refs, lossy))
-                                }
-                            }
-                        })
+                        .filter_map(|path| scan_file(path, &source.read(path).ok()?, &patterns))
                         .collect();
                     for (refs, lossy) in scanned {
+                        if lossy {
+                            lossy_code_files.extend(refs.first().map(|r| r.path.clone()));
+                        }
                         code_refs.extend(refs);
-                        lossy_code_files.extend(lossy);
                     }
+                    code_files.extend(
+                        listing
+                            .files
+                            .into_iter()
+                            .filter(|p| !item_files.contains(p.as_str())),
+                    );
                 }
             }
         }
-
-        let type_order = |name: &str| {
-            config
-                .types
-                .iter()
-                .position(|t| t.name == name)
-                .unwrap_or(usize::MAX)
-        };
-        items.sort_by(|a, b| {
-            (type_order(&a.type_name), &a.id, &a.path).cmp(&(
-                type_order(&b.type_name),
-                &b.id,
-                &b.path,
-            ))
-        });
-        code_refs
-            .sort_by(|a, b| (&a.path, a.target.span.start).cmp(&(&b.path, b.target.span.start)));
 
         let mut project = Project {
             config,
@@ -249,6 +267,9 @@ impl Project {
             code_refs,
             lossy_code_files,
             findings,
+            item_files,
+            code_files,
+            patterns,
             by_id: HashMap::new(),
             inbound: HashMap::new(),
             children: HashMap::new(),
@@ -258,7 +279,113 @@ impl Project {
         Ok(project)
     }
 
+    /// Re-reads one file after an edit (`bytes`) or its deletion (`None`),
+    /// and rebuilds the graph: the language server's path to its 50 ms
+    /// budget (DESIGN.md, "Performance"). Parsing is per file and the
+    /// graph is a few hash maps over parsed items, so only the parse is
+    /// worth avoiding; the graph is rebuilt whole rather than patched,
+    /// which keeps one way of building it.
+    ///
+    /// A Markdown file under `paths` is (re)read as an item; a file the
+    /// code listing found, or one marked with [`Project::track_code_file`],
+    /// is rescanned for code references. Anything else is ignored. The
+    /// configuration itself isn't: a changed `kiln.toml` means loading
+    /// again.
+    // implements: REQ-008
+    pub fn update_file(&mut self, path: &str, bytes: Option<&[u8]>) {
+        let in_item_paths = self.in_item_paths(path);
+        if in_item_paths {
+            self.items.retain(|i| i.path != path);
+            self.findings.retain(|f| f.path != path);
+            self.item_files.remove(path);
+            if let Some(bytes) = bytes {
+                let prefixes = self.config.prefixes();
+                let options = ItemOptions {
+                    prefixes: &prefixes,
+                    link_bare_ids: self.config.link_bare_ids,
+                };
+                let parsed = parse_file(path, Ok(bytes.to_vec()), &options);
+                self.findings.extend(parsed.findings);
+                if parsed.is_item {
+                    self.item_files.insert(path.to_owned());
+                }
+                self.items.extend(parsed.item);
+            }
+        }
+        if self.code_files.contains(path) {
+            self.code_refs.retain(|r| r.path != path);
+            self.lossy_code_files.remove(path);
+            if let Some(bytes) = bytes.filter(|_| !self.item_files.contains(path)) {
+                if let Some((refs, lossy)) = scan_file(path, bytes, &self.patterns) {
+                    if lossy && !refs.is_empty() {
+                        self.lossy_code_files.insert(path.to_owned());
+                    }
+                    self.code_refs.extend(refs);
+                }
+            }
+            if bytes.is_none() {
+                self.code_files.remove(path);
+            }
+        }
+        self.build_graph();
+    }
+
+    /// Whether `path` is a Markdown file under `paths`, so it is read as an
+    /// item when it starts with `+++`.
+    pub fn in_item_paths(&self, path: &str) -> bool {
+        path.rsplit_once('.')
+            .is_some_and(|(_, e)| e.eq_ignore_ascii_case("md"))
+            && self
+                .config
+                .paths
+                .iter()
+                .any(|dir| dir == "." || path.starts_with(&format!("{dir}/")))
+    }
+
+    /// Adds (or removes) a file to the code files scanned for references,
+    /// for a file created after loading that the code listing now finds.
+    /// [`Project::update_file`] then scans it.
+    pub fn track_code_file(&mut self, path: &str, tracked: bool) {
+        if tracked {
+            self.code_files.insert(path.to_owned());
+        } else {
+            self.code_files.remove(path);
+        }
+    }
+
+    /// Every file that contributed items or code references, or was
+    /// scanned for them: what a watcher compares the disk against.
+    pub fn known_files(&self) -> (&HashSet<String>, &HashSet<String>) {
+        (&self.item_files, &self.code_files)
+    }
+
+    fn sort(&mut self) {
+        let config = &self.config;
+        let type_order = |name: &str| {
+            config
+                .types
+                .iter()
+                .position(|t| t.name == name)
+                .unwrap_or(usize::MAX)
+        };
+        self.items.sort_by(|a, b| {
+            (type_order(&a.type_name), &a.id, &a.path).cmp(&(
+                type_order(&b.type_name),
+                &b.id,
+                &b.path,
+            ))
+        });
+        self.code_refs
+            .sort_by(|a, b| (&a.path, a.target.span.start).cmp(&(&b.path, b.target.span.start)));
+    }
+
+    /// Sorts, then builds the graph from scratch.
     fn build_graph(&mut self) {
+        self.sort();
+        self.by_id.clear();
+        self.inbound.clear();
+        self.children.clear();
+        self.mentioned_by.clear();
         for (i, item) in self.items.iter().enumerate() {
             self.by_id.entry(item.id.clone()).or_default().push(i);
             if let Some(Ok(parent)) = item.parent.as_ref().map(|p| &p.id) {
@@ -506,4 +633,112 @@ impl Project {
             .unwrap_or(0);
         ItemId::new(prefix, max + 1)
     }
+
+    /// What is known about `item`, as rows of a label and its values,
+    /// empty rows left out: other copies, parent, children, tags, Jira,
+    /// owner, due, links both ways (inverses from items and code),
+    /// mentions, coverage and milestone progress. `kiln show` prints these
+    /// and the language server's hover shows them, so both say the same.
+    pub fn facts(&self, item: &Item) -> Vec<(String, Vec<String>)> {
+        let p = self;
+        let mut rows: Vec<(String, Vec<String>)> = Vec::new();
+        let mut push = |key: &str, values: Vec<String>| {
+            if !values.is_empty() {
+                rows.push((key.to_owned(), values));
+            }
+        };
+        let others: Vec<String> = p
+            .indices(&item.id)
+            .iter()
+            .map(|&i| &p.items[i])
+            .filter(|i| i.path != item.path)
+            .map(|i| i.path.clone())
+            .collect();
+        push("also in", others);
+        let describe = |r: &kiln_model::Ref| match r.id.as_ref().ok().and_then(|id| p.item(id)) {
+            Some(target) => labelled(target),
+            None => format!("{} (doesn't exist)", r.raw),
+        };
+        push("parent", item.parent.iter().map(describe).collect());
+        push(
+            "children",
+            p.children(&item.id).into_iter().map(labelled).collect(),
+        );
+        push("tags", item.tags.clone());
+        push("jira", item.jira.clone());
+        push("owner", item.owner.iter().cloned().collect());
+        push("due", item.due.iter().map(ToString::to_string).collect());
+
+        let mut roles: Vec<&str> = item.links.iter().map(|l| l.role.as_str()).collect();
+        roles.dedup();
+        for role in roles {
+            let targets = item
+                .links
+                .iter()
+                .filter(|l| l.role == role)
+                .map(|l| describe(&l.target))
+                .collect();
+            push(role, targets);
+        }
+        let inbound = p.inbound(&item.id);
+        let mut inbound_roles: Vec<&str> = p.config.links.iter().map(|r| r.name.as_str()).collect();
+        for link in inbound {
+            if !inbound_roles.contains(&link.role.as_str()) {
+                inbound_roles.push(&link.role);
+            }
+        }
+        for role in inbound_roles {
+            let label = p
+                .config
+                .role(role)
+                .map(|r| r.inverse.clone())
+                .unwrap_or_else(|| format!("{role} (from)"));
+            let sources = inbound
+                .iter()
+                .filter(|l| l.role == role)
+                .map(|l| match l.source {
+                    Source::Item(i) => labelled(&p.items[i]),
+                    Source::Code(_) => p.describe(l.source),
+                })
+                .collect();
+            push(&label, sources);
+        }
+        push(
+            "mentioned by",
+            p.mentioned_by(&item.id).into_iter().map(labelled).collect(),
+        );
+
+        if item.type_name == "requirement"
+            || p.config.coverage_roles.iter().any(|r| {
+                p.config
+                    .role(r)
+                    .is_some_and(|role| role.allows_to(&item.type_name))
+            })
+        {
+            let coverage = p
+                .config
+                .coverage_roles
+                .iter()
+                .filter(|r| {
+                    p.config
+                        .role(r)
+                        .is_some_and(|role| role.allows_to(&item.type_name))
+                })
+                .map(|r| format!("{r}: {}", if p.covered(&item.id, r) { "yes" } else { "no" }))
+                .collect();
+            push("coverage", coverage);
+        }
+        if let Some(progress) = p.progress(&item.id) {
+            push(
+                "progress",
+                vec![format!("{} of {} done", progress.done, progress.total)],
+            );
+        }
+        rows
+    }
+}
+
+/// `REQ-014 Title`.
+pub fn labelled(item: &Item) -> String {
+    format!("{} {}", item.id, item.title)
 }

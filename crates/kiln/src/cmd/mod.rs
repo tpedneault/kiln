@@ -50,43 +50,11 @@ pub fn unique<'p>(project: &'p Project, id: &ItemId) -> Result<&'p Item, Fail> {
     Ok(item)
 }
 
-/// A TOML basic string, quoted and escaped.
-pub fn toml_string(s: &str) -> String {
-    let mut out = String::from("\"");
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\t' => out.push_str("\\t"),
-            c if c.is_control() => out.push_str(&format!("\\u{:04X}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
-
-/// `REQ-014 Title`.
-pub fn labelled(item: &Item) -> String {
-    format!("{} {}", item.id, item.title)
-}
+pub use kiln_index::labelled;
 
 /// Pretty JSON with a final newline.
 pub fn json_out(value: &serde_json::Value) -> String {
     let mut s = serde_json::to_string_pretty(value).unwrap_or_else(|_| "null".to_owned());
     s.push('\n');
     s
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn toml_strings_escape_what_toml_needs() {
-        assert_eq!(
-            toml_string("a \"b\" \\ c\u{1}"),
-            "\"a \\\"b\\\" \\\\ c\\u0001\""
-        );
-    }
 }

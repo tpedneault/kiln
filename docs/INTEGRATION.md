@@ -42,8 +42,9 @@ already uses `completion`, `hover`, `definition`, `references`, `rename`
 }
 ```
 
-and `kiln init` offers to write that (merging into an existing
-`tools.json`, never replacing it). What `kiln lsp` provides in item files:
+and `kiln init --fenix` writes that (merging into an existing
+`tools.json`, never replacing it, and leaving another Markdown server
+alone). What `kiln lsp` provides in item files:
 
 | Request | Gives |
 |---|---|
@@ -53,11 +54,37 @@ and `kiln init` offers to write that (merging into an existing
 | references (`gr`) | every link, mention and code reference to the item |
 | rename | renames an ID everywhere (front matter, bodies, code references, the file name), the same as `kiln renumber` |
 | diagnostics | `kiln check` findings for the open files, recomputed incrementally, plus project-wide ones on the `kiln.toml` |
-| code actions | "New child requirement", "Add `verifies` link…", "Set status → …", "Create test verifying this", "Fix file name to match ID" |
+| code actions | "Set status → …"; on an ID in the file, "Add `verifies` link to REQ-014" for each role allowed and not yet there; "New child requirement"; "Create test that verifies REQ-014" for each coverage role; "Rename file to …" when the name doesn't start with the ID (K105) |
 | formatting | normalises front-matter key order and quoting without touching the body |
 
 Markdown files that aren't items (a README) get only ID completion and
-hover, so the server is harmless across a whole repository.
+hover, so the server is harmless across a whole repository; outside a
+project (no `kiln.toml` above the file) every request gets an empty answer.
+
+Every change is a workspace edit computed by the same code as the
+command line (`set_field`, `add_link`, `plan_renumber`, `plan_new_item`);
+the server never writes a file itself, so the editor's undo covers it.
+
+**What Fenix's client does, at the pinned revision** (checked in K4,
+`crates/fenix-lsp`, `crates/fenix-gui/src/lsp.rs`; nothing in Fenix
+changed for it):
+
+- It sends `didOpen` and `didChange` (whole or ranged, as the server asks;
+  Kiln asks for whole documents), but not `didSave`, `didClose` or
+  `workspace/didChangeWatchedFiles`. Kiln therefore watches the disk
+  itself for files changed outside the editor (G8).
+- It applies workspace edits made of text edits only:
+  `resourceOperations` is empty and an edit carrying a file create or
+  rename is refused whole. So rename renumbers every reference but leaves
+  the file name (K105 then says so), and the code actions that create or
+  rename a file come back disabled with the command that does it from a
+  terminal (G7). Kiln offers them for real to a client that declares
+  `create`/`rename`.
+- It shows only code actions that carry an edit, no command and no
+  `disabled`, so in Fenix the disabled ones above are simply absent.
+- Hover is flattened to plain text, completion items' `textEdit`,
+  `filterText` and `detail` are used, snippets are not: Kiln sends plain
+  text and no snippets.
 
 ### Opening items in Fenix (K1 `new --open`, K5, K7)
 
@@ -144,6 +171,30 @@ needed; if it prompts, that is the right behaviour too.
 
 **Noticed by K8, only for Cloud users.** Basic auth with e-mail and API
 token and the v3 search endpoint. Not needed for Data Center.
+
+#### G7. File operations in workspace edits <a id="g7"></a>
+
+**Noticed by K4.** Fenix's client declares no `resourceOperations` and
+refuses a workspace edit containing `create`, `rename` or `delete`
+(`fenix_lsp::workspace_edit::prepare`). Supporting `create` and `rename`
+(with the rename shown in the multi-file preview, and an open buffer
+following its file) would let `kiln lsp` rename an item's file with its
+ID and create items from code actions ("New child requirement", "Create
+test that verifies REQ-014", "Rename file to …"). Until then Kiln
+offers those actions disabled, naming the command that does the same
+(`kiln new … --open`), and rename leaves the file name for K105 to
+report.
+
+#### G8. File notifications to the language server <a id="g8"></a>
+
+**Noticed by K4, small.** Fenix sends no `didSave`, `didClose` or
+`workspace/didChangeWatchedFiles`, so a server doesn't learn of files
+created, deleted or changed outside the editor (`kiln new` in a
+terminal, a `git pull`). Kiln works around it by polling: item files and
+`kiln.toml` every 2 s, code files every 10 s, on a thread of its own.
+Sending `didChangeWatchedFiles` would make that immediate and free (Kiln
+handles it already), and `didClose` would let a closed buffer's file
+count from disk again.
 
 ## Flint
 
@@ -247,5 +298,7 @@ token work in all three.
 | G4 | `[[ID]]` follows LSP definition in the reading view | Fenix | cosmetic | small |
 | G5 | (handled) reload after outside edits | Fenix | — | — |
 | G6 | Jira Cloud in `fenix-jira` | Fenix | K8, Cloud only | small |
+| G7 | File create/rename in workspace edits | Fenix | K4 | medium |
+| G8 | `didChangeWatchedFiles` (and `didClose`) to language servers | Fenix | K4 | small |
 
 Nothing here blocks K0–K6.

@@ -28,6 +28,8 @@ mod toml_walk;
 
 pub use code::{compile_pattern, is_scannable, scan_code, CodePattern, MAX_CODE_FILE};
 pub use config::{confined, is_word, parse_config, CONFIG_FILE, FORMAT};
-pub use edit::{add_link, remove_link, set_field, splice, EditError, FieldValue};
+pub use edit::{
+    add_link, format_front_matter, remove_link, set_field, splice, EditError, FieldValue,
+};
 pub use item::{parse_item, relative_destination, sections, ItemOptions, Sections, MAX_TITLE};
 pub use text::{denormalize, normalize, uses_crlf, LineIndex};

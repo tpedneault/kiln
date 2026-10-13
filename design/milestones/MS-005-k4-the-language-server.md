@@ -2,7 +2,7 @@
 id = "MS-005"
 type = "milestone"
 title = "K4: the language server"
-status = "planned"
+status = "done"
 
 [links]
 depends-on = ["MS-004"]

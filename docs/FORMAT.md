@@ -358,8 +358,10 @@ file, line, column and rule.
 
 ## Edits Kiln makes
 
-`kiln set`, `link`, `unlink`, `renumber`, `new`, LSP code actions and the
-Flint provider are the only writers. They:
+`kiln set`, `link`, `unlink`, `renumber`, `new` and the Flint provider
+are the only writers. `kiln lsp` computes the same edits with the same
+functions but writes nothing: it hands them to the editor as workspace
+edits, which apply to the open buffer (and undo there). The writers:
 
 - change only the front-matter keys they are about, through `toml_edit`,
   so comments, ordering and spacing survive;
@@ -373,6 +375,13 @@ Flint provider are the only writers. They:
   When the ID is duplicated, references can't say which item they meant:
   only the chosen file's own ID and name change, and the references are
   listed for a person to check.
+
+Formatting (`kiln lsp`, `textDocument/formatting`) is the one edit that
+touches keys it isn't "about": it puts the top-level keys in the order of
+the table in "Front matter" (`id`, `type`, `title`, `status`, `parent`,
+`tags`, `jira`, `owner`, `due`, then unknown keys, then `[links]` and
+`[extra]`) and writes every string as `"…"`. Comments move with their
+key; spacing, the body and everything else stay.
 
 ## Versioning
 

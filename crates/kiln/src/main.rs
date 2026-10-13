@@ -95,6 +95,9 @@ enum Command {
         /// The project's name in reports (default: the folder's name).
         #[arg(long)]
         name: Option<String>,
+        /// Also register `kiln lsp` for Markdown in .fenix/tools.json (merged, never replaced).
+        #[arg(long)]
+        fenix: bool,
     },
     /// Create an item with the next free ID and print its path.
     New {
@@ -202,6 +205,8 @@ enum Command {
         #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
         format: TextOrJson,
     },
+    /// Language server on stdin and stdout, for Fenix or any LSP editor.
+    Lsp,
     /// Store a token in the OS credential store, prompting without echo.
     Auth {
         #[command(subcommand)]
@@ -232,7 +237,10 @@ fn main() -> ExitCode {
     };
     let project = cli.project.as_deref();
     let result = match cli.command {
-        Command::Init { name } => cmd::init::run(project, name),
+        Command::Init { name, fenix } => cmd::init::run(project, name, fenix),
+        Command::Lsp => kiln_lsp::serve_stdio(project::today)
+            .map(|()| 0)
+            .map_err(|e| Fail::new(EXIT_USAGE, format!("lsp: {e}"))),
         Command::New {
             type_name,
             parent,
