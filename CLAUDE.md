@@ -129,5 +129,6 @@ kiln.toml, design/    Kiln's own Kiln project (dogfooding), checked in CI
 docs/generated/       its exported design document, `kiln export --check` in CI
 crates/               the workspace (kiln-* libraries, kiln binary)
 scripts/ci.ps1        the one entry point for the gates
+scripts/release.ps1   a release's steps; .github/workflows/release.yml runs them on a tag
 CHANGELOG.md          Keep a Changelog; add under Unreleased
 ```

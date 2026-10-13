@@ -28,7 +28,8 @@ crates/kiln/          the binary: src/cmd/ has one module per command
 crates/kiln-check/examples/bench.rs   the benchmark gate (check and export)
 crates/*/golden/      golden files (KILN_BLESS=1 rewrites them)
 scripts/ci.ps1        the gates, locally and in CI (CI.md)
-.github/workflows/    CI on Windows and Linux
+scripts/release.ps1   a release's steps: check, notes, package (CI.md)
+.github/workflows/    CI on Windows and Linux; releases from a tag
 docs/                 design (DESIGN, FORMAT, EXPORT, CONFLUENCE,
                       INTEGRATION) and user docs (CLI, later CONFIGURATION)
 ```

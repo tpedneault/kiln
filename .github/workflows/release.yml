@@ -1,0 +1,112 @@
+name: Release
+
+# A tag vX.Y.Z publishes a GitHub release with Windows and Linux archives
+# (docs/CI.md, "Releasing"). The release stays a draft until every
+# archive is uploaded, so a failed build never leaves a half release.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: never
+  RUST_BACKTRACE: '1'
+
+jobs:
+  prepare:
+    name: Check version and draft the release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Tag, Cargo.toml and CHANGELOG.md agree
+        run: ./scripts/release.ps1 -Step check -Tag $env:GITHUB_REF_NAME
+      - name: Draft the release with the changelog section
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ./scripts/release.ps1 -Step notes -Tag $env:GITHUB_REF_NAME
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $prerelease = if ($env:GITHUB_REF_NAME -like '*-*') { @('--prerelease') } else { @() }
+          gh release create $env:GITHUB_REF_NAME --draft --verify-tag --title "Kiln $($env:GITHUB_REF_NAME.TrimStart('v'))" --notes-file target/dist/notes.md @prerelease
+
+  build:
+    name: ${{ matrix.name }}
+    needs: prepare
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: Windows
+            os: windows-2022
+          # The oldest supported runner, so the binary needs glibc 2.35 at
+          # most and runs in older CI containers (Debian 12, Ubuntu 22.04).
+          - name: Linux
+            os: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Rust stable with Clippy and rustfmt
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt --no-self-update
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup override set stable
+      - name: Configure Windows Git paths
+        if: runner.os == 'Windows'
+        run: |
+          git config --global core.longpaths true
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git config --global core.autocrlf false
+      # What ships passes the same gates as every pull request, on the
+      # runner that builds it.
+      - name: Format, lint and test
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: ./scripts/ci.ps1
+      - name: Build and archive kiln and kilnw
+        run: ./scripts/release.ps1 -Step package -Tag $env:GITHUB_REF_NAME
+      - name: Upload to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $files = Get-ChildItem target/dist -File | Where-Object { $_.Name -match '\.(zip|tar\.gz)(\.sha256)?$' } | ForEach-Object FullName
+          gh release upload $env:GITHUB_REF_NAME @files --clobber
+
+  publish:
+    name: Publish the release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Undraft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false

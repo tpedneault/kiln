@@ -719,6 +719,7 @@ fn kiln_jira(dir: &Path, token: &str, args: &[&str]) -> Output {
 }
 
 #[test]
+// verifies: REQ-006
 fn list_jira_and_k207_read_the_mirror_once_per_ten_minutes() {
     use kiln_jira::fake::{Fake, State, TOKEN};
     let fake = Fake::start(

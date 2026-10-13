@@ -27,13 +27,26 @@ in [design/](design/), and its generated design document in
 
 - [Design](docs/DESIGN.md)
 - [File format](docs/FORMAT.md)
-- [Exporting](docs/EXPORT.md): one design document, sections or a page tree; Confluence, Markdown or HTML
+- [Exporting](docs/EXPORT.md): one design document, sections or a page tree; Confluence, Markdown, HTML or Word
 - [Publishing to Confluence](docs/CONFLUENCE.md)
 - [Fenix, Flint and Jira](docs/INTEGRATION.md)
 - [Architecture](docs/ARCHITECTURE.md): the crates and which way they depend
 - [Command line](docs/CLI.md)
 - [Configuration](docs/CONFIGURATION.md)
-- [Continuous integration](docs/CI.md): the gates, and running them locally
+- [Continuous integration](docs/CI.md): the gates, running them locally, and releasing
+
+## Installing
+
+Each [release](https://github.com/tpedneault/kiln/releases) has an
+archive for Windows (`x86_64-pc-windows-msvc`, a `.zip`) and Linux
+(`x86_64-unknown-linux-gnu`, a `.tar.gz`, glibc 2.35 or newer), each with
+a `.sha256` beside it. Unpack it and put the folder on the `PATH`: `kiln`
+is the command line (and opens the GUI from a terminal); `kilnw` opens the
+GUI without a console window on Windows. On Linux, `kiln` needs nothing
+else installed to run headless in CI.
+
+From source, with Rust stable: `cargo install --locked --git
+https://github.com/tpedneault/kiln kiln`.
 
 ## Licence
 
