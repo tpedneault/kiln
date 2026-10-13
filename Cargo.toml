@@ -39,19 +39,31 @@ kiln-index = { path = "crates/kiln-index" }
 kiln-check = { path = "crates/kiln-check" }
 kiln-git = { path = "crates/kiln-git" }
 kiln-fenix = { path = "crates/kiln-fenix" }
+kiln-render = { path = "crates/kiln-render" }
+kiln-export = { path = "crates/kiln-export" }
+kiln-confluence = { path = "crates/kiln-confluence" }
+kiln-secrets = { path = "crates/kiln-secrets" }
 
 clap = { version = "4.5", features = ["derive"] }
+dirs = "6"
 ignore = "0.4"
 pulldown-cmark = { version = "0.13", default-features = false }
 rayon = "1"
+quick-xml = "0.38"
+# The same as `fenix-jira`: native certificates, so a TLS-intercepting
+# corporate proxy works (DESIGN.md, "Security").
+ureq = { version = "2", features = ["tls", "native-certs", "json"] }
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
+fontdb = "0.23"
 tempfile = "3"
 # The same minor as `fenix-storage`, so the build carries one copy.
 toml_edit = "0.22"
 
 fenix-storage = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
+fenix-diagram = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
 fenix-control = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
 
 [workspace.lints.rust]

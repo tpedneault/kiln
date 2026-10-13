@@ -1,6 +1,6 @@
 # Command line
 
-How to run `kiln`, as it stands (K1). The commands planned for later
+How to run `kiln`, as it stands (K2). The commands planned for later
 milestones are in [DESIGN.md](DESIGN.md), "Command line"; each is
 documented here when it ships. The file format is
 [FORMAT.md](FORMAT.md); `kiln.toml` is summed up in
@@ -118,6 +118,49 @@ error, 0 otherwise (warnings don't fail).
 A `kiln.toml` Kiln can't read at all (K001, or a newer `format`) is
 reported as a finding in the chosen format, with exit 1, so CI shows it.
 
+## Exporting
+
+### `kiln export [NAME…] [--dry-run | --check] [--format text|json]`
+
+Renders every export target in `kiln.toml` (or the named ones) and writes
+the file targets whose bytes changed; see [EXPORT.md](EXPORT.md) for
+targets, templates, layouts and formats.
+
+```
+$ kiln export --dry-run
+design-md (markdown, document) → docs/generated/DESIGN.md
+  would update docs/generated/DESIGN.md
+  leaves out: TEST-004
+```
+
+| Option | Does |
+|---|---|
+| `--dry-run` | renders everything and prints what would change; writes nothing |
+| `--check` | like `--dry-run`, and exits 1 if anything would change (for committed exports in CI) |
+| `--require-clean` | refuses when the working tree has uncommitted changes |
+| `--allow-shallow` | exports from a shallow clone; files older than its boundary link at the exported commit |
+| `--snapshot FILE` | Confluence: plans against a recorded snapshot instead of the live space |
+| `--save-snapshot FILE` | Confluence: writes the snapshot a live dry run read |
+| `--format json` | the outcome per target as JSON (the Confluence plan included) |
+
+File targets write atomically and only what changed, and remove the files
+they wrote earlier and no longer produce. "leaves out" lists open items
+no part of the document placed: an omission should be a decision.
+
+Confluence targets only plan until K3: `kiln export --dry-run` reads the
+space with `KILN_CONFLUENCE_TOKEN` (and `KILN_CONFLUENCE_USER` on Cloud)
+and prints each page's operation and why:
+
+```
+spec (confluence, document) → space FLINT, page 123456789
+  update    "Flint — design document": REQ-014 changed; REQ-031 new (42 KiB)
+  0 create, 1 update, 0 unchanged, 0 drift, 0 retire
+```
+
+Without `--dry-run` or `--check`, a Confluence target is refused (exit 2).
+A plan that would be refused (a page edited in Confluence, a page too
+large) exits 1; a server or network error exits 3.
+
 ## Editing
 
 The editing commands change only what they are about, keep comments,
@@ -187,6 +230,6 @@ kiln: a requirement can't be the source of `verifies` (from: test, code)
 | Exit code | Means |
 |---|---|
 | 0 | fine |
-| 1 | `kiln check` found an error, or a change was refused (a file changed on disk) |
+| 1 | `kiln check` found an error, `kiln export --check` found changes, a Confluence plan was refused, or a change was refused (a file changed on disk) |
 | 2 | usage or configuration error: unknown command or ID, no `kiln.toml`, a `kiln.toml` Kiln can't read, a value the configuration doesn't allow |
-| 3 | network or server error (from K2) |
+| 3 | network or server error (Confluence) |

@@ -127,7 +127,8 @@ keys.
 | Data Center, no PATs | username + password (only with `auth = "basic"`) | Basic |
 | Cloud | account e-mail (`user`) + API token | Basic |
 
-Looked up in this order:
+Looked up in this order (K2 reads only the first; the credential store
+arrives with `kiln auth confluence` in K3):
 
 1. `KILN_CONFLUENCE_TOKEN` (and `KILN_CONFLUENCE_USER` overriding `user`):
    for CI, set as masked protected variables.
@@ -198,7 +199,9 @@ snapshot (reads) ──► remote pages                            read-back, pr
 `kiln-export` assembles and splits the document (EXPORT.md); this back end
 renders each page to storage format (see "Storage format") and computes
 its `renderHash` over title, parent key, body, labels and the set of
-attachment hashes. Refuses on a dirty working tree with `--require-clean`
+attachment hashes. A diagram's hash is its picture's name, which is
+content-addressed by its source (EXPORT.md, "Diagrams"), so planning
+draws nothing; a repository image's is the sha256 of its bytes. Refuses on a dirty working tree with `--require-clean`
 (CI passes it).
 
 ### 2. Snapshot
@@ -219,6 +222,17 @@ Kiln never looks at or touches other pages:
    for a document.
 4. Pages under the root without this target's property are **foreign**:
    never modified, moved or deleted, and listed in the plan.
+5. Bodies are read only for pages whose version is past the property's
+   `publishedVersion` (a possible edit), to compare their normalised hash.
+6. Each title a page would take is looked up in the space; a title held
+   by a page this target doesn't own is disambiguated (see "Pages and
+   their identity").
+
+The snapshot is plain JSON (`id`, `title`, `parentId`, `version`, author,
+time, the `kiln` property, `bodyHash`; plus `takenTitles`):
+`--save-snapshot FILE` writes the one a live dry run read, `--snapshot
+FILE` plans against one offline, for tests, demos and planning without a
+token.
 
 ### 3. Plan
 
@@ -315,8 +329,13 @@ kind to the page.
 **Normalising storage** before hashing: parse as XML; drop
 `ac:macro-id`, `ac:local-id`, `local-id` and `data-*` attributes; drop
 `ac:inline-comment-marker` elements (keeping their text); sort attributes;
-collapse whitespace between block elements; serialise canonically. The
-normaliser is tested on bodies captured from both flavours.
+drop whitespace-only text between elements; treat CDATA as text and
+decode entities (XML's, numeric, and the HTML ones Confluence writes such
+as `&nbsp;`); serialise canonically. The normaliser is tested on bodies
+captured from both flavours (K3). **Verify** which other attributes
+Confluence adds on save (`ac:schema-version` on macros is likely): any
+not dropped here would count every page as drifted after its first
+publish, so K3 adds them to the list from captured bodies.
 
 ## Comments
 
@@ -343,7 +362,8 @@ raw HTML through.
 | Document node | Storage |
 |---|---|
 | headings, paragraphs, emphasis, strong, strikethrough, inline code | `h1`–`h6`, `p`, `em`, `strong`, `del`, `code`; numbering as text in the heading |
-| item heading | the heading, preceded by the `anchor` macro named by the ID (`<ac:structured-macro ac:name="anchor"><ac:parameter ac:name="">REQ-014</ac:parameter></ac:structured-macro>`, **verify** the default-parameter form on both flavours) |
+| item heading | the heading, with the `anchor` macro named by the ID at its start, inside the heading element (`<h2><ac:structured-macro ac:name="anchor"><ac:parameter ac:name="">REQ-014</ac:parameter></ac:structured-macro>2.1 REQ-014 …</h2>`; **verify** the default-parameter form, and that `…#REQ-014` scrolls to it, on both flavours) |
+| item in a `style="row"` table, or a report row | the `anchor` macro at the start of the row's first cell |
 | properties line / table | a `p` of status lozenge and links / a two-column `table` |
 | "Changed" / "New" markers (`--since`) | `status` macro, Yellow / Green, after the heading text |
 | lists, GitHub task lists | `ul`/`ol`; task items as text `☐`/`☑` (Confluence task lists are interactive, which invites edits) |
@@ -356,10 +376,10 @@ raw HTML through.
 | reference to an item exported nowhere | text, plus a link to its file in the repository |
 | callouts `[!NOTE]` … | `info` (NOTE, IMPORTANT), `tip` (TIP), `note` (WARNING), `warning` (CAUTION) macros |
 | relative links to repo files, code locations | `a href` to the repository web URL (EXPORT.md, "Which commit a link names") |
-| relative images | attached (content-addressed name) and shown with `ac:image` |
+| relative images | attached as `image-<sha256 of the bytes, 12 hex>.<ext>` and shown with `ac:image` |
 | status | `status` macro, `colour` by group: initial Grey, done Green, closed Grey, others Blue; gaps Red |
 | table of contents (`kiln:toc`) | the `toc` macro (`maxLevel` 3 by default; `[export.confluence] toc_levels`) |
-| `sections`/`tree` root's list of child pages | the `children` macro (**verify** parameters; fall back to a generated list) |
+| `sections`/`tree` root's list of child pages | the `children` macro with `all` = `true` (**verify** parameters; fall back to a generated list) |
 
 Because cross-page links go by title, a title change re-renders every page
 that links to the renamed item; the planner sees those as body changes and
@@ -387,7 +407,7 @@ listed here; nothing else is used.
 | page by id (title, version, parent, space) | `GET /content/{id}?expand=version,ancestors,space` | `GET /api/v2/pages/{id}` |
 | page body (storage) | `GET /content/{id}?expand=body.storage,version` | `GET /api/v2/pages/{id}?body-format=storage` |
 | children of a page | `GET /content/{id}/child/page?expand=version` (paged) | `GET /api/v2/pages/{id}/children` (paged) |
-| descendants of the root | `GET /content/{id}/descendant/page?expand=version,ancestors&limit=…` (paged) | `GET /api/v2/pages/{id}/descendants` (paged; **verify** depth and fields), else children recursively |
+| descendants of the root | `GET /content/{id}/descendant/page?expand=version,ancestors&limit=…` (paged) | `GET /api/v2/pages/{id}/descendants` (paged; **verify** depth and fields: K2 assumes no versions, so each listed page is read with "page by id"), else children recursively |
 | page by title in space | `GET /content?spaceKey=…&title=…&type=page` | `GET /api/v2/pages?space-id=…&title=…` (space id from `GET /api/v2/spaces?keys=…`) |
 | create page | `POST /content` `{type:"page", title, space:{key}, ancestors:[{id}], body:{storage:{value, representation:"storage"}}}` | `POST /api/v2/pages` `{spaceId, status:"current", title, parentId, body:{representation:"storage", value}}` |
 | update page | `PUT /content/{id}` with `version:{number: n+1, message}` (and `ancestors` to move) | `PUT /api/v2/pages/{id}` `{id, status:"current", title, body, version:{number: n+1, message}}` |
@@ -404,6 +424,17 @@ listed here; nothing else is used.
 
 Notes:
 
+- Paging follows `_links.next` on both flavours; a next link starting
+  with the base URL's own path (Cloud's `/wiki`, a Data Center context
+  path) is resolved against the host.
+- On Cloud, v2 names version authors by account id, not name; the plan
+  shows the id (**verify** whether a name is worth one more call).
+- HTTP goes through the proxy the environment names for the URL's scheme
+  (`HTTPS_PROXY`, `HTTP_PROXY`, else `ALL_PROXY`, either case) unless
+  `NO_PROXY` names the host (exact, domain suffix, `*`, or an IPv4 CIDR).
+  `ureq`'s own reading of the environment ignores `NO_PROXY`, which would
+  send an internal Confluence through a corporate proxy, so Kiln decides
+  itself. The Windows WinINET setting is still **verify** (K3).
 - Attachments use content-addressed names, so Kiln only ever creates and
   deletes them, never uploads a new version. That avoids the attachment
   update endpoints, which differ the most between flavours. A document
@@ -509,11 +540,13 @@ Ship these as `contrib/gitlab-ci.yml` and `contrib/github-workflow.yml`.
 
 ## Milestone split
 
-- **K2 (no writes)**: the storage emitter, normaliser, planner and the read
-  half of both clients; `kiln export --dry-run` for Confluence targets
-  against a live space and against a recorded snapshot file (`--snapshot
-  <file>` for offline tests and demos). The `document` layout first, then
-  `sections` and `tree`.
+- **K2 (no writes)**, done: the storage emitter, normaliser, planner and the
+  read half of both clients, tested against the in-process fake server
+  (read half, both flavours, paging, 429 with `Retry-After`, 401);
+  `kiln export --dry-run` for Confluence targets against a live space and
+  against a recorded snapshot file (`--snapshot <file>`, `--save-snapshot
+  <file>`). Every layout. No endpoint marked **verify** has been confirmed
+  against a live instance yet; each still is.
 - **K3 (writes)**: apply, properties, labels, attachments, adopting a page,
   retires, drift, `restrict_edits`, size limits, retries, `auth
   confluence`, CI recipes, the fake server's write half, live tests on

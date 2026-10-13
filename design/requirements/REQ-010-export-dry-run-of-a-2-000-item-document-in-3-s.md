@@ -2,7 +2,7 @@
 id = "REQ-010"
 type = "requirement"
 title = "Export dry run of a 2,000-item document in 3 s"
-status = "approved"
+status = "verified"
 parent = "REQ-004"
 +++
 

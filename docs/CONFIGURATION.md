@@ -22,7 +22,8 @@ named like a token or password is an error (K004).
 | `[render]` `link_bare_ids` | whether a bare `REQ-014` in prose is a reference | `true` |
 | `[jira]` `url` | where `jira` keys point (read-only) | none |
 | `[check]` | severity per rule: `K201 = "error"`, `K105 = "off"` | each rule's default (FORMAT.md, "Check rules") |
-| `[confluence]`, `[[export]]` | exports (K2/K3; EXPORT.md, CONFLUENCE.md) | none |
+| `[[export]]` | export targets: `name`, `format` (markdown, html, confluence), `layout`, `title`, `template`, `types`, `exclude_status`, `reports`, `numbering`, `item_style`, `link_to`, `path`, and `[export.markdown]` (`flavour`, `diagrams`), `[export.html]` (`theme`), `[export.confluence]` (`parent` or `page`, `space`, `labels`, `toc_levels`) — EXPORT.md | none |
+| `[confluence]` | the connection: `url`, `space`, `flavour`, `user`, `auth`, `labels`, `jira_macro`, `jira_server_id`, `on_drift`, `diagrams`, `max_page_kib`, … — CONFLUENCE.md | none |
 
 Mistakes in `kiln.toml` are findings with the line they are on: `kiln
 check` lists them. Other commands carry on with what is valid and say on
@@ -40,8 +41,16 @@ K201 = "error"
 
 | Variable | Effect |
 |---|---|
+| `KILN_CONFLUENCE_TOKEN` | the Confluence token (a personal access token on Data Center, an API token on Cloud); never put it in a file |
+| `KILN_CONFLUENCE_USER` | Cloud: the account e-mail the token belongs to (overrides `[confluence] user`) |
+| `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, `NO_PROXY` | the proxy for Confluence calls, honouring `NO_PROXY` (CONFLUENCE.md, "The API, by flavour") |
+| `KILN_HOME` | puts Kiln's own folders (settings, state, logs) in one folder |
 | `FENIX_HOME` | which Fenix `kiln new --open` talks to (the one started with the same `FENIX_HOME`) |
 
-Kiln keeps no settings or state of its own yet; its folders (and
-`KILN_HOME`) arrive with the first thing that needs them (DESIGN.md,
-"Kiln's own folders").
+## Kiln's own folders
+
+Settings in `%AppData%\kiln` / `~/.config/kiln`; state in
+`%LocalAppData%\kiln\state` / `~/.local/state/kiln/state`, logs beside it;
+all three under `KILN_HOME` when it is set. K2 keeps one thing there: the
+cache of rasterised diagrams (`state/diagrams`), which CI may cache
+between runs.

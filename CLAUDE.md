@@ -6,8 +6,9 @@ links between them in CI, and exports them (by default as one design
 document on one Confluence page) for people who don't use Kiln. It is
 part of a suite with Fenix (editor, https://github.com/tpedneault/fenix)
 and Flint (launcher, https://github.com/tpedneault/flint). The design is settled; K0 (the
-workspace and CI) and K1 (the format, `kiln check`, the editing
-commands, this repository's own `design/`) are done.
+workspace and CI), K1 (the format, `kiln check`, the editing commands,
+this repository's own `design/`) and K2 (exports; Confluence planning
+without writes; the committed design document) are done.
 
 ## Read first, in this order
 
@@ -118,6 +119,7 @@ docs/CI.md            the gates and how to run them
 docs/CLI.md           the command line as it stands
 docs/CONFIGURATION.md kiln.toml and environment, the overview
 kiln.toml, design/    Kiln's own Kiln project (dogfooding), checked in CI
+docs/generated/       its exported design document, `kiln export --check` in CI
 crates/               the workspace (kiln-* libraries, kiln binary)
 scripts/ci.ps1        the one entry point for the gates
 CHANGELOG.md          Keep a Changelog; add under Unreleased

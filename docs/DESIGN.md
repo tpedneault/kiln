@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0 and K1 done (the format, `kiln check`, the editing commands, this repository's own `design/`); K2 next. Pinned against Fenix
+Status: K0–K2 done (the format, `kiln check`, the editing commands, exports to Markdown and HTML, Confluence planning without writes, this repository's own `design/` and generated design document); K3 next. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -186,7 +186,7 @@ nearest `kiln.toml` (`--project <dir>` overrides).
 | `kiln renumber <ID> --to <ID> [--file PATH]` | moves an ID and rewrites every reference (the cure for two branches allocating the same number; `--file` picks which copy of a duplicate moves) | K1 |
 | `kiln trace [--type requirement] [--format text\|json\|csv]` | coverage: what implements and verifies each item, and the gaps | K1 |
 | `kiln impact <ID>` | everything that links to it, transitively, by path | K1 |
-| `kiln export [NAME…] --dry-run` / `--check` | renders every (or the named) export target and shows what would change; `--check` exits 1 if anything would | K2 |
+| `kiln export [NAME…] --dry-run` / `--check` | renders every (or the named) export target and shows what would change; `--check` exits 1 if anything would; Confluence targets plan against the live space or `--snapshot FILE` | K2 |
 | `kiln export [NAME…]` | writes file targets (K2) and publishes Confluence targets (K3); all flags in EXPORT.md and CONFLUENCE.md | K2 / K3 |
 | `kiln confluence comments` | unresolved footer comments on published pages, per item, with links | K6 |
 | `kiln auth confluence` / `auth jira` | stores a token in the OS credential store, prompting without echo | K3 / K8 |
@@ -221,7 +221,8 @@ in detail when K6 is done; nothing before it depends on it.
 
 A benchmark on a generated project runs in CI from K1, as Flint's index
 benchmark does: `crates/kiln-check/examples/bench.rs`, gating at 50% over
-the `kiln check` budget (CI.md). It measures with a warm file cache; the
+the `kiln check` budget and (from K2) the `kiln export --dry-run` budget
+(CI.md). It measures with a warm file cache; the
 cold figure is for a person to check on a laptop.
 
 ## Security

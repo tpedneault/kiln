@@ -11,16 +11,23 @@
 //! (`kiln-check`). FORMAT.md is the contract: change it and this crate
 //! together, with `kiln-parse`.
 //!
-//! Kiln's own folders (settings, state, logs, `KILN_HOME`) join this crate
-//! with the first thing that keeps state (the Confluence page cache, K3);
-//! K1 keeps none.
+//! Also the export targets and Confluence connection (K2), and Kiln's own
+//! folders (settings, state, logs, `KILN_HOME`), whose rules are pure
+//! here and resolved against the platform by the binary.
 
 mod config;
+mod export;
 mod finding;
+mod folders;
 mod id;
 mod item;
 
 pub use config::{default_config, slug, CodeConfig, Config, LinkRole, TypeDef, CODE};
+pub use export::{
+    ConfluenceConfig, ConfluenceFlavour, ConfluenceTarget, Diagrams, ExportFormat, ExportTarget,
+    Flavour, HtmlOptions, ItemStyle, Layout, MarkdownOptions, OnDrift, REPORTS,
+};
 pub use finding::{Finding, Rule, Severity, Span};
+pub use folders::{Folders, Platform};
 pub use id::{is_prefix, IdError, ItemId};
 pub use item::{CodeRef, Date, Item, LinkEntry, Mention, Ref, RelativeLink};

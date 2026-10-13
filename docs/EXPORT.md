@@ -117,8 +117,8 @@ and a browsable tree of the same items, or one document per audience.
 
 Without a template, a document is: the title, a short summary (the commit,
 counts by type and status, coverage, milestone progress), a table of
-contents, one section per type in `types`, then the `reports` as
-appendices.
+contents, one section per type in `types` that has items, then the
+`reports` as appendices (lettered `A`, `B`).
 
 A template is a Markdown file in the repository that gives the document
 its own shape and prose: an introduction, scope, definitions, the order
@@ -188,11 +188,21 @@ Flint covers Windows and Linux (KDE Plasma 6 on Wayland). It does not…
 
 Rules:
 
+- The template's shallowest heading level is the document's top level,
+  so a template may use `#` or `##` for its sections.
+- An explicit `status=` in `kiln:items` decides on its own, even for
+  statuses the target excludes by default (`status="accepted,superseded"`
+  shows superseded decisions though they are closed).
 - An item appears **once** per document. A later directive that selects
   an item an earlier one placed skips it (so "Everything else" above
   really is everything else). An item selected by none is simply not in
   that document; `kiln export --dry-run` lists what each target leaves
   out, so an omission is a decision, not an accident.
+- Items placed with `style="row"` have no heading; each row carries an
+  anchor named by the ID, so references still land on it. Items a report
+  lists (the roadmap's milestones, the risks) and that nothing else
+  placed are placed on their row the same way, after everything else,
+  so a report never takes an item from a later `kiln:items`.
 - Items keep their `parent` nesting within a directive. An item whose
   parent isn't placed by the same directive starts at the directive's
   level.
@@ -223,7 +233,10 @@ approved · under REQ-002 · verified by TEST-031 · Jira FLINT-88 ← propertie
   is a page of its own).
 - `none`: heading and body only, for documents meant to read as prose.
 
-Headings: the document's sections and items use levels 1–6 by depth.
+Headings: the document's sections and items use levels 1–6 by depth. In
+Confluence the page title is the document's title and sections start at
+level 1; in a file the title is the first heading, so sections start one
+level below it.
 Below level 6, items keep their number (`2.1.3.1.2.1`) on a level-6
 heading. An item body's own headings are moved under the item's level,
 and those that would pass level 6 become bold paragraphs.
@@ -236,7 +249,7 @@ and those that would pass level 6 become bold paragraphs.
 | `findings` | `kiln check` warnings and errors, by rule, linked to the repository |
 | `roadmap` | milestones in `due` order, status, progress, included items |
 | `risks` | open risks and what mitigates them |
-| `changes` | with `--since REV`: items added, removed and changed (status, title, links, body) between REV and the published commit |
+| `changes` | with `--since REV`: items added, removed and changed (status, title, links, body) between REV and the published commit (K6; until then naming it is K005 or K112) |
 
 With `--since REV`, every item that changed since REV is also marked in
 place with a "Changed" or "New" lozenge next to its heading, so a reviewer
@@ -267,10 +280,18 @@ flavour = "gitlab"         # gitlab | github | commonmark: how heading anchors a
 diagrams = "source"        # source: keep ```mermaid blocks (GitLab and GitHub draw them) | image: PNG files beside the document
 ```
 
-- Item anchors: headings start with the ID, so the anchor is predictable;
-  Kiln computes it with the flavour's own slug rules (GitLab's and
-  GitHub's differ) and links with it. `commonmark` adds an explicit
-  `<a id="REQ-014"></a>` before the heading.
+- Item anchors: headings start with the number and ID, so the anchor is
+  predictable; Kiln computes it with the flavour's own slug rules (GitLab's
+  and GitHub's differ: GitLab collapses repeated `-`) and links with it,
+  across pages and into `link_to` Markdown exports too. `commonmark` adds
+  an explicit `<a id="REQ-014"></a>` before the heading. GitLab and GitHub
+  keep no anchors of Kiln's making, so a reference to a row item lands on
+  the section holding the row.
+- Images in the repository link to the raw file (`/-/raw/`, `/raw/`) when
+  the export is outside the repository, so they display; relatively when
+  it is inside.
+- With `diagrams = "image"`, PNG files are written beside the page and the
+  source follows each picture in a `<details>` block.
 - Useful committed in the repository (a generated `docs/DESIGN.md`) with
   `kiln export --check` in CI to fail when it is stale, or attached to a
   release.
@@ -282,7 +303,9 @@ no scripts, no network fetches. A print stylesheet (page breaks before
 top-level sections, link URLs shown, no navigation) makes the browser's
 "Print to PDF" a decent PDF, which covers the PDF case without a PDF
 engine. Light theme by default; `[export.html] theme = "<Fenix theme
-name>"` uses one of the suite's palettes.
+name>"` will use one of the suite's palettes (only `light` exists so far;
+another name is K005). A remote image (an `https:` URL) is never fetched:
+it shows as its alt text, so the file stays self-contained.
 
 ### Later: `docx` (K8)
 
@@ -307,16 +330,25 @@ kiln export [NAME…] [--dry-run | --check] [--yes] [--force] [--since REV]
             [--require-clean] [--allow-shallow] [--format text|json]
 ```
 
-- No names: every target. Names: those.
+- No names: every target. Names: those. A target or template `kiln check`
+  calls broken (K005, K112) doesn't export.
 - `--dry-run`: render everything, print what would change (Confluence: the
   plan; files: which files would be written), write nothing.
 - `--check`: like `--dry-run`, and exit 1 if anything would change. For
   committed file exports in CI.
 - File targets write a file only when its bytes change, atomically
   (`fenix_storage::write`), and remove files they wrote earlier that are
-  no longer produced (tracked in a `.kiln-export` list beside them; files
+  no longer produced (tracked in a `.kiln-export` list in the target's
+  folder, written only for targets that produce more than one file; files
   Kiln didn't write are never removed).
+- `--dry-run` also lists the open items each target leaves out.
 - Confluence targets: see CONFLUENCE.md for `--yes`, `--force`, drift.
+  Until K3 they only plan: `--dry-run` (or `--check`) against the live
+  space, or `--snapshot FILE` offline; `--save-snapshot FILE` records the
+  live snapshot.
+- `link_to` links files to files and Confluence pages to Confluence pages;
+  a `link_to` across the two is ignored and the item links to its file in
+  the repository.
 - Exit codes as in DESIGN.md: 1 means `--check` found changes or a plan
   was refused.
 
@@ -325,7 +357,33 @@ kiln export [NAME…] [--dry-run | --check] [--yes] [--force] [--since REV]
 The same project at the same commit exports byte-identical output, on
 Windows and on Linux. Everything without an inherent order is sorted;
 line endings are normalised; the time of the export never appears (the
-summary shows the published commit and that commit's date).
+summary shows the published commit and that commit's date). The one
+exception is rasterised diagrams: their pixels depend on the fonts a
+machine has, so an HTML export with diagrams (or Markdown with
+`diagrams = "image"`) is identical only between machines with the same
+fonts. Picture names are content-addressed by the diagram source, not the
+pixels, so they don't change.
+
+### Exports kept in the repository
+
+A file target whose `path` is inside the repository and not ignored by
+git (a committed `docs/generated/DESIGN.md`) can't name the commit that
+will contain it: that commit doesn't exist when the file is written, and
+`kiln export --check` in CI would never pass. Such a target is
+**in-tree**:
+
+- links to repository files are relative paths (with `#L<line>` for code
+  locations), which GitLab and GitHub resolve at the revision being
+  viewed, instead of web URLs naming commits;
+- the summary says "Generated by Kiln from the files in this repository"
+  instead of naming a commit, and `kiln:value commit` renders as "this
+  revision" (`date` as nothing).
+
+Everything else follows the rules below. A file under an ignored folder
+(`target/kiln/design.html`) is not in-tree and links to the web like a
+Confluence page. Code locations carry line numbers, so an in-tree export
+that shows them goes stale when code above them moves; `--check` says so
+and `kiln export` brings it back.
 
 ### Which commit a link names
 
@@ -338,7 +396,7 @@ when something it shows changed; the summary, which names the exported
 commit, is the one place that changes on every new commit.
 
 `kiln-git` gets these in one pass (`git log --format=%H --name-only` over
-the paths involved). A shallow clone can't answer for files older than
+the project). A shallow clone can't answer for files older than
 its boundary, so exports check `git rev-parse --is-shallow-repository`
 and fail with "the clone is shallow: fetch full history (GitLab:
 GIT_DEPTH: 0; GitHub: fetch-depth: 0)" unless `--allow-shallow`, which
@@ -362,6 +420,8 @@ for a bundled fallback font.
 
 **Caching.** PNGs are cached in Kiln's state folder by
 `sha256(source + fenix-diagram rev + scale)`; CI can cache that folder.
+The same hash names the picture (`diagram-<12 hex>.png`), so a Confluence
+dry run knows every attachment without drawing anything.
 
 ## Testing
 

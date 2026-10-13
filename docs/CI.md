@@ -19,18 +19,25 @@ workspace; Kiln has no crate that needs a display before K7.
 | lint | `cargo clippy --locked --workspace --all-targets -- -D warnings` |
 | tests | `cargo test --locked --workspace --no-fail-fast` |
 | dogfood | `kiln check` on this repository's own `kiln.toml` and `design/` (errors fail; warnings are listed) |
-| benchmark | `cargo run --release -p kiln-check --example bench -- --gate`: `kiln check` on a generated 2,000-item, 50,000-file project; fails above 3 s, 50% over the 2 s budget |
+| dogfood export | `kiln export --check`: `docs/generated/DESIGN.md` is what `kiln export` would write now |
+| benchmark | `cargo run --release -p kiln-check --example bench -- --gate`: `kiln check` on a generated 2,000-item, 50,000-file project, failing above 3 s (50% over the 2 s budget); and `kiln export --dry-run` of that project as one document, failing above 4.5 s (50% over 3 s) |
 
 | Job | Runner | Notes |
 |---|---|---|
 | Windows | `windows-2022` (MSVC) | primary platform; checked out into a path with a space |
 | Linux | `ubuntu-24.04` | headless, as in a CI container |
 
-Still to come: `kiln export --check` on the committed design document
-(K2). The benchmark generates its project once into `target/kiln-bench`
+When the export gate fails, run `kiln export` and commit
+`docs/generated/DESIGN.md`. It shows code locations with line numbers, so
+editing code above a `// implements:` or `// verifies:` comment makes it
+stale too; that is the gate doing its job. The benchmark generates its project once into `target/kiln-bench`
 (about 3 s on Linux, longer on Windows), then measures four runs; the gate
 is the median of the last three. Kiln's own tests need `git` on the PATH
-(`kiln-git`'s test makes a repository).
+(`kiln-git`'s test makes a repository). Golden files (`crates/*/golden/`)
+are compared byte for byte; after a deliberate change run the tests with
+`KILN_BLESS=1` and review the diff. The Confluence client is tested
+against an in-process fake server on a local port; nothing in CI talks to
+a real Confluence.
 
 ## Run locally
 

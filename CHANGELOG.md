@@ -27,8 +27,27 @@ All notable changes to Kiln are recorded here. The format follows
   `kiln check` on 2,000 items and 50,000 source files
   ([docs/CLI.md](docs/CLI.md), [docs/CONFIGURATION.md](docs/CONFIGURATION.md)).
 
+- K2: exports. `kiln export` with `--dry-run`, `--check`,
+  `--require-clean`, `--allow-shallow` and `--format json`; templates with
+  `<!-- kiln:… -->` directives; the `document`, `sections` and `tree`
+  layouts; the Markdown (GitLab, GitHub and CommonMark anchors) and HTML
+  (self-contained, printable) formats; traceability, findings, roadmap and
+  risks reports; Mermaid diagrams drawn with `fenix-diagram` and cached.
+  Confluence targets plan without writing: the storage-format emitter,
+  drift-detecting normaliser, planner and read-only client for Cloud and
+  Data Center, against the live space or a `--snapshot` file. Check rules
+  K005, K111 and K112. Kiln's own design document in
+  [docs/generated/DESIGN.md](docs/generated/DESIGN.md), kept current in
+  CI; the benchmark gate covers `kiln export --dry-run`.
+
 ### Changed
 
+- Exports written into the repository link files relatively and name no
+  commit, so a committed export can be kept current
+  ([docs/EXPORT.md](docs/EXPORT.md), "Exports kept in the repository").
+- Confluence calls honour `NO_PROXY`.
+- `kiln check` is faster: reference patterns are compiled once, not per
+  item.
 - The file format: IDs are written with at least three digits and one
   spelling per number (`REQ-007`, not `REQ-7`); `[code] exclude`; the
   default code pattern; which rules apply when

@@ -41,8 +41,12 @@ try {
     # Kiln checks its own design/ folder (K1 dogfooding): an error fails CI,
     # warnings are the honest gaps and don't.
     Invoke-Gate 'kiln-check' 'cargo' @('run', '--locked', '--quiet', '-p', 'kiln', '--', 'check')
-    # The budget is a requirement (DESIGN.md, "Performance"): fails when
-    # `kiln check` on 2,000 items and 50k files is 50% over 2 s.
+    # Its committed design document (docs/generated/DESIGN.md) is current
+    # (K2 dogfooding); when this fails, run `kiln export` and commit.
+    Invoke-Gate 'kiln-export' 'cargo' @('run', '--locked', '--quiet', '-p', 'kiln', '--', 'export', '--check')
+    # The budgets are requirements (DESIGN.md, "Performance"): fails when
+    # `kiln check` on 2,000 items and 50k files is 50% over 2 s, or
+    # `kiln export --dry-run` of that 2,000-item document 50% over 3 s.
     Invoke-Gate 'bench' 'cargo' @('run', '--locked', '--release', '-p', 'kiln-check', '--example', 'bench', '--', '--gate')
     Write-Host "All gates passed. Logs: $logRoot"
 } finally {

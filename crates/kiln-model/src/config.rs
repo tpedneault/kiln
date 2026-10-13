@@ -1,11 +1,10 @@
 //! `kiln.toml`, as a value (docs/FORMAT.md, "`kiln.toml`").
 //!
-//! Only what Kiln interprets is kept. `[confluence]` and `[[export]]` are
-//! known keys, so they are not K003, but their contents belong to K2/K3
-//! and are not modelled (or checked) yet.
+//! Only what Kiln interprets is kept.
 
 use std::collections::BTreeMap;
 
+use crate::export::{ConfluenceConfig, ExportTarget};
 use crate::finding::{Rule, Severity};
 
 /// The pseudo-type of code references; only ever a link's `from`.
@@ -33,6 +32,10 @@ pub struct Config {
     pub jira_url: Option<String>,
     /// `[check]` overrides.
     pub severities: BTreeMap<Rule, Severity>,
+    /// `[confluence]`, when present and usable.
+    pub confluence: Option<ConfluenceConfig>,
+    /// `[[export]]`, the valid ones, in order.
+    pub exports: Vec<ExportTarget>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -128,6 +131,10 @@ impl Config {
     /// The role whose inverse is written as `key` (`verified-by`).
     pub fn role_by_inverse_key(&self, key: &str) -> Option<&LinkRole> {
         self.links.iter().find(|r| r.inverse_key() == key)
+    }
+
+    pub fn export(&self, name: &str) -> Option<&ExportTarget> {
+        self.exports.iter().find(|e| e.name == name)
     }
 
     pub fn prefixes(&self) -> Vec<String> {
@@ -339,6 +346,8 @@ mod tests {
             link_bare_ids: true,
             jira_url: None,
             severities: BTreeMap::new(),
+            confluence: None,
+            exports: vec![],
         };
         let patterns = config.code_patterns();
         assert_eq!(patterns.len(), 1);
