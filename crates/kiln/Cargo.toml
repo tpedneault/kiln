@@ -1,0 +1,15 @@
+[package]
+name = "kiln"
+description = "Requirements, design decisions and project progress, kept as Markdown in the repository they describe"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+clap.workspace = true

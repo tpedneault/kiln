@@ -17,13 +17,17 @@ navigation through Kiln's language server) and
 [Flint](https://github.com/tpedneault/flint) (the launcher, where any item
 is a few keystrokes away).
 
-**Status:** designed, not yet implemented.
+**Status:** designed; the workspace and CI are in place (K0), and the
+file format and `kiln check` (K1) come next.
 
 - [Design](docs/DESIGN.md)
 - [File format](docs/FORMAT.md)
 - [Exporting](docs/EXPORT.md): one design document, sections or a page tree; Confluence, Markdown or HTML
 - [Publishing to Confluence](docs/CONFLUENCE.md)
 - [Fenix, Flint and Jira](docs/INTEGRATION.md)
+- [Architecture](docs/ARCHITECTURE.md): the crates and which way they depend
+- [Command line](docs/CLI.md)
+- [Continuous integration](docs/CI.md): the gates, and running them locally
 
 ## Licence
 

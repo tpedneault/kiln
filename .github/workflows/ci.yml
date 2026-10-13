@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  RUST_BACKTRACE: '1'
+
+jobs:
+  gates:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows is the primary platform. The checkout path has a space
+          # in it, so path handling is tested the way users hit it.
+          - name: Windows
+            os: windows-2022
+            path: kiln repo
+          - name: Linux
+            os: ubuntu-24.04
+            path: kiln
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: ${{ matrix.path }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          path: ${{ matrix.path }}
+      - name: Install Rust stable with Clippy and rustfmt
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt --no-self-update
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup override set stable
+      - name: Configure Windows Git paths
+        if: runner.os == 'Windows'
+        run: |
+          git config --global core.longpaths true
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git config --global core.autocrlf false
+      - name: Format, lint and test
+        # The Windows runner's default TEMP is an 8.3 short path
+        # (C:\Users\RUNNER~1), which canonicalises to a different spelling
+        # than tests compare against. Its own temp folder has no short names.
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: ./scripts/ci.ps1
+      - name: Upload diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ci-logs-${{ runner.os }}
+          path: ${{ matrix.path }}/target/ci/
+          if-no-files-found: warn
+          retention-days: 14
