@@ -1,25 +1,50 @@
 //! The `kiln` binary: the command line (`clap`) over the library crates.
 //! It owns what only a process has: arguments, stdout and stderr, exit
-//! codes, finding the project by walking up to `kiln.toml`. Everything
-//! else is a library call, so commands stay thin and their logic stays
-//! testable without spawning a process.
+//! codes, finding the project by walking up to `kiln.toml`, reading and
+//! writing files. Everything else is a library call, so commands stay
+//! thin and their logic stays testable without spawning a process.
 //!
-//! Conventions every command keeps (DESIGN.md, "Command line"): errors
-//! are one line on stderr naming what failed and why, with file and line
-//! when there is one; exit codes are 0 fine, 1 findings or a refused plan,
-//! 2 usage or configuration error, 3 network or server error.
-//!
-//! K0 ships only `--help` and `--version`; the commands arrive from K1
-//! (docs/CLI.md). With no arguments it prints help and exits 2, until K7
+//! Conventions every command keeps (DESIGN.md, "Command line"): results
+//! go to stdout, messages to stderr; errors are one line on stderr naming
+//! what failed and why, with file and line when there is one; exit codes
+//! are 0 fine, 1 findings or a refused change, 2 usage or configuration
+//! error, 3 network or server error. The commands are documented in
+//! docs/CLI.md. With no arguments it prints help and exits 2, until K7
 //! gives that invocation the GUI.
 
+mod cmd;
+mod project;
+
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::error::ErrorKind;
-use clap::Parser;
+use clap::{Parser, Subcommand, ValueEnum};
 
+/// Findings, or a change refused.
+pub const EXIT_FINDINGS: u8 = 1;
 /// Usage or configuration error.
-const EXIT_USAGE: u8 = 2;
+pub const EXIT_USAGE: u8 = 2;
+
+/// Why a command stopped: an exit code and one line for stderr.
+#[derive(Debug)]
+pub struct Fail {
+    pub code: u8,
+    pub message: String,
+}
+
+impl Fail {
+    pub fn new(code: u8, message: impl Into<String>) -> Self {
+        Fail {
+            code,
+            message: message.into(),
+        }
+    }
+
+    pub fn usage(message: impl Into<String>) -> Self {
+        Fail::new(EXIT_USAGE, message)
+    }
+}
 
 #[derive(Parser)]
 #[command(
@@ -28,21 +53,170 @@ const EXIT_USAGE: u8 = 2;
     about = "Requirements, design decisions and project progress, kept as Markdown in the repository they describe",
     arg_required_else_help = true
 )]
-struct Cli {}
+struct Cli {
+    /// Use the project at or above this folder instead of the current one.
+    #[arg(long, global = true, value_name = "DIR")]
+    project: Option<PathBuf>,
+
+    #[command(subcommand)]
+    command: Command,
+}
+
+/// Plain text for people, JSON for tools.
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum TextOrJson {
+    Text,
+    Json,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum CheckFormat {
+    Text,
+    Json,
+    /// GitLab Code Quality report.
+    Gitlab,
+    /// GitHub Actions workflow commands.
+    Github,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum TraceFormat {
+    Text,
+    Json,
+    Csv,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Write a kiln.toml with the default types and a design/ folder; never overwrites.
+    Init {
+        /// The project's name in reports (default: the folder's name).
+        #[arg(long)]
+        name: Option<String>,
+    },
+    /// Create an item with the next free ID and print its path.
+    New {
+        /// The item's type (requirement, decision, …).
+        #[arg(value_name = "TYPE")]
+        type_name: String,
+        #[arg(long, value_name = "ID")]
+        parent: Option<String>,
+        #[arg(long, value_name = "TEXT")]
+        title: Option<String>,
+        /// Open the new file in Fenix at its title.
+        #[arg(long)]
+        open: bool,
+    },
+    /// List items, filtered.
+    List {
+        #[arg(long = "type", value_name = "TYPE")]
+        type_name: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long)]
+        tag: Option<String>,
+        #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
+        format: TextOrJson,
+    },
+    /// Show one item with its links in both directions, coverage and progress.
+    Show {
+        id: String,
+        #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
+        format: TextOrJson,
+    },
+    /// Check the project against the rules; exit 1 on any error.
+    Check {
+        #[arg(long, value_enum, default_value_t = CheckFormat::Text)]
+        format: CheckFormat,
+    },
+    /// Change front-matter values: status=, title=, parent=, owner=, due= (empty removes).
+    Set {
+        id: String,
+        #[arg(required = true, value_name = "KEY=VALUE")]
+        assignments: Vec<String>,
+    },
+    /// Add a link: `kiln link TEST-004 verifies REQ-014`.
+    Link {
+        id: String,
+        role: String,
+        target: String,
+    },
+    /// Remove a link.
+    Unlink {
+        id: String,
+        role: String,
+        target: String,
+    },
+    /// Move an item to another ID and rewrite every reference to it.
+    Renumber {
+        id: String,
+        #[arg(long, value_name = "ID")]
+        to: String,
+        /// Which file, when the ID is duplicated.
+        #[arg(long, value_name = "PATH")]
+        file: Option<String>,
+    },
+    /// Coverage: what implements and verifies each item, and the gaps.
+    Trace {
+        #[arg(long = "type", value_name = "TYPE")]
+        type_name: Option<String>,
+        #[arg(long, value_enum, default_value_t = TraceFormat::Text)]
+        format: TraceFormat,
+    },
+    /// Everything that reaches an item by links or parents, transitively.
+    Impact {
+        id: String,
+        #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
+        format: TextOrJson,
+    },
+}
 
 fn main() -> ExitCode {
-    match Cli::try_parse() {
-        // Unreachable until the first command exists: no arguments asks
-        // for help, and any argument is unknown.
-        Ok(Cli {}) => ExitCode::SUCCESS,
-        Err(err) => report(&err),
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(err) => return report(&err),
+    };
+    let project = cli.project.as_deref();
+    let result = match cli.command {
+        Command::Init { name } => cmd::init::run(project, name),
+        Command::New {
+            type_name,
+            parent,
+            title,
+            open,
+        } => cmd::new::run(project, &type_name, parent, title, open),
+        Command::List {
+            type_name,
+            status,
+            tag,
+            format,
+        } => cmd::list::run(project, type_name, status, tag, format),
+        Command::Show { id, format } => cmd::show::run(project, &id, format),
+        Command::Check { format } => cmd::check::run(project, format),
+        Command::Set { id, assignments } => cmd::edit::set(project, &id, &assignments),
+        Command::Link { id, role, target } => cmd::edit::link(project, &id, &role, &target, true),
+        Command::Unlink { id, role, target } => {
+            cmd::edit::link(project, &id, &role, &target, false)
+        }
+        Command::Renumber { id, to, file } => {
+            cmd::renumber::run(project, &id, &to, file.as_deref())
+        }
+        Command::Trace { type_name, format } => cmd::trace::run(project, type_name, format),
+        Command::Impact { id, format } => cmd::impact::run(project, &id, format),
+    };
+    match result {
+        Ok(code) => ExitCode::from(code),
+        Err(fail) => {
+            eprintln!("kiln: {}", fail.message);
+            ExitCode::from(fail.code)
+        }
     }
 }
 
 /// Help and version go out as clap renders them. A usage error is cut to
 /// its first line: clap's own rendering adds a usage block and tips over
 /// several lines, and every Kiln error is one line, so CI logs and
-/// wrappers can rely on that from the first command on.
+/// wrappers can rely on that.
 fn report(err: &clap::Error) -> ExitCode {
     match err.kind() {
         ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => {

@@ -13,3 +13,14 @@ workspace = true
 
 [dependencies]
 clap.workspace = true
+kiln-model.workspace = true
+kiln-parse.workspace = true
+kiln-index.workspace = true
+kiln-check.workspace = true
+kiln-git.workspace = true
+kiln-fenix.workspace = true
+fenix-storage.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -17,8 +17,9 @@ navigation through Kiln's language server) and
 [Flint](https://github.com/tpedneault/flint) (the launcher, where any item
 is a few keystrokes away).
 
-**Status:** designed; the workspace and CI are in place (K0), and the
-file format and `kiln check` (K1) come next.
+**Status:** the file format, `kiln check` and the editing commands work
+(K1); Kiln's own requirements and decisions live in [design/](design/).
+Exports (K2) come next.
 
 - [Design](docs/DESIGN.md)
 - [File format](docs/FORMAT.md)
@@ -27,6 +28,7 @@ file format and `kiln check` (K1) come next.
 - [Fenix, Flint and Jira](docs/INTEGRATION.md)
 - [Architecture](docs/ARCHITECTURE.md): the crates and which way they depend
 - [Command line](docs/CLI.md)
+- [Configuration](docs/CONFIGURATION.md)
 - [Continuous integration](docs/CI.md): the gates, and running them locally
 
 ## Licence

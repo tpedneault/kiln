@@ -11,3 +11,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+kiln-model.workspace = true
+toml_edit.workspace = true
+pulldown-cmark.workspace = true
+regex.workspace = true

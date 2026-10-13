@@ -38,6 +38,12 @@ try {
     # --locked prevents CI from silently choosing a different dependency graph.
     Invoke-Gate 'clippy' 'cargo' @('clippy', '--locked', '--workspace', '--all-targets', '--', '-D', 'warnings')
     Invoke-Gate 'tests' 'cargo' @('test', '--locked', '--workspace', '--no-fail-fast')
+    # Kiln checks its own design/ folder (K1 dogfooding): an error fails CI,
+    # warnings are the honest gaps and don't.
+    Invoke-Gate 'kiln-check' 'cargo' @('run', '--locked', '--quiet', '-p', 'kiln', '--', 'check')
+    # The budget is a requirement (DESIGN.md, "Performance"): fails when
+    # `kiln check` on 2,000 items and 50k files is 50% over 2 s.
+    Invoke-Gate 'bench' 'cargo' @('run', '--locked', '--release', '-p', 'kiln-check', '--example', 'bench', '--', '--gate')
     Write-Host "All gates passed. Logs: $logRoot"
 } finally {
     $results | ConvertTo-Json -Depth 4 -AsArray | Set-Content -LiteralPath (Join-Path $logRoot 'summary.json') -Encoding utf8

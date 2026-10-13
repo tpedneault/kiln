@@ -18,19 +18,23 @@ workspace; Kiln has no crate that needs a display before K7.
 | format | `cargo fmt --all --check` |
 | lint | `cargo clippy --locked --workspace --all-targets -- -D warnings` |
 | tests | `cargo test --locked --workspace --no-fail-fast` |
+| dogfood | `kiln check` on this repository's own `kiln.toml` and `design/` (errors fail; warnings are listed) |
+| benchmark | `cargo run --release -p kiln-check --example bench -- --gate`: `kiln check` on a generated 2,000-item, 50,000-file project; fails above 3 s, 50% over the 2 s budget |
 
 | Job | Runner | Notes |
 |---|---|---|
 | Windows | `windows-2022` (MSVC) | primary platform; checked out into a path with a space |
 | Linux | `ubuntu-24.04` | headless, as in a CI container |
 
-Gates still to come: the benchmark gate (K1, DESIGN.md "Performance"),
-`kiln check` on this repository's own `design/` folder (K1), and
-`kiln export --check` on its committed design document (K2).
+Still to come: `kiln export --check` on the committed design document
+(K2). The benchmark generates its project once into `target/kiln-bench`
+(about 3 s on Linux, longer on Windows), then measures four runs; the gate
+is the median of the last three. Kiln's own tests need `git` on the PATH
+(`kiln-git`'s test makes a repository).
 
 ## Run locally
 
-Install Rust stable with Clippy and rustfmt, and PowerShell 7. On
+Install Rust stable with Clippy and rustfmt, git, and PowerShell 7. On
 Windows, also the Visual Studio C++ Build Tools. From the repository
 root:
 

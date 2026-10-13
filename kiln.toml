@@ -1,0 +1,84 @@
+# Kiln's own project: Kiln's requirements, decisions, milestones and risks,
+# checked by `kiln check` in CI (scripts/ci.ps1). docs/FORMAT.md is the
+# format; this file is FORMAT.md's defaults plus where Kiln's code is.
+format = 1
+name = "Kiln"
+paths = ["design"]
+
+[code]
+paths = ["crates"]
+
+[repository]
+web = "https://github.com/tpedneault/kiln/blob/{commit}/{path}#L{line}"
+
+[types.requirement]
+prefix = "REQ"
+statuses = ["draft", "proposed", "approved", "implemented", "verified", "obsolete"]
+initial = "draft"
+done = ["verified"]
+closed = ["obsolete"]
+parents = ["requirement"]
+
+[types.design]
+prefix = "DES"
+statuses = ["draft", "accepted", "obsolete"]
+closed = ["obsolete"]
+parents = ["design"]
+
+[types.decision]
+prefix = "ADR"
+statuses = ["proposed", "accepted", "rejected", "superseded"]
+closed = ["rejected", "superseded"]
+
+[types.milestone]
+prefix = "MS"
+statuses = ["planned", "active", "done", "dropped"]
+done = ["done"]
+closed = ["dropped"]
+
+[types.task]
+prefix = "TASK"
+statuses = ["todo", "doing", "blocked", "done", "dropped"]
+done = ["done"]
+closed = ["dropped"]
+parents = ["task"]
+
+[types.test]
+prefix = "TEST"
+statuses = ["draft", "ready", "passing", "failing", "obsolete"]
+closed = ["obsolete"]
+
+[types.risk]
+prefix = "RISK"
+statuses = ["open", "mitigated", "accepted", "closed"]
+closed = ["closed"]
+
+[links.implements]
+from = ["design", "task", "code"]
+to = ["requirement"]
+inverse = "implemented by"
+
+[links.verifies]
+from = ["test", "code"]
+to = ["requirement"]
+inverse = "verified by"
+
+[links.part-of]
+from = ["task"]
+to = ["milestone"]
+inverse = "includes"
+
+[links.supersedes]
+from = ["decision"]
+to = ["decision"]
+inverse = "superseded by"
+
+[links.mitigates]
+from = ["requirement", "design", "task"]
+to = ["risk"]
+inverse = "mitigated by"
+
+[links.depends-on]
+from = ["task", "milestone"]
+to = ["task", "milestone"]
+inverse = "blocks"
