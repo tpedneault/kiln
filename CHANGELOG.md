@@ -39,6 +39,17 @@ All notable changes to Kiln are recorded here. The format follows
   K005, K111 and K112. Kiln's own design document in
   [docs/generated/DESIGN.md](docs/generated/DESIGN.md), kept current in
   CI; the benchmark gate covers `kiln export --dry-run`.
+- K3: publishing to Confluence on Cloud and Data Center. `kiln export`
+  creates, updates, moves and retires pages (`--yes`, or a prompt on a
+  terminal), with labels, attachments, the `kiln` property, version
+  messages naming the commit, drift detection (`--force`), adopting a
+  page (`--adopt`), `--prune-removed`, `restrict_edits`, size limits,
+  retries on 409/429/503, and a page cache; an interrupted publish
+  finishes on the next run. `kiln auth confluence` stores a token in the
+  OS credential store, shared with Flint. CI recipes in
+  [contrib/](contrib/), live tests and
+  [dev/confluence/README.md](dev/confluence/README.md) for both flavours
+  ([docs/CONFLUENCE.md](docs/CONFLUENCE.md), [docs/CLI.md](docs/CLI.md)).
 
 ### Changed
 

@@ -56,7 +56,9 @@ when a gate fails.
 
 ## Limits
 
-Tests marked `#[ignore]` need a live service (Confluence from K3) or a
-manual setup and are documented where they live; CI does not run them.
+Tests marked `#[ignore]` need a live service or a manual setup and are
+documented where they live; CI does not run them. The live Confluence
+tests are `crates/kiln/tests/live.rs`, set up as
+[dev/confluence/README.md](../dev/confluence/README.md) describes.
 Behaviour inside Fenix and Flint, and against real Confluence instances,
 is checked by hand (CLAUDE.md, "What only Thomas can verify").

@@ -52,6 +52,32 @@ impl Date {
     }
 }
 
+impl Date {
+    /// Days since 1970-01-01: the inverse of [`Date::from_unix_days`].
+    pub fn to_unix_days(self) -> i64 {
+        let y = i64::from(self.year) - i64::from(self.month <= 2);
+        let era = y.div_euclid(400);
+        let yoe = y.rem_euclid(400);
+        let m = i64::from(self.month);
+        let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + i64::from(self.day) - 1;
+        let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        era * 146_097 + doe - 719_468
+    }
+
+    /// `YYYY-MM-DD`.
+    pub fn parse(s: &str) -> Option<Date> {
+        let mut parts = s.splitn(3, '-');
+        let (y, m, d) = (parts.next()?, parts.next()?, parts.next()?);
+        let date = Date {
+            year: y.parse().ok()?,
+            month: m.parse().ok()?,
+            day: d.parse().ok()?,
+        };
+        (1..=12).contains(&date.month).then_some(())?;
+        (Date::from_unix_days(date.to_unix_days()) == date).then_some(date)
+    }
+}
+
 impl fmt::Display for Date {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:04}-{:02}-{:02}", self.year, self.month, self.day)
@@ -142,5 +168,13 @@ mod tests {
         assert_eq!(Date::from_unix_days(-1).to_string(), "1969-12-31");
         assert_eq!(Date::from_unix_days(11_016).to_string(), "2000-02-29");
         assert_eq!(Date::from_unix_days(20_739).to_string(), "2026-10-13");
+        for days in [-800_000, -1, 0, 11_016, 20_739, 60_000] {
+            assert_eq!(Date::from_unix_days(days).to_unix_days(), days);
+        }
+        assert_eq!(
+            Date::parse("2026-10-13").map(Date::to_unix_days),
+            Some(20_739)
+        );
+        assert_eq!(Date::parse("2026-02-30"), None);
     }
 }

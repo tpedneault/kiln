@@ -18,6 +18,39 @@ use crate::model::{KilnProperty, RemotePage};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientError {
     pub message: String,
+    pub kind: ErrorKind,
+}
+
+/// The failures apply reacts to; everything else is `Other`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ErrorKind {
+    #[default]
+    Other,
+    /// 409: the page changed since it was read.
+    Conflict,
+    /// 413: the page is too large for the server.
+    TooLarge,
+}
+
+impl ClientError {
+    pub fn new(message: impl Into<String>) -> Self {
+        ClientError {
+            message: message.into(),
+            kind: ErrorKind::Other,
+        }
+    }
+}
+
+/// A request body.
+pub enum Body {
+    None,
+    Json(Value),
+    /// One file, as multipart field `file`.
+    Multipart {
+        name: String,
+        bytes: Vec<u8>,
+        mime: String,
+    },
 }
 
 impl std::fmt::Display for ClientError {
@@ -31,13 +64,33 @@ impl std::error::Error for ClientError {}
 fn err(message: impl Into<String>) -> ClientError {
     ClientError {
         message: message.into(),
+        kind: ErrorKind::Other,
     }
 }
 
-/// The calls a snapshot needs.
+/// Who a token belongs to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Identity {
+    pub name: String,
+    /// What restrictions name a user by: the username on Data Center,
+    /// the account id on Cloud.
+    pub key: String,
+}
+
+/// A page just created.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Created {
+    pub id: u64,
+    pub version: u64,
+}
+
+/// The calls Kiln makes (CONFLUENCE.md, "The API, by flavour"), and
+/// nothing else.
 pub trait Confluence {
     /// The account the token belongs to, by display name.
     fn whoami(&self) -> Result<String, ClientError>;
+    /// The account the token belongs to, for restrictions.
+    fn identity(&self) -> Result<Identity, ClientError>;
     /// A page's title, parent, version and author; `None` when it doesn't
     /// exist (or the token can't see it).
     fn page(&self, id: u64) -> Result<Option<RemotePage>, ClientError>;
@@ -51,6 +104,37 @@ pub trait Confluence {
     fn body(&self, id: u64) -> Result<String, ClientError>;
     /// The id of the page titled `title` in `space`, if any.
     fn find_title(&self, space: &str, title: &str) -> Result<Option<u64>, ClientError>;
+    /// Creates a page under `parent`.
+    fn create_page(
+        &self,
+        space: &str,
+        parent: u64,
+        title: &str,
+        body: &str,
+    ) -> Result<Created, ClientError>;
+    /// Writes version `version` of a page (the current one plus one),
+    /// moving it under `parent` when given; returns the new version.
+    fn update_page(
+        &self,
+        id: u64,
+        parent: Option<u64>,
+        title: &str,
+        body: &str,
+        version: u64,
+        message: &str,
+    ) -> Result<u64, ClientError>;
+    /// Creates or replaces the page's `kiln` property.
+    fn write_property(&self, id: u64, property: &KilnProperty) -> Result<(), ClientError>;
+    fn labels(&self, id: u64) -> Result<Vec<String>, ClientError>;
+    fn add_labels(&self, id: u64, labels: &[String]) -> Result<(), ClientError>;
+    /// The page's attachments: (attachment id, file name).
+    fn attachments(&self, id: u64) -> Result<Vec<(String, String)>, ClientError>;
+    fn upload(&self, id: u64, name: &str, bytes: &[u8], mime: &str) -> Result<(), ClientError>;
+    fn delete_attachment(&self, attachment_id: &str) -> Result<(), ClientError>;
+    /// Restricts editing the page to `who` (`restrict_edits`).
+    fn restrict_edits(&self, id: u64, who: &Identity) -> Result<(), ClientError>;
+    /// Sends a page to the space's trash (`--prune-removed`).
+    fn trash(&self, id: u64) -> Result<(), ClientError>;
 }
 
 /// HTTP with authentication, timeouts and retries.
@@ -128,6 +212,17 @@ impl Http {
     /// with the base's own path, as `_links.next` does). `Ok(None)` for
     /// 404.
     pub fn get(&self, path: &str) -> Result<Option<Value>, ClientError> {
+        self.request("GET", path, Body::None)
+    }
+
+    /// Sends a request with retries on 429 and 503. `Ok(None)` for 404,
+    /// and for a success with no JSON body (a 204).
+    pub fn request(
+        &self,
+        method: &str,
+        path: &str,
+        body: Body,
+    ) -> Result<Option<Value>, ClientError> {
         let base_path = &self.base[self.origin().len()..];
         let url = if !base_path.is_empty() && path.starts_with(base_path) {
             format!("{}{path}", self.origin())
@@ -135,49 +230,92 @@ impl Http {
             format!("{}{path}", self.base)
         };
         let endpoint = path.split('?').next().unwrap_or(path);
+        // Attachments and big bodies get longer (CONFLUENCE.md, "Errors,
+        // limits, retries").
+        let long = match &body {
+            Body::Multipart { .. } => true,
+            Body::Json(v) => v.to_string().len() > 1024 * 1024,
+            Body::None => false,
+        };
         let mut wait = Duration::from_secs(1);
         for attempt in 1..=6 {
-            let response = self
+            let mut req = self
                 .agent
-                .get(&url)
+                .request(method, &url)
                 .set("Authorization", &self.authorization)
-                .set("Accept", "application/json")
-                .call();
+                .set("Accept", "application/json");
+            if long {
+                req = req.timeout(Duration::from_secs(120));
+            }
+            if method != "GET" {
+                // Confluence's XSRF check; harmless where unneeded.
+                req = req.set("X-Atlassian-Token", "no-check");
+            }
+            let response = match &body {
+                Body::None => req.call(),
+                Body::Json(v) => req
+                    .set("Content-Type", "application/json")
+                    .send_string(&v.to_string()),
+                Body::Multipart { name, bytes, mime } => {
+                    let (content_type, payload) = multipart(name, bytes, mime);
+                    req.set("Content-Type", &content_type).send_bytes(&payload)
+                }
+            };
             match response {
                 Ok(r) => {
-                    let text = r.into_string().map_err(|e| err(format!("Confluence GET {endpoint}: reading the reply: {e}")))?;
+                    let text = r
+                        .into_string()
+                        .map_err(|e| err(format!("Confluence {method} {endpoint}: reading the reply: {e}")))?;
+                    if text.trim().is_empty() {
+                        return Ok(None);
+                    }
                     return serde_json::from_str(&text)
                         .map(Some)
-                        .map_err(|e| err(format!("Confluence GET {endpoint}: the reply isn't JSON: {e}")));
+                        .map_err(|e| err(format!("Confluence {method} {endpoint}: the reply isn't JSON: {e}")));
                 }
                 Err(ureq::Error::Status(404, _)) => return Ok(None),
                 Err(ureq::Error::Status(401, _)) => {
                     return Err(err(format!(
-                        "Confluence refused the token for {} (check KILN_CONFLUENCE_TOKEN, and KILN_CONFLUENCE_USER on Cloud)",
+                        "Confluence refused the token for {} (run `kiln auth confluence`, or check KILN_CONFLUENCE_TOKEN, and KILN_CONFLUENCE_USER on Cloud)",
                         self.base
                     )))
                 }
                 Err(ureq::Error::Status(429 | 503, r)) if attempt < 6 => {
                     let retry = r.header("Retry-After").and_then(|v| v.trim().parse::<u64>().ok()).map(Duration::from_secs);
-                    let pause = retry.unwrap_or(wait);
-                    (self.sleep)(pause);
+                    (self.sleep)(retry.unwrap_or(wait));
                     wait = (wait * 2).min(Duration::from_secs(32));
                 }
                 Err(ureq::Error::Status(code, r)) => {
-                    let body = r.into_string().unwrap_or_default();
-                    let reason = serde_json::from_str::<Value>(&body)
+                    let text = r.into_string().unwrap_or_default();
+                    let reason = serde_json::from_str::<Value>(&text)
                         .ok()
-                        .and_then(|v| v.get("message").or_else(|| v.pointer("/errors/0/title")).and_then(Value::as_str).map(str::to_owned))
-                        .unwrap_or_else(|| body.lines().next().unwrap_or("").chars().take(200).collect());
-                    return Err(err(format!("Confluence GET {endpoint}: HTTP {code}: {reason}")));
+                        .and_then(|v| {
+                            v.get("message")
+                                .or_else(|| v.pointer("/errors/0/title"))
+                                .and_then(Value::as_str)
+                                .map(str::to_owned)
+                        })
+                        .unwrap_or_else(|| text.lines().next().unwrap_or("").chars().take(200).collect());
+                    let kind = match code {
+                        409 => ErrorKind::Conflict,
+                        413 => ErrorKind::TooLarge,
+                        _ => ErrorKind::Other,
+                    };
+                    return Err(ClientError {
+                        message: format!("Confluence {method} {endpoint}: HTTP {code}: {reason}"),
+                        kind,
+                    });
                 }
                 Err(ureq::Error::Transport(t)) => {
-                    return Err(err(format!("Confluence GET {endpoint}: {}", t.to_string().lines().next().unwrap_or("network error"))))
+                    return Err(err(format!(
+                        "Confluence {method} {endpoint}: {}",
+                        t.to_string().lines().next().unwrap_or("network error")
+                    )))
                 }
             }
         }
         Err(err(format!(
-            "Confluence GET {endpoint}: still rate-limited after 6 attempts"
+            "Confluence {method} {endpoint}: still rate-limited after 6 attempts"
         )))
     }
 
@@ -271,11 +409,35 @@ fn in_cidr(host: &str, cidr: &str) -> bool {
     }
 }
 
+/// A multipart/form-data body with one part, field `file`: (content type,
+/// bytes). `ureq` 2 builds no multipart bodies, so this does, with a
+/// boundary that doesn't occur in the bytes.
+pub fn multipart(name: &str, bytes: &[u8], mime: &str) -> (String, Vec<u8>) {
+    let mut boundary = format!("kiln-{}", &crate::hash(bytes)[7..31]);
+    while bytes
+        .windows(boundary.len())
+        .any(|w| w == boundary.as_bytes())
+    {
+        boundary.push('x');
+    }
+    let filename: String = name
+        .chars()
+        .filter(|c| !matches!(c, '"' | '\\' | '\r' | '\n'))
+        .collect();
+    let mut body = format!(
+        "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\nContent-Type: {mime}\r\n\r\n"
+    )
+    .into_bytes();
+    body.extend_from_slice(bytes);
+    body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+    (format!("multipart/form-data; boundary={boundary}"), body)
+}
+
 /// The client for `config`'s flavour.
 pub fn connect(config: &ConfluenceConfig, token: &Token, user: &str) -> Box<dyn Confluence> {
     let http = Http::new(config, token, user);
     match config.resolved_flavour() {
-        ConfluenceFlavour::Cloud => Box::new(crate::cloud::Cloud { http }),
+        ConfluenceFlavour::Cloud => Box::new(crate::cloud::Cloud::new(http)),
         _ => Box::new(crate::dc::DataCenter { http }),
     }
 }

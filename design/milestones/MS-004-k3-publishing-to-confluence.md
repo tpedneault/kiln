@@ -2,7 +2,7 @@
 id = "MS-004"
 type = "milestone"
 title = "K3: publishing to Confluence"
-status = "planned"
+status = "done"
 
 [links]
 depends-on = ["MS-003"]

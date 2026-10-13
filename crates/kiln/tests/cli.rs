@@ -237,9 +237,9 @@ fn confluence_targets_plan_from_a_snapshot_and_never_write() {
     ok(d, &["new", "requirement", "--title", "Fast"]);
     std::fs::write(d.join("snapshot.json"), "{\"anchorPage\": 42}\n").unwrap();
 
-    let refused = kiln_in(d, &["export"]);
+    let refused = kiln_in(d, &["export", "--snapshot", "snapshot.json"]);
     assert_eq!(refused.status.code(), Some(2));
-    assert!(stderr(&refused).contains("publishing to Confluence arrives in K3"));
+    assert!(stderr(&refused).contains("--snapshot plans offline"));
 
     let plan = ok(d, &["export", "--dry-run", "--snapshot", "snapshot.json"]);
     assert!(
@@ -274,6 +274,122 @@ fn confluence_targets_plan_from_a_snapshot_and_never_write() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
-    assert!(String::from_utf8_lossy(&out.stderr)
-        .contains("needs KILN_CONFLUENCE_TOKEN (or --snapshot FILE)"));
+    // No token stored, or (headless) no credential store to look in.
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("KILN_CONFLUENCE_TOKEN"), "{err}");
+    assert!(!err.contains('\n') || err.lines().count() == 1, "{err}");
+}
+
+/// `kiln` with a Confluence token and its own state folder.
+fn kiln_publishing(dir: &Path, args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_kiln"))
+        .args(args)
+        .current_dir(dir)
+        .env("FENIX_HOME", dir.join("no-fenix"))
+        .env("KILN_HOME", dir.join("kiln-home"))
+        .env("KILN_CONFLUENCE_TOKEN", "test-token")
+        .env_remove("KILN_CONFLUENCE_USER")
+        .output()
+        .expect("the kiln binary runs")
+}
+
+#[test]
+// verifies: REQ-002
+fn confluence_targets_publish_with_yes_and_stop_on_drift() {
+    use kiln_confluence::fake::{Fake, FakePage, State};
+    let mut state = State::default();
+    state.pages.insert(
+        42,
+        FakePage {
+            title: "Designs".into(),
+            parent: None,
+            version: 1,
+            author: "alice".into(),
+            body: String::new(),
+            property: None,
+        },
+    );
+    let fake = Fake::start(state, false);
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    std::fs::write(
+        d.join("kiln.toml"),
+        format!("{config}\n[confluence]\nurl = \"{}\"\nspace = \"DEMO\"\n\n[[export]]\nname = \"spec\"\nformat = \"confluence\"\ntitle = \"Demo design\"\n[export.confluence]\nparent = 42\n", fake.url),
+    )
+    .unwrap();
+    ok(d, &["new", "requirement", "--title", "Fast"]);
+
+    // Not a terminal and no --yes: the plan, then exit 1, nothing written.
+    let asked = kiln_publishing(d, &["export"]);
+    assert_eq!(asked.status.code(), Some(1), "{}", stderr(&asked));
+    assert!(
+        stdout(&asked).contains("create    \"Demo design\": new"),
+        "{}",
+        stdout(&asked)
+    );
+    assert!(stderr(&asked).contains("pass --yes"), "{}", stderr(&asked));
+    assert_eq!(fake.state.lock().unwrap().writes(), 0);
+
+    let published = kiln_publishing(d, &["export", "--yes"]);
+    assert_eq!(published.status.code(), Some(0), "{}", stderr(&published));
+    assert!(
+        stdout(&published).contains("spec: published 1 created, 0 updated"),
+        "{}",
+        stdout(&published)
+    );
+    let id = {
+        let s = fake.state.lock().unwrap();
+        let (id, page) = s
+            .pages
+            .iter()
+            .find(|(_, p)| p.title == "Demo design")
+            .unwrap();
+        assert_eq!(page.parent, Some(42));
+        assert!(page.body.contains("REQ-001"), "{}", page.body);
+        *id
+    };
+    assert!(d
+        .join("kiln-home/state/confluence/DEMO-Demo-spec.json")
+        .is_file());
+
+    let writes = fake.state.lock().unwrap().writes();
+    let again = kiln_publishing(d, &["export", "--yes"]);
+    assert_eq!(again.status.code(), Some(0), "{}", stderr(&again));
+    assert!(
+        stdout(&again).contains("0 create, 0 update, 1 unchanged"),
+        "{}",
+        stdout(&again)
+    );
+    assert_eq!(
+        fake.state.lock().unwrap().writes(),
+        writes,
+        "unchanged costs no write"
+    );
+
+    fake.state
+        .lock()
+        .unwrap()
+        .edit(id, "<p>A fix made in Confluence.</p>");
+    let drift = kiln_publishing(d, &["export", "--yes"]);
+    assert_eq!(drift.status.code(), Some(1));
+    assert!(
+        stdout(&drift)
+            .contains("refused: \"Demo design\" was edited in Confluence (edited by alice"),
+        "{}",
+        stdout(&drift)
+    );
+    let forced = kiln_publishing(d, &["export", "--yes", "--force"]);
+    assert_eq!(forced.status.code(), Some(0), "{}", stderr(&forced));
+    assert!(fake.state.lock().unwrap().pages[&id]
+        .body
+        .contains("REQ-001"));
+    let out = kiln_publishing(d, &["export", "--yes", "--format", "json"]);
+    let json: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(
+        json[0]["applied"],
+        serde_json::Value::Null,
+        "nothing to publish"
+    );
 }
