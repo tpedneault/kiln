@@ -1,0 +1,10 @@
+# Check every text file out with LF, whatever the platform or Git's
+# core.autocrlf setting. Fixture projects and golden export files are
+# compared byte for byte on Windows and Linux (DESIGN.md, "Testing"), so a
+# CRLF checkout would make the same commit render differently.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.ttf binary
+*.docx binary

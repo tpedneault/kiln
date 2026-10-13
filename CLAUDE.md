@@ -5,8 +5,8 @@ items, tests and risks as Markdown files in the repository, checks the
 links between them in CI, and exports them (by default as one design
 document on one Confluence page) for people who don't use Kiln. It is
 part of a suite with Fenix (editor, https://github.com/tpedneault/fenix)
-and Flint (launcher, https://github.com/tpedneault/flint). Nothing is implemented yet; the
-design is settled.
+and Flint (launcher, https://github.com/tpedneault/flint). The design is settled; K0 (the
+workspace, crate shells and CI) is done.
 
 ## Read first, in this order
 
@@ -112,5 +112,10 @@ docs/FORMAT.md        the file format (the contract)
 docs/EXPORT.md        exports: targets, layouts, templates, formats
 docs/CONFLUENCE.md    the Confluence format
 docs/INTEGRATION.md   Fenix, Flint, Jira (G1–G6)
+docs/ARCHITECTURE.md  the crates as built and which way they depend
+docs/CI.md            the gates and how to run them
+docs/CLI.md           the command line as it stands
+crates/               the workspace (kiln-* libraries, kiln binary)
+scripts/ci.ps1        the one entry point for the gates
 CHANGELOG.md          Keep a Changelog; add under Unreleased
 ```

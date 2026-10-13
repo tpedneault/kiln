@@ -13,3 +13,8 @@ All notable changes to Kiln are recorded here. The format follows
   [docs/EXPORT.md](docs/EXPORT.md),
   [docs/CONFLUENCE.md](docs/CONFLUENCE.md) and
   [docs/INTEGRATION.md](docs/INTEGRATION.md).
+- K0: the Cargo workspace with every crate as a documented shell, a
+  `kiln` binary with `--help` and `--version`, one-line errors and the
+  documented exit codes, and CI on Windows and Linux through
+  `scripts/ci.ps1` ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
+  [docs/CI.md](docs/CI.md), [docs/CLI.md](docs/CLI.md)).

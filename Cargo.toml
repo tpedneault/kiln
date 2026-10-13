@@ -1,0 +1,53 @@
+[workspace]
+resolver = "2"
+# Pure crates first, then the ones whose role is I/O, then the binary
+# (docs/ARCHITECTURE.md). `kiln-gui` joins in K7, so nothing graphical
+# enters the build before it is needed.
+members = [
+    "crates/kiln-model",
+    "crates/kiln-parse",
+    "crates/kiln-index",
+    "crates/kiln-check",
+    "crates/kiln-render",
+    "crates/kiln-export",
+    "crates/kiln-confluence",
+    "crates/kiln-git",
+    "crates/kiln-lsp",
+    "crates/kiln-flint",
+    "crates/kiln-fenix",
+    "crates/kiln-secrets",
+    "crates/kiln",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/tpedneault/kiln"
+authors = ["Thomas Pedneault <thomas@pedneault.dev>"]
+# The crates are Kiln's own building blocks, not libraries on crates.io.
+publish = false
+
+# Every external dependency is declared here once, and crates take it with
+# `workspace = true`. Fenix and Flint crates go here too, by git and pinned
+# `rev`, only those DESIGN.md lists, added by the milestone that first uses
+# them (DESIGN.md, "Dependencies on Fenix and Flint crates").
+[workspace.dependencies]
+clap = { version = "4.5", features = ["derive"] }
+
+[workspace.lints.rust]
+# Nothing Kiln does needs `unsafe`. Denied rather than forbidden so a
+# platform call that truly needs it (K7's Windows console attach) can
+# allow it locally, next to a comment saying why.
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+# No panics on bad input from files, config, servers or peers (CLAUDE.md).
+# `unwrap` hides the reason a value was assumed present; outside tests,
+# handle the error or `expect` it with the invariant spelled out.
+# Tests may unwrap (clippy.toml).
+unwrap_used = "warn"
+
+[profile.release]
+lto = true
+codegen-units = 1

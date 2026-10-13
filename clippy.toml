@@ -1,0 +1,3 @@
+# A test that unwraps fails loudly at the line that broke, which is what a
+# test should do; the workspace's `unwrap_used` lint is for shipped code.
+allow-unwrap-in-tests = true

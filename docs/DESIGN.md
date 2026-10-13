@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: design, nothing implemented yet. Pinned against Fenix
+Status: K0 done (workspace, crate shells, CI); K1 next. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -18,6 +18,7 @@ Status: design, nothing implemented yet. Pinned against Fenix
 | [EXPORT.md](EXPORT.md) | export targets, layouts (one document, sections, a page tree), templates, formats (Confluence, Markdown, HTML; Word later) |
 | [CONFLUENCE.md](CONFLUENCE.md) | the Confluence format: pages, planner, drift, the API |
 | [INTEGRATION.md](INTEGRATION.md) | Fenix, Flint and Jira: what Kiln uses, and what they need to add |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | the workspace as built: crates, dependency direction, lints |
 
 ## Why the name
 
