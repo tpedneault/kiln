@@ -30,7 +30,7 @@ pub use doc::{
     plain, Align, Block, Callout, Directive, Inline, ListItem, PropEntry, Props, Table, Target,
     Tone,
 };
-pub use reports::{report, status_tone, ReportOptions};
+pub use reports::{report, status_tone, ReportOptions, Since};
 pub use template::{template_problems, TemplateProblem};
 
 #[cfg(test)]

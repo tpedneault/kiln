@@ -1,7 +1,9 @@
 //! What Kiln needs from git: the current commit and its date, whether the
 //! tree is dirty, the last commit that changed each file (one
 //! `git log` pass, for exports' repository links), whether the clone is
-//! shallow, and whether a path is ignored. K6 adds revisions and tags.
+//! shallow, and whether a path is ignored; and (K6) a revision resolved
+//! to its commit, and the files at a revision, for `kiln diff` and
+//! `kiln export --since`.
 //!
 //! Shells out to `git`, as `fenix-git` does, rather than linking a git
 //! library: the user's own git already honours their credentials,
@@ -161,6 +163,116 @@ pub fn is_ignored(dir: &Path, path: &str) -> Result<bool, GitError> {
     }
 }
 
+/// The commit `rev` names (a tag, a branch, `HEAD~3`, an id). A revision
+/// starting with `-` is refused rather than handed to git, where it would
+/// read as an option.
+pub fn resolve(dir: &Path, rev: &str) -> Result<String, GitError> {
+    if rev.starts_with('-') || rev.trim().is_empty() {
+        return Err(GitError::Failed(format!("`{rev}` isn't a revision")));
+    }
+    let spec = format!("{rev}^{{commit}}");
+    let output = git(
+        dir,
+        &[
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            "--end-of-options",
+            &spec,
+        ],
+    )?;
+    let id = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    if output.status.success() && id.len() >= 40 {
+        return Ok(id);
+    }
+    match failed(&output) {
+        GitError::NoCommit if head_commit(dir).is_ok() => Err(GitError::Failed(format!(
+            "`{rev}` isn't a revision in this repository"
+        ))),
+        other => Err(other),
+    }
+}
+
+/// The files under `dir` at `commit` that `keep` accepts, by path relative
+/// to `dir` with `/`, with their contents: one `git ls-tree` and one
+/// `git cat-file --batch` for all of them, however many there are.
+pub fn files_at(
+    dir: &Path,
+    commit: &str,
+    keep: &dyn Fn(&str) -> bool,
+) -> Result<Vec<(String, Vec<u8>)>, GitError> {
+    let output = git(
+        dir,
+        &["ls-tree", "-r", "-z", "--name-only", commit, "--", "."],
+    )?;
+    if !output.status.success() {
+        return Err(failed(&output));
+    }
+    let paths: Vec<String> = output
+        .stdout
+        .split(|b| *b == 0)
+        .filter(|p| !p.is_empty())
+        .map(|p| String::from_utf8_lossy(p).into_owned())
+        .filter(|p| keep(p))
+        .collect();
+    if paths.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut child = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["cat-file", "--batch"])
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|e| GitError::Failed(e.to_string()))?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| GitError::Failed("cat-file has no input".into()))?;
+    // Fed from a thread: git answers while it reads, and a full pipe
+    // either way would otherwise stall both sides.
+    let requests: String = paths.iter().map(|p| format!("{commit}:./{p}\n")).collect();
+    let feeder = std::thread::spawn(move || {
+        use std::io::Write;
+        let _ = stdin.write_all(requests.as_bytes());
+    });
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| GitError::Failed("cat-file has no output".into()))?;
+    let mut all = Vec::new();
+    std::io::Read::read_to_end(&mut stdout, &mut all)
+        .map_err(|e| GitError::Failed(e.to_string()))?;
+    let _ = feeder.join();
+    let _ = child.wait();
+    let mut out = Vec::with_capacity(paths.len());
+    let mut at = 0;
+    for path in paths {
+        let Some(nl) = all[at..].iter().position(|b| *b == b'\n') else {
+            return Err(GitError::Failed(format!("cat-file stopped before {path}")));
+        };
+        let header = String::from_utf8_lossy(&all[at..at + nl]).into_owned();
+        at += nl + 1;
+        let mut fields = header.split(' ');
+        let (_, kind, size) = (fields.next(), fields.next(), fields.next());
+        let Some(size) = size.and_then(|s| s.parse::<usize>().ok()) else {
+            // `missing` (a submodule, a race): nothing to read.
+            continue;
+        };
+        if at + size > all.len() {
+            return Err(GitError::Failed(format!("cat-file cut {path} short")));
+        }
+        if kind == Some("blob") {
+            out.push((path, all[at..at + size].to_vec()));
+        }
+        at += size + 1;
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238,5 +350,40 @@ mod tests {
         assert_eq!(commit_date(d, &first).unwrap().len(), 10);
         assert!(is_ignored(d, "target/x.html").unwrap());
         assert!(!is_ignored(d, "docs/x.md").unwrap());
+    }
+
+    #[test]
+    fn files_at_a_revision_from_a_subfolder() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        git(d, &["init", "-q"]);
+        std::fs::create_dir_all(d.join("sub/design")).unwrap();
+        std::fs::write(d.join("sub/design/a.md"), "old a").unwrap();
+        std::fs::write(d.join("sub/design/b.md"), "b").unwrap();
+        std::fs::write(d.join("sub/x.rs"), "x").unwrap();
+        std::fs::write(d.join("top.md"), "top").unwrap();
+        git(d, &["add", "."]);
+        git(d, &["commit", "-q", "-m", "one"]);
+        git(d, &["tag", "v1"]);
+        std::fs::write(d.join("sub/design/a.md"), "new a").unwrap();
+        git(d, &["commit", "-q", "-am", "two"]);
+        let v1 = resolve(&d.join("sub"), "v1").unwrap();
+        assert_eq!(resolve(d, "HEAD~1").unwrap(), v1);
+        assert!(
+            resolve(d, "--output=x").is_err(),
+            "an option isn't a revision"
+        );
+        assert!(resolve(d, "nope")
+            .unwrap_err()
+            .to_string()
+            .contains("`nope` isn't a revision"));
+        let files = files_at(&d.join("sub"), &v1, &|p| p.ends_with(".md")).unwrap();
+        assert_eq!(
+            files,
+            vec![
+                ("design/a.md".to_owned(), b"old a".to_vec()),
+                ("design/b.md".to_owned(), b"b".to_vec())
+            ]
+        );
     }
 }

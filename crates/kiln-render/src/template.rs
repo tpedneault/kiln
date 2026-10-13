@@ -16,8 +16,8 @@ pub struct TemplateProblem {
     pub message: String,
 }
 
-const REPORT_NAMES: &[&str] = &["traceability", "findings", "roadmap", "risks"];
-const VALUES: &[&str] = &["name", "commit", "date"];
+const REPORT_NAMES: &[&str] = &["traceability", "findings", "roadmap", "risks", "changes"];
+const VALUES: &[&str] = &["name", "commit", "date", "since"];
 
 /// Problems in a template's text, with lines counted from 1.
 pub fn template_problems(text: &str, project: &Project) -> Vec<TemplateProblem> {
@@ -35,15 +35,10 @@ pub fn template_problems(text: &str, project: &Project) -> Vec<TemplateProblem> 
     for (n, line) in text.lines().enumerate() {
         for caps in value.captures_iter(line) {
             let name = caps[1].trim();
-            if name == "since" {
+            if !VALUES.contains(&name) {
                 out.push(problem(
                     n as u32 + 1,
-                    "kiln:value since needs `kiln export --since`, which arrives in K6".into(),
-                ));
-            } else if !VALUES.contains(&name) {
-                out.push(problem(
-                    n as u32 + 1,
-                    format!("kiln:value `{name}` isn't name, commit or date"),
+                    format!("kiln:value `{name}` isn't name, commit, date or since"),
                 ));
             }
         }
@@ -159,10 +154,6 @@ fn directive(d: &Directive, project: &Project, out: &mut Vec<TemplateProblem>) {
         }
         "report" => {
             match d.positional.as_slice() {
-                [name] if name == "changes" => out.push(problem(
-                    d.line,
-                    "the changes report needs `kiln export --since`, which arrives in K6".into(),
-                )),
                 [name] if REPORT_NAMES.contains(&name.as_str()) => {}
                 _ => out.push(problem(
                     d.line,

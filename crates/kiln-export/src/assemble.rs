@@ -10,7 +10,7 @@ use kiln_index::{Project, Source};
 use kiln_model::{ExportTarget, Finding, Item, ItemId, ItemStyle};
 use kiln_render::{
     render_markdown, report, status_tone, Block, BodyContext, Directive, Inline, PropEntry, Props,
-    ReportOptions, Table, Target,
+    ReportOptions, Since, Table, Target,
 };
 
 use crate::document::{Document, Node, Section, SectionKind};
@@ -34,6 +34,8 @@ pub struct Assembly<'a> {
     /// `kiln check`'s findings, for the findings report.
     pub findings: &'a [Finding],
     pub revision: &'a Revision,
+    /// `--since`: the baseline and every item change from it.
+    pub since: Option<&'a Since>,
 }
 
 /// An assembled document and the items no part of it placed.
@@ -137,6 +139,7 @@ impl<'a> State<'a> {
                 depth: 1,
                 kind: SectionKind::Heading,
                 own_page: false,
+                marker: None,
                 nodes: children,
             }));
         }
@@ -145,7 +148,10 @@ impl<'a> State<'a> {
                 &name,
                 self.project(),
                 self.a.findings,
-                &ReportOptions::default(),
+                &ReportOptions {
+                    since: self.a.since,
+                    ..Default::default()
+                },
             )
             .unwrap_or_default();
             nodes.push(Node::Section(Section {
@@ -154,6 +160,7 @@ impl<'a> State<'a> {
                 depth: 1,
                 kind: SectionKind::Report(name),
                 own_page: false,
+                marker: None,
                 nodes: blocks.into_iter().map(Node::Block).collect(),
             }));
         }
@@ -199,6 +206,7 @@ impl<'a> State<'a> {
                         depth,
                         kind: SectionKind::Heading,
                         own_page: false,
+                        marker: None,
                         nodes: Vec::new(),
                     });
                 }
@@ -228,6 +236,7 @@ impl<'a> State<'a> {
                 let name = d.positional.first().map(String::as_str).unwrap_or("");
                 let options = ReportOptions {
                     type_name: d.attr("type").map(str::to_owned),
+                    since: self.a.since,
                 };
                 report(name, self.project(), self.a.findings, &options)
                     .unwrap_or_default()
@@ -404,6 +413,11 @@ impl<'a> State<'a> {
             depth,
             kind: SectionKind::Item(item.id.clone()),
             own_page,
+            marker: self
+                .a
+                .since
+                .and_then(|s| s.kind_of(&item.id))
+                .filter(|k| *k != kiln_index::ChangeKind::Removed),
             nodes,
         }
     }
@@ -718,6 +732,7 @@ impl<'a> State<'a> {
                 .to_owned(),
             "date" if rev.in_tree => String::new(),
             "date" => rev.date.clone().unwrap_or_default(),
+            "since" => self.a.since.map(Since::describe).unwrap_or_default(),
             _ => String::new(),
         }
     }

@@ -19,12 +19,14 @@
 //! callers write an edited file, so the command line and the Flint
 //! provider refuse alike when the file changed under them.
 
+mod diff;
 mod new_item;
 mod project;
 mod renumber;
 mod source;
 mod write;
 
+pub use diff::{diff, ChangeKind, Detail, ItemChange};
 pub use new_item::{plan_new_item, toml_string, NewItem, NewItemSpec};
 pub use project::{labelled, Impact, Inbound, LoadError, Progress, Project, Source, Step};
 pub use renumber::{plan_renumber, FileEdits, RenumberPlan};

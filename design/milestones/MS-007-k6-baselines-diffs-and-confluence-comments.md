@@ -2,7 +2,7 @@
 id = "MS-007"
 type = "milestone"
 title = "K6: baselines, diffs and Confluence comments"
-status = "planned"
+status = "done"
 
 [links]
 depends-on = ["MS-006"]

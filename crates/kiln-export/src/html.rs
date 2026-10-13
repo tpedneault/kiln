@@ -116,8 +116,12 @@ impl Writer<'_> {
         } else {
             ""
         };
+        let marker = s
+            .marker_inline()
+            .map(|m| format!(" {}", self.inlines(&[m])))
+            .unwrap_or_default();
         format!(
-            "<section{class}>\n<h{level} id=\"{}\">{}</h{level}>\n{}</section>\n",
+            "<section{class}>\n<h{level} id=\"{}\">{}{marker}</h{level}>\n{}</section>\n",
             esc(&id),
             esc(&s.heading_text()),
             self.nodes(&s.nodes)

@@ -312,6 +312,28 @@ for files holding code references on purpose, such as test fixtures.
   any link or parent edge (a child reaches its parent), with the path,
   breadth first.
 
+## Baselines
+
+A **baseline** is a git revision (a tag such as `v1.0`, a branch, a
+commit). `kiln diff REV[..REV]` and `kiln export --since REV` compare the
+project there with the project now (the working tree, uncommitted edits
+included) or at a second revision, item by item:
+
+- The project at a revision is its `kiln.toml` and Markdown files as git
+  has them there, read without checking anything out. Code isn't read:
+  code references aren't compared (they move with every refactoring; the
+  comparison is for readers of the design). A revision from before the
+  project had a `kiln.toml` has no items, so everything reads as added.
+- Items are matched by ID. A renumbered item is one removed and one
+  added. A duplicated ID is compared by its first copy on each side.
+- An item is **added** or **removed** when its ID exists on one side
+  only, and **changed** when any of these differ: `status`, `title`,
+  `type`, `parent`, `[links]` (each role and target added or removed),
+  `tags` and `jira` (as sets), `owner`, `due`, the body (ignoring leading
+  and trailing blank lines), the file it lives in.
+- Revisions are passed to git as revisions, never as options: one
+  starting with `-` is refused.
+
 ## Check rules
 
 Each rule has a code, a default severity and a span (file, line, column).

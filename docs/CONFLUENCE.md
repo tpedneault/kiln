@@ -397,14 +397,30 @@ Footer comments live outside the page body and survive every update.
 Inline comments anchor to markers in the body; Kiln's update drops those
 markers and orphans the comments, so the banner asks readers to comment at
 the bottom. This matters more for `document`, where every change rewrites
-the page everyone comments on. A later improvement (not before K6): carry
+the page everyone comments on. A later improvement (not in K6): carry
 existing `ac:inline-comment-marker` elements over into the new body
 wherever the marked text still appears verbatim in the same block.
 
-`kiln confluence comments [EXPORT]` (K6) lists unresolved footer comments
-per page, and for a document per nearest item heading when the comment
-quotes text (**verify** what the API returns for that), so feedback from
-Confluence readers reaches the team.
+`kiln confluence comments [EXPORT…]` (K6) lists the unresolved footer
+comments on each target's pages, so feedback from Confluence readers
+reaches the team:
+
+- A comment on an item's own page (`tree`) is about that item. On a page
+  holding many items (`document`, `sections`), a comment that quotes the
+  page (a `<blockquote>` in its body, which Confluence's "quote" writes)
+  is placed at the nearest item anchor above the quoted text; any other
+  comment is about the page. **verify**: that a quote reaches the API as a
+  `<blockquote>` on both flavours.
+- Replies are listed too (Data Center: `depth=all`). Resolved comments are
+  left out: Data Center marks them `extensions.resolution.status =
+  "resolved"`, Cloud v2 `resolutionStatus = "resolved"`. **verify** both:
+  footer comments may not carry a resolution at all, in which case every
+  one is listed.
+- Each comes with a link, `…/pages/viewpage.action?pageId=N&focusedCommentId=C#comment-C`
+  (**verify** that it scrolls to the comment on both flavours), and its
+  author: the display name on Data Center, the account id on Cloud (v2
+  names authors by id; a name would cost a call per author).
+- Retired pages are skipped. It reads only; nothing is written.
 
 ## Storage format
 
@@ -419,7 +435,7 @@ raw HTML through.
 | item heading | the heading, with the `anchor` macro named by the ID at its start, inside the heading element (`<h2><ac:structured-macro ac:name="anchor"><ac:parameter ac:name="">REQ-014</ac:parameter></ac:structured-macro>2.1 REQ-014 …</h2>`; **verify** the default-parameter form, and that `…#REQ-014` scrolls to it, on both flavours) |
 | item in a `style="row"` table, or a report row | the `anchor` macro at the start of the row's first cell |
 | properties line / table | a `p` of status lozenge and links / a two-column `table` |
-| "Changed" / "New" markers (`--since`) | `status` macro, Yellow / Green, after the heading text |
+| "Changed" / "New" markers (`--since`) | `status` macro, Yellow / Green, inside the heading after its text; the page title and anchor don't change |
 | lists, GitHub task lists | `ul`/`ol`; task items as text `☐`/`☑` (Confluence task lists are interactive, which invites edits) |
 | tables, `style="row"` item tables | `table`/`tbody`/`tr`/`th`/`td` |
 | fenced code | `code` macro with `language` parameter, body in CDATA (split any `]]>`) |
@@ -474,7 +490,7 @@ listed here; nothing else is used.
 | delete attachment | `DELETE /content/{attachmentId}` | `DELETE /api/v2/attachments/{id}` |
 | trash a retired page | `--prune-removed` sends retired pages older than N days to the trash: `DELETE /content/{id}` | `DELETE /api/v2/pages/{id}` |
 | restrictions | `PUT /content/{id}/restriction` (**verify**) | `PUT /rest/api/content/{id}/restriction` (**verify**) |
-| footer comments (K6) | `GET /content/{id}/child/comment?expand=body.storage,extensions.resolution` (**verify**) | `GET /api/v2/pages/{id}/footer-comments` |
+| footer comments | `GET /content/{id}/child/comment?expand=body.storage,history,extensions.resolution&depth=all` (paged; **verify**) | `GET /api/v2/pages/{id}/footer-comments?body-format=storage` (paged; **verify** the resolution field) |
 
 Notes:
 

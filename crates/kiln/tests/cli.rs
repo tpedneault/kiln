@@ -528,3 +528,172 @@ fn provider_says_hello_and_registers_the_items() {
     drop(stdin);
     assert!(child.wait().unwrap().success());
 }
+
+fn git(dir: &Path, args: &[&str]) {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args([
+            "-c",
+            "user.name=Kiln",
+            "-c",
+            "user.email=kiln@example.com",
+            "-c",
+            "commit.gpgsign=false",
+        ])
+        .args(args)
+        .output()
+        .expect("git runs");
+    assert!(
+        out.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+// verifies: REQ-016
+fn diff_and_export_since_a_tag() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    git(d, &["init", "-q"]);
+    ok(d, &["init", "--name", "Demo"]);
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    std::fs::write(
+        d.join("kiln.toml"),
+        format!("{config}\n[[export]]\nname = \"doc\"\nformat = \"markdown\"\npath = \"out/DESIGN.md\"\nreports = [\"changes\"]\n"),
+    )
+    .unwrap();
+    ok(d, &["new", "requirement", "--title", "Fast"]);
+    ok(d, &["new", "requirement", "--title", "Small"]);
+    ok(d, &["new", "requirement", "--title", "Gone soon"]);
+    git(d, &["add", "."]);
+    git(d, &["commit", "-q", "-m", "one"]);
+    git(d, &["tag", "v1"]);
+
+    ok(d, &["set", "REQ-001", "status=approved"]);
+    ok(d, &["new", "requirement", "--title", "Quiet"]);
+    std::fs::remove_file(d.join("design/requirements/REQ-003-gone-soon.md")).unwrap();
+
+    let diff = ok(d, &["diff", "v1"]);
+    let lines: Vec<&str> = diff.lines().collect();
+    assert!(
+        lines[0].starts_with("v1 (") && lines[0].ends_with(") → the working tree"),
+        "{diff}"
+    );
+    assert_eq!(
+        &lines[1..],
+        [
+            "~ REQ-001 Fast: status draft → approved",
+            "+ REQ-004 Quiet (requirement)",
+            "- REQ-003 Gone soon (requirement)",
+            "1 added, 1 changed, 1 removed",
+        ]
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&ok(d, &["diff", "v1", "--format", "json"])).unwrap();
+    assert_eq!(json["items"][0]["details"][0], "status draft → approved");
+    git(d, &["commit", "-q", "-am", "two"]);
+    let committed = ok(d, &["diff", "v1..HEAD"]);
+    assert!(
+        committed.contains("0 added, 1 changed, 1 removed"),
+        "REQ-004 isn't committed: {committed}"
+    );
+    assert_eq!(kiln_in(d, &["diff", "nope"]).status.code(), Some(2));
+
+    ok(d, &["export", "--since", "v1"]);
+    let md = std::fs::read_to_string(d.join("out/DESIGN.md")).unwrap();
+    assert!(md.contains("REQ-001 Fast\n\n*Changed*\n"), "{md}");
+    assert!(md.contains("REQ-004 Quiet\n\n*New*\n"), "{md}");
+    assert!(
+        md.contains("REQ-002 Small\n\n**draft**"),
+        "unchanged items have no marker: {md}"
+    );
+    assert!(md.contains("Since v1 ("), "{md}");
+    assert!(md.contains("| REQ-003 Gone soon | **Removed** |"), "{md}");
+    // Without a baseline the report says how to get one.
+    ok(d, &["export"]);
+    let md = std::fs::read_to_string(d.join("out/DESIGN.md")).unwrap();
+    assert!(md.contains("export with `kiln export --since REV`"), "{md}");
+}
+
+#[test]
+fn confluence_comments_are_listed_per_item() {
+    use kiln_confluence::fake::{Fake, FakePage, State};
+    let mut state = State::default();
+    state.pages.insert(
+        42,
+        FakePage {
+            title: "Designs".into(),
+            parent: None,
+            version: 1,
+            author: "alice".into(),
+            body: String::new(),
+            property: None,
+        },
+    );
+    let fake = Fake::start(state, false);
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    std::fs::write(
+        d.join("kiln.toml"),
+        format!("{config}\n[confluence]\nurl = \"{}\"\nspace = \"DEMO\"\n\n[[export]]\nname = \"spec\"\nformat = \"confluence\"\ntitle = \"Demo design\"\n[export.confluence]\nparent = 42\n", fake.url),
+    )
+    .unwrap();
+    let path = ok(d, &["new", "requirement", "--title", "Fast"]);
+    std::fs::write(d.join(path.trim()), "+++\nid = \"REQ-001\"\ntype = \"requirement\"\ntitle = \"Fast\"\nstatus = \"draft\"\n+++\n\nStarts in a second.\n").unwrap();
+    let before = kiln_publishing(d, &["confluence", "comments"]);
+    assert!(
+        stdout(&before).contains("spec → space DEMO: not published yet"),
+        "{}",
+        stdout(&before)
+    );
+    assert_eq!(
+        kiln_publishing(d, &["export", "--yes"]).status.code(),
+        Some(0)
+    );
+    {
+        let mut s = fake.state.lock().unwrap();
+        let doc = *s
+            .pages
+            .iter()
+            .find(|(_, p)| p.title == "Demo design")
+            .unwrap()
+            .0;
+        s.extra.entry(doc).or_default().comments = vec![
+            (
+                "7".into(),
+                "bob".into(),
+                "<blockquote><p>Starts in a second.</p></blockquote><p>Cold or warm?</p>".into(),
+                false,
+            ),
+            ("8".into(), "carol".into(), "<p>Done.</p>".into(), true),
+        ];
+    }
+    let out = kiln_publishing(d, &["confluence", "comments"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let text = stdout(&out);
+    assert!(
+        text.contains("spec → space DEMO: 1 unresolved comment\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("  REQ-001   bob, 2026-10-12: Starts in a second. Cold or warm?\n"),
+        "{text}"
+    );
+    assert!(text.contains("focusedCommentId=7#comment-7"), "{text}");
+    let json: serde_json::Value = serde_json::from_str(&stdout(&kiln_publishing(
+        d,
+        &["confluence", "comments", "spec", "--format", "json"],
+    )))
+    .unwrap();
+    assert_eq!(json[0]["comments"][0]["item"], "REQ-001");
+    assert_eq!(
+        kiln_publishing(d, &["confluence", "comments", "nope"])
+            .status
+            .code(),
+        Some(2)
+    );
+}

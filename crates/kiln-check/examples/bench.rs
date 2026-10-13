@@ -254,6 +254,7 @@ fn export(root: &Path) -> (Duration, usize) {
         project: &project,
         findings: &findings,
         revision: &revision,
+        since: None,
     };
     let all = vec![kiln_export::prepare(&target, None, &assembly)];
     let mut resolved = all.clone();

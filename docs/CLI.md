@@ -1,6 +1,6 @@
 # Command line
 
-How to run `kiln`, as it stands (K5). The commands planned for later
+How to run `kiln`, as it stands (K6). The commands planned for later
 milestones are in [DESIGN.md](DESIGN.md), "Command line"; each is
 documented here when it ships. The file format is
 [FORMAT.md](FORMAT.md); `kiln.toml` is summed up in
@@ -105,6 +105,26 @@ crates/kiln-parse/src/edit.rs:58   implements REQ-013, child of REQ-001
 crates/kiln-parse/src/edit.rs:173  verifies REQ-013, child of REQ-001
 ```
 
+### `kiln diff REV[..REV] [--type TYPE] [--format text|json]`
+
+The items added, changed and removed between two revisions, or between
+a revision and the working tree (uncommitted edits included) when only one
+is given. A revision is a tag, branch or commit; the project there is read
+from git, not checked out. What counts as a change is FORMAT.md,
+"Baselines".
+
+```
+$ kiln diff v1.0
+v1.0 (1a2b3c4) → the working tree
+~ REQ-014 Fast start: status approved → implemented; + mitigates RISK-002; body
++ REQ-031 Telemetry export (requirement)
+- REQ-007 Old idea (requirement)
+1 added, 1 changed, 1 removed
+```
+
+`--type` keeps one type; `--format json` gives each item's change and
+details. A revision git doesn't know is a usage error (exit 2).
+
 ## Checking
 
 ### `kiln check [--format text|json|gitlab|github]`
@@ -151,6 +171,7 @@ design-md (markdown, document) → docs/generated/DESIGN.md
 | `--force` | Confluence: overwrites pages edited in Confluence (after their edit is in the repository) |
 | `--adopt` | Confluence: publishes into a `page =` that already has content, replacing it |
 | `--prune-removed DAYS` | Confluence: sends pages retired more than DAYS days ago to the space's trash |
+| `--since REV` | marks each item new or changed since REV (a tag, branch or commit) and fills the `changes` report (EXPORT.md, "Reports") |
 | `--format json` | the outcome per target as JSON (the Confluence plan included) |
 
 File targets write atomically and only what changed, and remove the files
@@ -207,6 +228,25 @@ to run instead (`kiln new … --open`). Fenix can't yet (INTEGRATION.md,
 G7). Files changed outside the editor are noticed within a few seconds.
 A Markdown file outside the project gets empty answers. Messages from
 the server itself go nowhere: stdout is the protocol.
+
+### `kiln confluence comments [EXPORT…] [--format text|json]`
+
+The unresolved footer comments on each Confluence target's pages (all
+targets, or the named ones), each under the item it is about when Kiln can
+tell (CONFLUENCE.md, "Comments"), with a link that opens it:
+
+```
+$ kiln confluence comments
+spec → space FLINT: 2 unresolved comments
+  REQ-014   Alice Martin, 2026-10-12: Startup in 50 ms Is that measured cold?
+            https://confluence.example.com/pages/viewpage.action?pageId=123&focusedCommentId=456#comment-456
+  (page)    Bob Chen, 2026-10-13: Can we get a PDF of this?
+            on "Flint — design document"
+            https://confluence.example.com/pages/viewpage.action?pageId=123&focusedCommentId=457#comment-457
+```
+
+It needs the same token as publishing, reads only, and exits 3 on a
+server or network error.
 
 ## In Flint
 

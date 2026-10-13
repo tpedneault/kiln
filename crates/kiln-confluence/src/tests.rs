@@ -72,6 +72,16 @@ fn desired(
     name: &str,
     taken: &HashSet<String>,
 ) -> Vec<DesiredPage> {
+    desired_since(project, source, name, taken, None)
+}
+
+fn desired_since(
+    project: &Project,
+    source: &MemorySource,
+    name: &str,
+    taken: &HashSet<String>,
+    since: Option<&kiln_render::Since>,
+) -> Vec<DesiredPage> {
     let rev = Revision {
         commit: Some("9f8e7d6c5b4a39281706f5e4d3c2b1a098765432".into()),
         date: Some("2026-10-12".into()),
@@ -81,6 +91,7 @@ fn desired(
         project,
         findings: &[],
         revision: &rev,
+        since,
     };
     let all: Vec<_> = project
         .config
@@ -633,6 +644,7 @@ fn publish(
         project: &project,
         findings: &[],
         revision: &rev,
+        since: None,
     };
     let all: Vec<_> = project
         .config
@@ -1042,4 +1054,114 @@ fn changing_layout_retires_pages_and_restrictions_apply() {
         .find(|(_, p)| p.title == "Flint — design document")
         .unwrap();
     assert_eq!(s.extra[id].restricted_to.as_deref(), Some("acc-kiln"));
+}
+
+#[test]
+fn since_markers_are_status_macros_in_the_heading() {
+    let (project, source) = project();
+    let since = kiln_render::Since {
+        label: "v1.0".into(),
+        commit: "1a2b3c4".into(),
+        changes: vec![kiln_index::ItemChange {
+            id: "REQ-002".parse().unwrap(),
+            kind: kiln_index::ChangeKind::Changed,
+            title: String::new(),
+            type_name: "requirement".into(),
+            path: String::new(),
+            details: Vec::new(),
+        }],
+    };
+    let pages = desired_since(&project, &source, "spec", &HashSet::new(), Some(&since));
+    let body = &pages[0].body;
+    let at = body.find("REQ-002 ").expect("the heading");
+    let heading_end = at + body[at..].find("</h").unwrap();
+    assert!(
+        body[at..heading_end].contains("<ac:structured-macro ac:name=\"status\"><ac:parameter ac:name=\"colour\">Yellow</ac:parameter><ac:parameter ac:name=\"title\">Changed</ac:parameter>"),
+        "{}",
+        &body[at..heading_end]
+    );
+    let plain = desired(&project, &source, "spec", &HashSet::new());
+    assert_eq!(
+        plain[0].title, pages[0].title,
+        "titles don't move with a baseline"
+    );
+}
+
+#[test]
+fn unresolved_comments_are_read_and_placed_on_both_flavours() {
+    let (_, source) = project();
+    for cloud in [false, true] {
+        let fake = Fake::start(empty_space(), cloud);
+        publish(&fake, cloud, &source, "spec", |_| {}).1.unwrap();
+        let doc = *fake
+            .state
+            .lock()
+            .unwrap()
+            .pages
+            .iter()
+            .find(|(_, p)| p.title == "Flint — design document")
+            .unwrap()
+            .0;
+        let comment = |id: &str, body: &str, resolved: bool| {
+            (id.to_owned(), "alice".to_owned(), body.to_owned(), resolved)
+        };
+        fake.state
+            .lock()
+            .unwrap()
+            .extra
+            .entry(doc)
+            .or_default()
+            .comments = vec![
+            comment(
+                "501",
+                "<blockquote><p>Careful.</p></blockquote><p>Careful of what?</p>",
+                false,
+            ),
+            comment(
+                "502",
+                "<blockquote><p>Finds things &amp; opens them</p></blockquote><p>Which things?</p>",
+                false,
+            ),
+            comment("503", "<p>Nice document.</p>", false),
+            comment("504", "<p>Fixed already.</p>", true),
+        ];
+        let c = client(&fake, cloud);
+        let project = Project::load(&source).unwrap();
+        let target = project.config.export("spec").unwrap().clone();
+        let snapshot = take_snapshot(
+            c.as_ref(),
+            &target,
+            "Flint",
+            "FLINT",
+            &[],
+            &crate::PageCache::default(),
+        )
+        .unwrap();
+        let placed = crate::comments::unresolved(
+            c.as_ref(),
+            &snapshot,
+            "https://c.example.com/wiki/",
+            "Flint",
+            "spec",
+        )
+        .unwrap();
+        let got: Vec<(Option<&str>, &str)> = placed
+            .iter()
+            .map(|p| (p.item.as_deref(), p.text.as_str()))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                (Some("REQ-002"), "Careful. Careful of what?"),
+                (Some("REQ-001"), "Finds things & opens them Which things?"),
+                (None, "Nice document."),
+            ],
+            "cloud: {cloud}"
+        );
+        assert_eq!(
+            placed[0].url,
+            format!("https://c.example.com/wiki/pages/viewpage.action?pageId={doc}&focusedCommentId=501#comment-501")
+        );
+        assert_eq!(placed[0].author, if cloud { "acc-alice" } else { "alice" });
+    }
 }

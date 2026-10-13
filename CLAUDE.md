@@ -10,8 +10,9 @@ workspace and CI), K1 (the format, `kiln check`, the editing commands,
 this repository's own `design/`), K2 (exports; Confluence planning
 without writes; the committed design document) and K3 (Confluence
 publishing, `kiln auth confluence`; every **verify** still unconfirmed
-live), K4 (`kiln lsp`; Fenix gaps G7 and G8 worked around) and K5
-(`kiln provider` for Flint) are done.
+live), K4 (`kiln lsp`; Fenix gaps G7 and G8 worked around), K5
+(`kiln provider` for Flint) and K6 (`kiln diff`, `export --since`,
+`kiln confluence comments`) are done.
 
 ## Read first, in this order
 

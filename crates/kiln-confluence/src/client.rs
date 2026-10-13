@@ -84,6 +84,20 @@ pub struct Created {
     pub version: u64,
 }
 
+/// A footer comment on a page (`kiln confluence comments`).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Comment {
+    pub id: String,
+    /// A display name on Data Center; an account id on Cloud (v2 names
+    /// authors by id).
+    pub author: String,
+    /// When it was written, as the server says it.
+    pub created: String,
+    /// Storage format.
+    pub body: String,
+    pub resolved: bool,
+}
+
 /// The calls Kiln makes (CONFLUENCE.md, "The API, by flavour"), and
 /// nothing else.
 pub trait Confluence {
@@ -135,6 +149,8 @@ pub trait Confluence {
     fn restrict_edits(&self, id: u64, who: &Identity) -> Result<(), ClientError>;
     /// Sends a page to the space's trash (`--prune-removed`).
     fn trash(&self, id: u64) -> Result<(), ClientError>;
+    /// A page's footer comments, replies included.
+    fn comments(&self, id: u64) -> Result<Vec<Comment>, ClientError>;
 }
 
 /// HTTP with authentication, timeouts and retries.

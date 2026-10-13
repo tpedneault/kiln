@@ -1145,6 +1145,7 @@ dependencies = [
  "kiln-lsp",
  "kiln-model",
  "kiln-parse",
+ "kiln-render",
  "kiln-secrets",
  "serde_json",
  "tempfile",

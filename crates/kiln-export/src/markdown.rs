@@ -257,6 +257,12 @@ impl<'a> Writer<'a> {
         );
         let level = self.level(s.depth).min(6);
         let mut out = format!("{explicit}{} {}\n", "#".repeat(level), escape(&text));
+        // Under the heading, not in it: GitLab and GitHub derive anchors
+        // from heading text, and a baseline mustn't move them.
+        // Italic, so it doesn't read as the bold status lozenge below it.
+        if let Some(kiln_render::Inline::Status { text, .. }) = s.marker_inline() {
+            out.push_str(&format!("\n*{text}*\n"));
+        }
         let inner = self.nodes(&s.nodes);
         if !inner.is_empty() {
             out.push('\n');

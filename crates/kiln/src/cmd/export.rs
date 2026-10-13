@@ -45,6 +45,8 @@ pub struct Options {
     pub adopt: bool,
     /// Trash retired pages older than this many days.
     pub prune_removed: Option<u32>,
+    /// A baseline: the changes report and New/Changed markers.
+    pub since: Option<String>,
     pub format: TextOrJson,
 }
 
@@ -138,6 +140,17 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
     let date = commit
         .as_deref()
         .and_then(|c| kiln_git::commit_date(&root, c).ok());
+    let since = match &o.since {
+        Some(rev) => {
+            let (old, base) = crate::project::at_revision(&root, rev)?;
+            Some(kiln_render::Since {
+                label: rev.clone(),
+                commit: base,
+                changes: kiln_index::diff(&old, p),
+            })
+        }
+        None => None,
+    };
 
     // Targets link into their `link_to` targets, so those are prepared too.
     let mut wanted: Vec<&ExportTarget> = selected.clone();
@@ -180,6 +193,7 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
             project: p,
             findings: &findings,
             revision: &revision,
+            since: since.as_ref(),
         };
         prepared.push(prepare(t, template.as_deref(), &assembly));
     }

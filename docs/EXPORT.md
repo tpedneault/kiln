@@ -172,7 +172,7 @@ Flint covers Windows and Linux (KDE Plasma 6 on Wayland). It does not…
 | `<!-- kiln:report traceability\|findings\|roadmap\|changes\|risks … -->` | a report (see "Reports") |
 | `<!-- kiln:summary -->` | the commit, its date, counts, coverage, progress |
 | `<!-- kiln:toc -->` | a table of contents (Confluence's `toc` macro; a generated list in files) |
-| `<!-- kiln:value name\|commit\|date\|since -->` | a value, inline |
+| `<!-- kiln:value name\|commit\|date\|since -->` | a value, inline (`since`: the `--since` baseline, empty without one) |
 
 `kiln:items` attributes, all optional and combined with AND:
 
@@ -249,12 +249,21 @@ and those that would pass level 6 become bold paragraphs.
 | `findings` | `kiln check` warnings and errors, by rule, linked to the repository |
 | `roadmap` | milestones in `due` order, status, progress, included items |
 | `risks` | open risks and what mitigates them |
-| `changes` | with `--since REV`: items added, removed and changed (status, title, links, body) between REV and the published commit (K6; until then naming it is K005 or K112) |
+| `changes` | with `--since REV`: a line of totals, then one row per item added, changed or removed between REV and what is exported (the working tree as `kiln export` reads it), with a New / Changed / Removed lozenge and what changed (`status draft → approved; + verifies REQ-002; body`). Removed items are named, not linked. Without `--since` it says how to get one |
 
 With `--since REV`, every item that changed since REV is also marked in
 place with a "Changed" or "New" lozenge next to its heading, so a reviewer
 reading the document finds the changes where they are, not only in the
-appendix.
+appendix. The marker is never part of the heading text, so anchors, page
+titles and links don't move when the baseline does: Markdown puts it in
+italics on the line under the heading (`*Changed*`), because GitLab and
+GitHub derive anchors from heading text; HTML and Confluence put a lozenge
+inside the heading after its text. Items placed in a `style="row"` table
+aren't marked; the changes report lists them.
+
+What counts as a change, and how REV is read, is FORMAT.md's "Baselines".
+`<!-- kiln:value since -->` is the baseline as `v1.0 (1a2b3c4)`, empty
+without `--since`.
 
 Reports in `tree` and `sections` get their own page or file; a report
 whose table passes `max_rows` (default 300) is split by top-level item.
@@ -346,6 +355,9 @@ kiln export [NAME…] [--dry-run | --check] [--yes] [--force] [--since REV]
   Until K3 they only plan: `--dry-run` (or `--check`) against the live
   space, or `--snapshot FILE` offline; `--save-snapshot FILE` records the
   live snapshot.
+- `--since REV` (a tag, branch or commit): the baseline for the `changes`
+  report and the in-place markers. The project at REV is read from git
+  (its `kiln.toml` and Markdown files), not checked out.
 - `link_to` links files to files and Confluence pages to Confluence pages;
   a `link_to` across the two is ignored and the item links to its file in
   the repository.

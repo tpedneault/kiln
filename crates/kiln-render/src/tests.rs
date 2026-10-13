@@ -140,7 +140,11 @@ fn roadmap_risks_and_findings() {
         none,
         vec![Block::Paragraph(vec![Inline::text("No findings.")])]
     );
-    assert!(report("changes", &p, &[], &ReportOptions::default()).is_none());
+    let no_baseline = report("changes", &p, &[], &ReportOptions::default()).unwrap();
+    assert!(
+        matches!(&no_baseline[0], Block::Paragraph(p) if crate::plain(p).contains("--since REV"))
+    );
+    assert!(report("nonsense", &p, &[], &ReportOptions::default()).is_none());
 }
 
 #[test]
@@ -159,9 +163,8 @@ fn template_problems_name_their_line() {
             "3: `gone` isn't a status of any type",
             "3: root `REQ-009` isn't an item",
             "6: kiln:item `REQ-099` isn't an item",
-            "7: the changes report needs `kiln export --since`, which arrives in K6",
             "9: unknown directive kiln:frobnicate (items, item, report, summary, toc, value)",
-            "11: kiln:value `colour` isn't name, commit or date",
+            "11: kiln:value `colour` isn't name, commit, date or since",
         ]
     );
 }

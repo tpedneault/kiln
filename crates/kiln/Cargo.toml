@@ -22,6 +22,7 @@ kiln-fenix.workspace = true
 fenix-storage.workspace = true
 serde_json.workspace = true
 kiln-export.workspace = true
+kiln-render.workspace = true
 kiln-confluence.workspace = true
 kiln-secrets.workspace = true
 kiln-lsp.workspace = true

@@ -42,6 +42,10 @@ pub struct Section {
     /// `tree` may give this section a page of its own (items, unless the
     /// directive said `split="no"`).
     pub own_page: bool,
+    /// With `--since`: the item is new or changed since the baseline. Kept
+    /// out of `title`, so headings, anchors and page titles don't move
+    /// when a baseline does; each back end shows it next to the heading.
+    pub marker: Option<kiln_index::ChangeKind>,
     /// Blocks and child sections in order. Headings inside blocks carry
     /// absolute depths (EXPORT.md: an item body's headings move under the
     /// item's level).
@@ -49,6 +53,19 @@ pub struct Section {
 }
 
 impl Section {
+    /// The marker as a status lozenge: "New" green, "Changed" yellow.
+    pub fn marker_inline(&self) -> Option<kiln_render::Inline> {
+        let (text, tone) = match self.marker? {
+            kiln_index::ChangeKind::Added => ("New", kiln_render::Tone::Green),
+            kiln_index::ChangeKind::Changed => ("Changed", kiln_render::Tone::Yellow),
+            kiln_index::ChangeKind::Removed => return None,
+        };
+        Some(kiln_render::Inline::Status {
+            text: text.into(),
+            tone,
+        })
+    }
+
     /// `2.1.3 REQ-014 Title`, the heading as shown.
     pub fn heading_text(&self) -> String {
         let title = kiln_render::plain(&self.title);
