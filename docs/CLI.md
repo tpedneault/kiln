@@ -1,6 +1,6 @@
 # Command line
 
-How to run `kiln`, as it stands (K4). The commands planned for later
+How to run `kiln`, as it stands (K5). The commands planned for later
 milestones are in [DESIGN.md](DESIGN.md), "Command line"; each is
 documented here when it ships. The file format is
 [FORMAT.md](FORMAT.md); `kiln.toml` is summed up in
@@ -207,6 +207,34 @@ to run instead (`kiln new … --open`). Fenix can't yet (INTEGRATION.md,
 G7). Files changed outside the editor are noticed within a few seconds.
 A Markdown file outside the project gets empty answers. Messages from
 the server itself go nowhere: stdout is the protocol.
+
+## In Flint
+
+### `kiln provider [--name NAME] [--prefix KEY]`
+
+A Flint provider on stdin and stdout (INTEGRATION.md, "Kiln as a Flint
+provider"). Declare it in Flint's `settings.toml`:
+
+```toml
+[[providers]]
+name = "kiln"
+command = ["kiln", "provider"]
+prefix = "k"
+```
+
+Every item that isn't closed is in Flint as `REQ-014 Title`, under
+`requirement · approved · under REQ-002`; `Enter` opens it in Fenix at its
+title. The other actions copy the ID or `[[REQ-014]]`, set the status, show
+what depends on it, open it in Confluence or Jira, and clock in on its
+agenda task in Fenix. The drill-downs: `k status REQ-014`, `k impact
+REQ-014`, `k all <text>` (closed items too).
+
+The project is `--project DIR` when given; otherwise the one Fenix shows
+when Flint is summoned (remembered for next time), or the folder the
+provider started in. `--name` must match the `[[providers]]` name and
+`--prefix` the scope keyword when either isn't the default. Changes on
+disk reach Flint within about 2 s. Messages go to stderr, which Flint
+keeps in `logs/providers/<name>.log`.
 
 ### `kiln auth confluence [--forget]`
 

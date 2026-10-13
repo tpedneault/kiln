@@ -14,18 +14,22 @@
 //! server stays within its 50 ms budget.
 //!
 //! It deliberately doesn't judge the project (`kiln-check` turns it into
-//! findings) or render it, and it never writes: a renumbering is a plan
-//! the caller applies.
+//! findings) or render it, and it decides no writes: a renumbering or a
+//! new item is a plan the caller applies. [`write_back`] is the one way
+//! callers write an edited file, so the command line and the Flint
+//! provider refuse alike when the file changed under them.
 
 mod new_item;
 mod project;
 mod renumber;
 mod source;
+mod write;
 
 pub use new_item::{plan_new_item, toml_string, NewItem, NewItemSpec};
 pub use project::{labelled, Impact, Inbound, LoadError, Progress, Project, Source, Step};
 pub use renumber::{plan_renumber, FileEdits, RenumberPlan};
 pub use source::{find_root, DiskSource, FileSource, Listing, MemorySource, Stamp};
+pub use write::{read_for_edit, write_back, ReadFile, WriteError};
 
 #[cfg(test)]
 mod tests;

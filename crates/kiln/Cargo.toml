@@ -25,6 +25,7 @@ kiln-export.workspace = true
 kiln-confluence.workspace = true
 kiln-secrets.workspace = true
 kiln-lsp.workspace = true
+kiln-flint.workspace = true
 dirs.workspace = true
 
 [dev-dependencies]

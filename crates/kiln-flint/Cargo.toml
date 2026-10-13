@@ -11,3 +11,17 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+flint-protocol.workspace = true
+kiln-model.workspace = true
+kiln-parse.workspace = true
+kiln-index.workspace = true
+kiln-confluence.workspace = true
+kiln-secrets.workspace = true
+kiln-fenix.workspace = true
+fenix-storage.workspace = true
+crossbeam-channel.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

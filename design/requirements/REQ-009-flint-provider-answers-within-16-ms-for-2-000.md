@@ -2,7 +2,7 @@
 id = "REQ-009"
 type = "requirement"
 title = "Flint provider answers within 16 ms for 2,000 items"
-status = "approved"
+status = "implemented"
 parent = "REQ-004"
 +++
 

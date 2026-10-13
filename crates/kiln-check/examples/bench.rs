@@ -6,7 +6,9 @@
 //! no diagrams, which the budget excludes); then a hundred keystrokes in
 //! one item file, each re-read alone and the whole project checked again,
 //! which is what the language server does per edit (its 50 ms p95
-//! budget).
+//! budget); then the Flint provider: its 2,000 static items (built, and
+//! small enough for one Flint message) and its drill-down answers (the
+//! 16 ms query budget).
 //!
 //! ```text
 //! cargo run --release -p kiln-check --example bench            # report
@@ -40,6 +42,9 @@ const EXPORT_GATE: Duration = Duration::from_millis(4500);
 const KEYSTROKE_BUDGET: Duration = Duration::from_millis(50);
 const KEYSTROKE_GATE: Duration = Duration::from_millis(75);
 const KEYSTROKES: usize = 100;
+const QUERY_BUDGET: Duration = Duration::from_millis(16);
+const QUERY_GATE: Duration = Duration::from_millis(24);
+const QUERIES: usize = 100;
 /// Bump when the generated project changes, so stale copies regenerate.
 const GENERATOR: &str = "1";
 
@@ -293,7 +298,48 @@ fn keystrokes(root: &Path) -> Vec<Duration> {
     times
 }
 
-// verifies: REQ-007, REQ-008, REQ-010
+/// The Flint provider: building every static item once, its encoded
+/// size, and the time each drill-down answer takes (`status`, `impact`
+/// of an item many depend on, `all`), in turn.
+fn provider(root: &Path) -> (Duration, usize, Vec<Duration>) {
+    let source = DiskSource::new(root);
+    let project = Project::load(&source).expect("the benchmark project loads");
+    let ctx = kiln_flint::items::Context {
+        provider: "kiln",
+        prefix: "k",
+        root,
+        confluence: true,
+    };
+    let start = Instant::now();
+    let items = kiln_flint::items::items(&project, &ctx);
+    let built = start.elapsed();
+    let size = serde_json::to_vec(&items)
+        .map(|b| b.len())
+        .unwrap_or(usize::MAX);
+    // The item most others reach: the one with the most inbound links.
+    let busiest = project
+        .items
+        .iter()
+        .max_by_key(|i| project.inbound(&i.id).len() + project.children(&i.id).len())
+        .map(|i| i.id.to_string())
+        .unwrap_or_default();
+    let queries = [
+        format!("status {busiest} "),
+        format!("impact {busiest}"),
+        "all 1".to_owned(),
+    ];
+    let mut times = Vec::with_capacity(QUERIES);
+    for i in 0..QUERIES {
+        let start = Instant::now();
+        let found = kiln_flint::items::drilldown(&project, &queries[i % queries.len()], &ctx);
+        let encoded = serde_json::to_vec(&found).map(|b| b.len()).unwrap_or(0);
+        times.push(start.elapsed());
+        std::hint::black_box(encoded);
+    }
+    (built, size, times)
+}
+
+// verifies: REQ-007, REQ-008, REQ-009, REQ-010
 fn main() {
     let gate = std::env::args().any(|a| a == "--gate");
     let root = root();
@@ -356,7 +402,37 @@ fn main() {
         KEYSTROKE_BUDGET.as_millis(),
         KEYSTROKE_GATE.as_millis()
     );
+    let (built, size, mut queries) = provider(&root);
+    queries.sort();
+    let query_p95 = queries[queries.len() * 95 / 100];
+    println!(
+        "provider: {} items built in {} ms, {} KiB as JSON (Flint's limit {} KiB); drill-down p95 over {QUERIES}: {} ms (budget {} ms, gate {} ms)",
+        ITEMS,
+        built.as_millis(),
+        size / 1024,
+        flint_protocol::frame::MAX_BODY / 1024,
+        query_p95.as_millis(),
+        QUERY_BUDGET.as_millis(),
+        QUERY_GATE.as_millis()
+    );
     let mut failed = false;
+    if gate && query_p95 > QUERY_GATE {
+        eprintln!(
+            "bench: a Flint drill-down took {} ms (p95), over the {} ms gate",
+            query_p95.as_millis(),
+            QUERY_GATE.as_millis()
+        );
+        failed = true;
+    }
+    // `provider/setItems` carries every item in one message.
+    if gate && size >= flint_protocol::frame::MAX_BODY - 64 * 1024 {
+        eprintln!(
+            "bench: the provider's items are {} KiB, too close to Flint's {} KiB message limit",
+            size / 1024,
+            flint_protocol::frame::MAX_BODY / 1024
+        );
+        failed = true;
+    }
     if gate && p95 > KEYSTROKE_GATE {
         eprintln!(
             "bench: a keystroke in the language server took {} ms (p95), over the {} ms gate",

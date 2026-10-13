@@ -58,3 +58,21 @@ impl PageCache {
         serde_json::to_string_pretty(self).unwrap_or_default()
     }
 }
+
+/// The cache file for a target, under the state folder's `confluence/`:
+/// `<space>-<project>-<export>.json`, with anything but letters, digits,
+/// `-` and `_` replaced, so a project name can't make a path.
+pub fn cache_file_name(space: &str, project: &str, export: &str) -> String {
+    let clean = |s: &str| -> String {
+        s.chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect()
+    };
+    format!("{}-{}-{}.json", clean(space), clean(project), clean(export))
+}

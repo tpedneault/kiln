@@ -60,6 +60,14 @@ All notable changes to Kiln are recorded here. The format follows
   polling; the benchmark gate covers a keystroke (50 ms p95)
   ([docs/CLI.md](docs/CLI.md), [docs/INTEGRATION.md](docs/INTEGRATION.md),
   which records Fenix gaps G7 and G8).
+- K5: `kiln provider`, a Flint provider: every open item as a Flint item
+  (open in Fenix at its title, copy the ID or `[[ID]]`, set the status,
+  show what depends on it, open in Confluence or Jira, clock in on its
+  agenda task) and the drill-downs `k status ID`, `k impact ID` and
+  `k all text`. It follows Fenix to the project in front and notices
+  changes on disk; the benchmark gate covers its drill-downs (16 ms) and
+  checks its items fit one Flint message ([docs/CLI.md](docs/CLI.md),
+  [docs/INTEGRATION.md](docs/INTEGRATION.md)).
 
 ### Changed
 

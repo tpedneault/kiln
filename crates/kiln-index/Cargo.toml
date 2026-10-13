@@ -15,6 +15,7 @@ kiln-model.workspace = true
 kiln-parse.workspace = true
 ignore.workspace = true
 rayon.workspace = true
+fenix-storage.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

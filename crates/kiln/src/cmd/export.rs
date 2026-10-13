@@ -449,7 +449,11 @@ fn confluence_plan(prep: &Prepared, ctx: &Planning) -> Result<ConfluenceRun, Fai
     let cache = crate::project::folders().map(|f| {
         f.state
             .join("confluence")
-            .join(cache_name(&space, &project.config.name, &t.name))
+            .join(kiln_confluence::cache_file_name(
+                &space,
+                &project.config.name,
+                &t.name,
+            ))
     });
     let read_at = Instant::now();
     let (snapshot, client): (Snapshot, Option<Box<dyn Confluence>>) = match &o.snapshot {
@@ -544,23 +548,6 @@ fn confluence_plan(prep: &Prepared, ctx: &Planning) -> Result<ConfluenceRun, Fai
         restrict_edits: config.restrict_edits,
         applied: None,
     })
-}
-
-/// `<space>-<project>-<export>.json`, with anything but letters, digits,
-/// `-` and `_` replaced, so a project name can't make a path.
-fn cache_name(space: &str, project: &str, export: &str) -> String {
-    let clean = |s: &str| -> String {
-        s.chars()
-            .map(|c| {
-                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                    c
-                } else {
-                    '_'
-                }
-            })
-            .collect()
-    };
-    format!("{}-{}-{}.json", clean(space), clean(project), clean(export))
 }
 
 /// The cache only saves reads, so failing to write it is not an error.
