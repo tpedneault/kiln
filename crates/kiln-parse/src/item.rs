@@ -13,7 +13,8 @@ use toml_edit::{ImDocument, Item as TomlItem};
 use crate::text::LineIndex;
 use crate::toml_walk::{inside_quotes, Walk};
 
-const KEYS: &[&str] = &[
+/// The front-matter keys, in the order formatting writes them.
+pub(crate) const KEYS: &[&str] = &[
     "id", "type", "title", "status", "parent", "tags", "jira", "owner", "due", "links", "extra",
 ];
 

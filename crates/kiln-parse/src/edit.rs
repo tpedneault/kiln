@@ -147,6 +147,57 @@ pub fn remove_link(text: &str, role: &str, target: &str) -> Result<String, EditE
     })
 }
 
+/// Normalises the front matter for `textDocument/formatting`: top-level
+/// keys in FORMAT.md's order (`id`, `type`, `title`, `status`, `parent`,
+/// `tags`, `jira`, `owner`, `due`; unknown keys after them, in their
+/// order; `[links]` and `[extra]` stay tables at the end), and every
+/// string written as a basic `"…"` string. Comments travel with their key;
+/// the body is never touched. A file already in shape comes back
+/// unchanged.
+pub fn format_front_matter(text: &str) -> Result<String, EditError> {
+    with_front_matter(text, |doc| {
+        let rank = |key: &str| {
+            crate::item::KEYS
+                .iter()
+                .position(|k| *k == key)
+                .unwrap_or(crate::item::KEYS.len())
+        };
+        doc.as_table_mut()
+            .sort_values_by(|a, _, b, _| rank(a.get()).cmp(&rank(b.get())));
+        requote_table(doc.as_table_mut());
+        Ok(())
+    })
+}
+
+fn requote_table(table: &mut dyn toml_edit::TableLike) {
+    for (_, item) in table.iter_mut() {
+        requote_item(item);
+    }
+}
+
+fn requote_item(item: &mut Item) {
+    match item {
+        Item::Value(v) => requote_value(v),
+        Item::Table(t) => requote_table(t),
+        Item::ArrayOfTables(a) => a.iter_mut().for_each(|t| requote_table(t)),
+        Item::None => {}
+    }
+}
+
+fn requote_value(value: &mut Value) {
+    match value {
+        Value::String(s) if !s.display_repr().starts_with('"') => {
+            let decor = s.decor().clone();
+            let mut basic = Value::from(s.value().as_str());
+            *basic.decor_mut() = decor;
+            *value = basic;
+        }
+        Value::Array(a) => a.iter_mut().for_each(requote_value),
+        Value::InlineTable(t) => t.iter_mut().for_each(|(_, v)| requote_value(v)),
+        _ => {}
+    }
+}
+
 /// Applies byte-range replacements to `text`. Ranges must not overlap;
 /// order doesn't matter.
 pub fn splice(text: &str, edits: &[(std::ops::Range<usize>, String)]) -> String {
@@ -230,5 +281,16 @@ mod tests {
             ),
             "a REQ-002 b REQ-002"
         );
+    }
+
+    #[test]
+    fn formatting_orders_keys_and_quotes_strings_only() {
+        let messy = "+++\nstatus = 'draft' # still\ntitle = \"Fast\"\nzzz = 1\nid = \"REQ-001\"\ntags = ['a', \"b\"]\ntype = \"requirement\"\n\n[links]\nverifies = ['REQ-002']\n+++\nBody 'quoted' stays.\n";
+        let out = format_front_matter(messy).unwrap();
+        assert_eq!(
+            out,
+            "+++\nid = \"REQ-001\"\ntype = \"requirement\"\ntitle = \"Fast\"\nstatus = \"draft\" # still\ntags = [\"a\", \"b\"]\nzzz = 1\n\n[links]\nverifies = [\"REQ-002\"]\n+++\nBody 'quoted' stays.\n"
+        );
+        assert_eq!(format_front_matter(&out).unwrap(), out, "idempotent");
     }
 }

@@ -18,8 +18,9 @@ navigation through Kiln's language server) and
 is a few keystrokes away).
 
 **Status:** the file format, `kiln check`, the editing commands,
-exports to Markdown and HTML, and publishing to Confluence (Cloud and Data
-Center) work (K1–K3). Kiln's own requirements and decisions live
+exports to Markdown and HTML, publishing to Confluence (Cloud and Data
+Center) and the language server for Fenix and other editors work
+(K1–K4). Kiln's own requirements and decisions live
 in [design/](design/), and its generated design document in
 [docs/generated/DESIGN.md](docs/generated/DESIGN.md).
 

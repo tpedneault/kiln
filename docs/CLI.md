@@ -1,6 +1,6 @@
 # Command line
 
-How to run `kiln`, as it stands (K3). The commands planned for later
+How to run `kiln`, as it stands (K4). The commands planned for later
 milestones are in [DESIGN.md](DESIGN.md), "Command line"; each is
 documented here when it ships. The file format is
 [FORMAT.md](FORMAT.md); `kiln.toml` is summed up in
@@ -15,13 +15,19 @@ Results go to stdout, messages to stderr, so `kiln list --format json |
 
 ## Starting
 
-### `kiln init [--name NAME]`
+### `kiln init [--name NAME] [--fenix]`
 
 Writes `kiln.toml` with FORMAT.md's default types and links, and a
 `design/` folder with a README. `NAME` defaults to the folder's name.
 Never overwrites: with a `kiln.toml` already there it stops (exit 2). Add
 a `[code]` section yourself to have source code scanned for code
 references.
+
+`--fenix` also registers `kiln lsp` as the Markdown language server in
+`.fenix/tools.json` (`"lsp": {"markdown": {"executable": "kiln", "args":
+["lsp"]}}`), merging into an existing file and leaving another Markdown
+server alone. In a project that already has a `kiln.toml`, `kiln init
+--fenix` does only that.
 
 ### `kiln new TYPE [--parent ID] [--title TEXT] [--open]`
 
@@ -173,6 +179,34 @@ and the next run finishes what the failed one started. `--format json`
 adds what was published under `applied` (publishing with JSON output
 needs `--yes`). CONFLUENCE.md has the details: drift, retired pages, the
 page cache.
+
+## Editing in an editor
+
+### `kiln lsp`
+
+A language server on stdin and stdout, for Fenix (`kiln init --fenix`
+sets it up) or any editor that speaks LSP. It finds the project from the
+editor's workspace folder, or from the first file opened, walking up to
+`kiln.toml`. In item files:
+
+| Request | Gives |
+|---|---|
+| completion | IDs after `[[`, in `parent = "` (types allowed as parent) and in `[links]` arrays (types the role allows, not already listed); statuses after `status = "`; types after `type = "`; tags already used; link roles at the start of a `[links]` line |
+| hover | on any ID: what `kiln show` prints for it |
+| definition | the item's `id` line (every copy, when duplicated) |
+| references | every link, `parent`, mention and code reference to the item (and its `id`, when asked) |
+| rename | `kiln renumber`: every reference, and the file name when the editor can rename files |
+| diagnostics | `kiln check` for the open files and `kiln.toml`, after each edit |
+| code actions | set status; add a link to the ID under the cursor; new child; create a test (or design, task…) covering this item; rename the file to match its ID |
+| formatting | front-matter keys in FORMAT.md's order, strings in `"…"`; the body untouched |
+
+It never writes a file: every change comes back as an edit the editor
+applies. Actions that create or rename a file are offered only to editors
+that can apply such edits; others get them disabled, naming the command
+to run instead (`kiln new … --open`). Fenix can't yet (INTEGRATION.md,
+G7). Files changed outside the editor are noticed within a few seconds.
+A Markdown file outside the project gets empty answers. Messages from
+the server itself go nowhere: stdout is the protocol.
 
 ### `kiln auth confluence [--forget]`
 

@@ -50,6 +50,16 @@ All notable changes to Kiln are recorded here. The format follows
   [contrib/](contrib/), live tests and
   [dev/confluence/README.md](dev/confluence/README.md) for both flavours
   ([docs/CONFLUENCE.md](docs/CONFLUENCE.md), [docs/CLI.md](docs/CLI.md)).
+- K4: `kiln lsp`, a language server for item files: completion of IDs,
+  statuses, types, tags and link roles; hover with what `kiln show`
+  prints; definition; references; rename as `kiln renumber`; `kiln check`
+  diagnostics after each edit; code actions (set status, add a link, new
+  child, create a covering test, rename the file to its ID) and
+  front-matter formatting. `kiln init --fenix` registers it in
+  `.fenix/tools.json`. Files changed outside the editor are noticed by
+  polling; the benchmark gate covers a keystroke (50 ms p95)
+  ([docs/CLI.md](docs/CLI.md), [docs/INTEGRATION.md](docs/INTEGRATION.md),
+  which records Fenix gaps G7 and G8).
 
 ### Changed
 

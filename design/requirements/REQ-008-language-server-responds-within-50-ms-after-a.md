@@ -2,7 +2,7 @@
 id = "REQ-008"
 type = "requirement"
 title = "Language server responds within 50 ms after a keystroke"
-status = "approved"
+status = "implemented"
 parent = "REQ-004"
 +++
 

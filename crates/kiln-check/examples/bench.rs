@@ -3,7 +3,10 @@
 //! files, loaded and checked the way `kiln check` does it, then exported
 //! as one 2,000-item Markdown document the way `kiln export --dry-run`
 //! does it (assembly, layout, references, back end, comparing with disk;
-//! no diagrams, which the budget excludes).
+//! no diagrams, which the budget excludes); then a hundred keystrokes in
+//! one item file, each re-read alone and the whole project checked again,
+//! which is what the language server does per edit (its 50 ms p95
+//! budget).
 //!
 //! ```text
 //! cargo run --release -p kiln-check --example bench            # report
@@ -34,6 +37,9 @@ const BUDGET: Duration = Duration::from_secs(2);
 const GATE: Duration = Duration::from_secs(3);
 const EXPORT_BUDGET: Duration = Duration::from_secs(3);
 const EXPORT_GATE: Duration = Duration::from_millis(4500);
+const KEYSTROKE_BUDGET: Duration = Duration::from_millis(50);
+const KEYSTROKE_GATE: Duration = Duration::from_millis(75);
+const KEYSTROKES: usize = 100;
 /// Bump when the generated project changes, so stale copies regenerate.
 const GENERATOR: &str = "1";
 
@@ -260,7 +266,34 @@ fn export(root: &Path) -> (Duration, usize) {
     (start.elapsed(), bytes)
 }
 
-// verifies: REQ-007, REQ-010
+/// The language server's work per keystroke: one file re-read
+/// (`Project::update_file`) and every rule run again. Returns each
+/// keystroke's time.
+fn keystrokes(root: &Path) -> Vec<Duration> {
+    let source = DiskSource::new(root);
+    let mut project = Project::load(&source).expect("the benchmark project loads");
+    let path = project.items[ITEMS / 2].path.clone();
+    let original = std::fs::read_to_string(root.join(&path)).expect("the item file reads");
+    let today = Date {
+        year: 2026,
+        month: 1,
+        day: 1,
+    };
+    let mut times = Vec::with_capacity(KEYSTROKES);
+    let mut typed = String::new();
+    for i in 0..KEYSTROKES {
+        typed.push(if i % 7 == 6 { ' ' } else { 'x' });
+        let text = format!("{original}\n{typed}");
+        let start = Instant::now();
+        project.update_file(&path, Some(text.as_bytes()));
+        let findings = kiln_check::check(&project, &source, today);
+        times.push(start.elapsed());
+        std::hint::black_box(findings);
+    }
+    times
+}
+
+// verifies: REQ-007, REQ-008, REQ-010
 fn main() {
     let gate = std::env::args().any(|a| a == "--gate");
     let root = root();
@@ -313,7 +346,25 @@ fn main() {
         EXPORT_BUDGET.as_millis(),
         EXPORT_GATE.as_millis()
     );
+    let mut strokes = keystrokes(&root);
+    strokes.sort();
+    let p95 = strokes[strokes.len() * 95 / 100];
+    println!(
+        "keystroke p95 over {KEYSTROKES}: {} ms, median {} ms (budget {} ms, gate {} ms)",
+        p95.as_millis(),
+        strokes[strokes.len() / 2].as_millis(),
+        KEYSTROKE_BUDGET.as_millis(),
+        KEYSTROKE_GATE.as_millis()
+    );
     let mut failed = false;
+    if gate && p95 > KEYSTROKE_GATE {
+        eprintln!(
+            "bench: a keystroke in the language server took {} ms (p95), over the {} ms gate",
+            p95.as_millis(),
+            KEYSTROKE_GATE.as_millis()
+        );
+        failed = true;
+    }
     if gate && median > GATE {
         eprintln!(
             "bench: kiln check took {} ms, over the {} ms gate",

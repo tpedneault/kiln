@@ -393,3 +393,90 @@ fn confluence_targets_publish_with_yes_and_stop_on_drift() {
         "nothing to publish"
     );
 }
+
+#[test]
+fn init_registers_the_language_server_for_fenix() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    std::fs::create_dir_all(d.join(".fenix")).unwrap();
+    std::fs::write(
+        d.join(".fenix/tools.json"),
+        "{\"tasks\": {\"build\": {\"executable\": \"cargo\", \"args\": [\"build\"]}}}\n",
+    )
+    .unwrap();
+    ok(d, &["init", "--name", "Demo", "--fenix"]);
+    let tools: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(d.join(".fenix/tools.json")).unwrap())
+            .unwrap();
+    assert_eq!(tools["lsp"]["markdown"]["executable"], "kiln");
+    assert_eq!(tools["lsp"]["markdown"]["args"][0], "lsp");
+    assert_eq!(
+        tools["tasks"]["build"]["executable"], "cargo",
+        "the rest is kept"
+    );
+
+    // An existing project gets only the editor setup; another Markdown
+    // server is left alone.
+    std::fs::write(
+        d.join(".fenix/tools.json"),
+        "{\"lsp\": {\"markdown\": {\"executable\": \"marksman\"}}}\n",
+    )
+    .unwrap();
+    let out = kiln_in(d, &["init", "--fenix"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stderr(&out).contains("already runs `marksman` for Markdown; left it alone"));
+    assert!(std::fs::read_to_string(d.join(".fenix/tools.json"))
+        .unwrap()
+        .contains("marksman"));
+    assert_eq!(
+        kiln_in(d, &["init"]).status.code(),
+        Some(2),
+        "kiln.toml exists"
+    );
+}
+
+#[test]
+fn lsp_speaks_the_protocol_on_stdio() {
+    use std::io::{BufRead, BufReader, Read, Write};
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_kiln"))
+        .arg("lsp")
+        .current_dir(d)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("kiln lsp starts");
+    let mut stdin = child.stdin.take().unwrap();
+    let mut send = |body: serde_json::Value| {
+        let body = body.to_string();
+        write!(stdin, "Content-Length: {}\r\n\r\n{body}", body.len()).unwrap();
+        stdin.flush().unwrap();
+    };
+    send(
+        serde_json::json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"capabilities": {}, "rootUri": null}}),
+    );
+    let mut out = BufReader::new(child.stdout.take().unwrap());
+    let mut length = 0;
+    loop {
+        let mut line = String::new();
+        out.read_line(&mut line).unwrap();
+        if line == "\r\n" {
+            break;
+        }
+        if let Some(n) = line.strip_prefix("Content-Length: ") {
+            length = n.trim().parse().unwrap();
+        }
+    }
+    let mut body = vec![0; length];
+    out.read_exact(&mut body).unwrap();
+    let reply: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(reply["result"]["serverInfo"]["name"], "kiln");
+    assert!(reply["result"]["capabilities"]["renameProvider"].is_object());
+    send(serde_json::json!({"jsonrpc": "2.0", "method": "initialized", "params": {}}));
+    send(serde_json::json!({"jsonrpc": "2.0", "id": 2, "method": "shutdown"}));
+    send(serde_json::json!({"jsonrpc": "2.0", "method": "exit"}));
+    drop(stdin);
+    assert!(child.wait().unwrap().success());
+}

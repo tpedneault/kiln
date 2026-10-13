@@ -29,7 +29,11 @@ fn config() -> String {
 }
 
 fn project() -> Project {
-    let source = MemorySource::new()
+    Project::load(&source()).unwrap()
+}
+
+fn source() -> MemorySource {
+    MemorySource::new()
         .with("kiln.toml", config())
         .with(
             "design/REQ-001.md",
@@ -125,8 +129,7 @@ fn project() -> Project {
             "src/lib.rs",
             format!("fn a() {{}}\n{}", code_ref("verifies", "REQ-003")),
         )
-        .with("src/fixtures/f.rs", code_ref("verifies", "REQ-999"));
-    Project::load(&source).unwrap()
+        .with("src/fixtures/f.rs", code_ref("verifies", "REQ-999"))
 }
 
 #[test]
@@ -321,4 +324,97 @@ fn a_missing_folder_and_a_broken_config_are_reported() {
         Project::load(&MemorySource::new()),
         Err(crate::LoadError::Read(_))
     ));
+}
+
+/// Everything a query sees, for comparing an updated project with a
+/// fresh load.
+fn summary(p: &Project) -> Vec<String> {
+    let mut out: Vec<String> = p
+        .items
+        .iter()
+        .map(|i| format!("{} {} {}", i.path, i.id, i.title))
+        .collect();
+    out.extend(
+        p.code_refs
+            .iter()
+            .map(|r| format!("{} {}", r.location(), r.target.raw)),
+    );
+    out.extend(p.findings.iter().map(ToString::to_string));
+    let mut ids: Vec<&ItemId> = p.ids().collect();
+    ids.sort();
+    for id in ids {
+        let inbound: Vec<String> = p
+            .inbound(id)
+            .iter()
+            .map(|l| format!("{} {}", l.role, p.describe(l.source)))
+            .collect();
+        let children: Vec<String> = p.children(id).iter().map(|i| i.id.to_string()).collect();
+        let mentions: Vec<String> = p
+            .mentioned_by(id)
+            .iter()
+            .map(|i| i.id.to_string())
+            .collect();
+        out.push(format!(
+            "{id}: in {inbound:?} children {children:?} mentioned {mentions:?}"
+        ));
+    }
+    out
+}
+
+#[test]
+// verifies: REQ-008
+fn updating_one_file_equals_loading_again() {
+    let mut src = source();
+    let mut p = Project::load(&src).unwrap();
+    let edits: Vec<(&str, Option<String>)> = vec![
+        // A link moves, a mention appears.
+        (
+            "design/TEST-001.md",
+            Some(item(
+                "TEST-001",
+                "test",
+                "passing",
+                "[links]\nverifies = [\"REQ-004\"]\n+++\nNow [[REQ-002]].\n",
+            )),
+        ),
+        // A new item, a broken one, a deleted one.
+        (
+            "design/REQ-005.md",
+            Some(item(
+                "REQ-005",
+                "requirement",
+                "draft",
+                "parent = \"REQ-002\"\n",
+            )),
+        ),
+        (
+            "design/REQ-002.md",
+            Some("+++\nid = \"REQ-002\"\ntitle = \n+++\n".to_owned()),
+        ),
+        ("design/TASK-003.md", None),
+        // Code changes, and a file outside every path is ignored.
+        (
+            "src/lib.rs",
+            Some(code_ref("implements", "REQ-001, REQ-005")),
+        ),
+        (
+            "notes/x.md",
+            Some(item("REQ-077", "requirement", "draft", "")),
+        ),
+        // A README becomes an item.
+        (
+            "design/README.md",
+            Some(item("REQ-006", "requirement", "draft", "")),
+        ),
+    ];
+    for (path, text) in edits {
+        match &text {
+            Some(t) => src.insert(path, t),
+            None => src.remove(path),
+        }
+        p.update_file(path, text.as_deref().map(str::as_bytes));
+        let fresh = Project::load(&src).unwrap();
+        assert_eq!(summary(&p), summary(&fresh), "after {path}");
+    }
+    assert!(p.item(&id("REQ-077")).is_none());
 }

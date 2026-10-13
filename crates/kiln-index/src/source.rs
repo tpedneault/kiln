@@ -192,6 +192,10 @@ impl MemorySource {
         self.files
             .insert(path.to_owned(), contents.as_ref().to_vec());
     }
+
+    pub fn remove(&mut self, path: &str) {
+        self.files.remove(path);
+    }
 }
 
 impl FileSource for MemorySource {

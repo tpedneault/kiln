@@ -43,6 +43,7 @@ kiln-render = { path = "crates/kiln-render" }
 kiln-export = { path = "crates/kiln-export" }
 kiln-confluence = { path = "crates/kiln-confluence" }
 kiln-secrets = { path = "crates/kiln-secrets" }
+kiln-lsp = { path = "crates/kiln-lsp" }
 
 clap = { version = "4.5", features = ["derive"] }
 dirs = "6"
@@ -50,6 +51,11 @@ dirs = "6"
 # stored by either tool serves both.
 keyring = { version = "3.6", features = ["windows-native", "async-secret-service", "async-io", "crypto-rust"] }
 rpassword = "7"
+# The language server: synchronous, as rust-analyzer; `lsp-types` at the
+# minor Fenix's client uses.
+lsp-server = "0.7"
+crossbeam-channel = "0.5"
+lsp-types = "0.97"
 ignore = "0.4"
 pulldown-cmark = { version = "0.13", default-features = false }
 rayon = "1"

@@ -1,0 +1,10 @@
+{
+  "lsp": {
+    "markdown": {
+      "args": [
+        "lsp"
+      ],
+      "executable": "kiln"
+    }
+  }
+}
