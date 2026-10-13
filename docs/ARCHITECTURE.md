@@ -5,12 +5,14 @@ Where Kiln's code lives and which way its dependencies point.
 map of the workspace that does it, and is updated whenever a crate gains
 a role or a dependency.
 
-Status: K7. The format crates (`kiln-model`, `kiln-parse`, `kiln-index`,
-`kiln-check`), the export crates (`kiln-render`, `kiln-export`,
+Status: K8, every milestone. The format crates (`kiln-model`,
+`kiln-parse`, `kiln-index`, `kiln-check`), the export crates
+(`kiln-render`, `kiln-export` with Markdown, HTML and Word,
 `kiln-confluence` with publishing), `kiln-git`, `kiln-secrets` (environment
 variables and the OS credential store through `keyring`), `kiln-fenix`
-(opening a file, clocking in, opening a URL), `kiln-lsp`, `kiln-flint` and
-the binary's K1–K7 commands and the GUI (`kiln-gui`) are built.
+(opening a file, clocking in, opening a URL), `kiln-lsp`, `kiln-flint`,
+`kiln-jira` (the Jira mirror), the GUI (`kiln-gui`) and the binary's
+commands are built.
 
 ## Layout
 
@@ -46,7 +48,7 @@ access except through a value or trait the caller passes in.
 | `kiln-index` | the loaded project: walk (`ignore`), parse in parallel (`rayon`), graph, queries (including the facts `kiln show` and hover print), renumber and new-item plans; the item diff between two projects; re-reading one file (`update_file`) | yes, given a file-source trait | K1 (incremental, K4) |
 | `kiln-check` | the FORMAT.md rules and their output formats | yes | K1 |
 | `kiln-render` | Markdown and templates → document tree (`pulldown-cmark`); report builders; Mermaid validation (`fenix-diagram`) | yes | K2 |
-| `kiln-export` | assembly, numbering, layouts, reference resolution, Markdown and HTML, the file destination, diagram pictures and their cache | yes, except writing files and the cache | K2 |
+| `kiln-export` | assembly, numbering, layouts, reference resolution, Markdown, HTML and Word (`zip`, ADR-011), the file destination, diagram pictures and their cache | yes, except writing files and the cache | K2, K8 (Word) |
 | `kiln-confluence` | storage emitter, normaliser, desired pages, planner, snapshots, the client (`ureq`); apply; reading and placing footer comments | emitter, normaliser and planner yes; client no | K2 (read), K3 (write) |
 | `kiln-git` | the current commit, dirty state, last commit per file, shallow detection; a revision resolved to its commit and the files at it (one `ls-tree`, one `cat-file --batch`) | no (shells out to `git`) | K1, K2, K6 |
 | `kiln-lsp` | `kiln lsp`: the protocol (`lsp-server`, `lsp-types`), open documents layered over the disk, features as functions of the project and a position, a thread watching the disk | no | K4 |
@@ -54,6 +56,7 @@ access except through a value or trait the caller passes in.
 | `kiln-fenix` | Fenix control channel: open at a line, clock in on an agenda task by Jira key; opening a URL with the OS | no | K1 (`new --open`), K5 |
 | `kiln-secrets` | tokens from the environment (K2) or the OS credential store (K3); a `Token` that never formats | no | K2, K3 |
 | `kiln` | the binary: `clap` CLI, exit codes, project discovery, reading and writing files; and `kilnw`, the GUI without a console on Windows (ADR-010) | no | K0 onward |
+| `kiln-jira` | the Jira mirror: linked keys, the cached mirror and its freshness, K207 (pure); one fetch through `fenix-jira`, and the fake Jira for tests (`fake` feature) | mirror and K207 yes; fetch no | K8 |
 | `kiln-gui` | the GUI (GUI.md): pages as rows and the application as a state machine (pure, tested as text); the window (`winit`), GPU (`wgpu`) and text (`glyphon`) that draw a `Screen` | pages and app yes; window no | K7 |
 
 `kiln-gui` is the one crate that pulls in `wgpu` and `winit`, which is
@@ -77,7 +80,8 @@ needs it lands):
 | `kiln-git`, `kiln-secrets`, `kiln-fenix` | `kiln-model` at most |
 | `kiln-lsp` | `kiln-model`, `kiln-parse`, `kiln-index`, `kiln-check` |
 | `kiln-flint` | `kiln-model`, `kiln-parse` (the status edit), `kiln-index`, `kiln-fenix`, `kiln-confluence` and `kiln-secrets` ("Open in Confluence") |
-| `kiln-gui` | `kiln-model`, `kiln-index`, `kiln-fenix` (opening an item); the baseline arrives as a loaded project, so it needs no `kiln-git` |
+| `kiln-jira` | `kiln-model`, `kiln-index` |
+| `kiln-gui` | `kiln-model`, `kiln-index`, `kiln-fenix` (opening an item), `kiln-jira` (the mirror's type; the binary hands over the function that loads it, so the GUI never sees a token); the baseline arrives as a loaded project, so it needs no `kiln-git` |
 | `kiln` | all of them |
 
 The rules:
@@ -119,7 +123,7 @@ crate nothing compiles:
 | `fenix-diagram` | `kiln-render` (validation), `kiln-export` (pictures) | K2, added |
 | `flint-protocol` | `kiln-flint`; the benchmark (`kiln-check`'s example, for the message limit) | K5, added |
 | `fenix-keymap` | `kiln-gui` (the `SPC` leader's key trie) | K7, added |
-| `fenix-jira` | the Jira mirror | K8 |
+| `fenix-jira` | `kiln-jira` (the mirror's searches) | K8, added |
 
 Never `fenix-gui`, `fenix-project` or `fenix-notebook`.
 

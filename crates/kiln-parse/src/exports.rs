@@ -6,9 +6,9 @@
 use std::collections::HashSet;
 
 use kiln_model::{
-    ConfluenceConfig, ConfluenceFlavour, ConfluenceTarget, Diagrams, ExportFormat, ExportTarget,
-    Flavour, HtmlOptions, ItemStyle, Layout, MarkdownOptions, OnDrift, Rule, Span, TypeDef,
-    REPORTS,
+    ConfluenceConfig, ConfluenceFlavour, ConfluenceTarget, Diagrams, DocxOptions, ExportFormat,
+    ExportTarget, Flavour, HtmlOptions, ItemStyle, Layout, MarkdownOptions, OnDrift, Rule, Span,
+    TypeDef, REPORTS,
 };
 use toml_edit::Item;
 
@@ -30,6 +30,7 @@ const TARGET_KEYS: &[&str] = &[
     "path",
     "markdown",
     "html",
+    "docx",
     "confluence",
 ];
 const CONFLUENCE_KEYS: &[&str] = &[
@@ -263,7 +264,7 @@ fn target(
             invalid(
                 w,
                 name_span,
-                format!("export `{name}` needs a `format` (confluence, markdown or html)"),
+                format!("export `{name}` needs a `format` (confluence, markdown, html or docx)"),
             );
             return None;
         }
@@ -273,7 +274,7 @@ fn target(
                 invalid(
                     w,
                     span,
-                    format!("format `{f}` isn't confluence, markdown or html (docx arrives in K8)"),
+                    format!("format `{f}` isn't confluence, markdown, html or docx"),
                 );
                 return None;
             }
@@ -426,6 +427,7 @@ fn target(
 
     let markdown = markdown_options(w, t.get("markdown"));
     let html = html_options(w, t.get("html"));
+    let docx = docx_options(w, t.get("docx"));
     let target_confluence = confluence_target(w, t.get("confluence"));
     if target_confluence.page.is_some() && layout != Layout::Document {
         let span = w.span_of_key(t, "confluence");
@@ -468,6 +470,7 @@ fn target(
             path,
             markdown,
             html,
+            docx,
             confluence: target_confluence,
         },
         link_to,
@@ -533,6 +536,28 @@ fn html_options(w: &mut Walk, item: Option<&Item>) -> HtmlOptions {
     }
     HtmlOptions {
         theme: theme.map(|(s, _)| s),
+    }
+}
+
+fn docx_options(w: &mut Walk, item: Option<&Item>) -> DocxOptions {
+    let Some(t) = item.and_then(|i| w.table(i, Rule::K005, "`[export.docx]`")) else {
+        return DocxOptions::default();
+    };
+    w.unknown_keys(t, &["reference"], Rule::K003, "in [export.docx]");
+    let reference = t
+        .get("reference")
+        .and_then(|i| w.string(i, Rule::K005, "`reference`"));
+    if let Some((path, span)) = &reference {
+        if !path.to_ascii_lowercase().ends_with(".docx") {
+            w.report(
+                Rule::K005,
+                *span,
+                format!("reference `{path}` isn't a .docx file"),
+            );
+        }
+    }
+    DocxOptions {
+        reference: reference.map(|(s, _)| s),
     }
 }
 

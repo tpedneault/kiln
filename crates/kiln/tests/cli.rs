@@ -197,7 +197,7 @@ fn export_writes_markdown_and_check_notices_staleness() {
     let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
     std::fs::write(
         d.join("kiln.toml"),
-        format!("{config}\n[[export]]\nname = \"doc\"\nformat = \"markdown\"\npath = \"docs/DESIGN.md\"\n\n[[export]]\nname = \"page\"\nformat = \"html\"\nlayout = \"sections\"\npath = \"out/html\"\n"),
+        format!("{config}\n[[export]]\nname = \"doc\"\nformat = \"markdown\"\npath = \"docs/DESIGN.md\"\n\n[[export]]\nname = \"page\"\nformat = \"html\"\nlayout = \"sections\"\npath = \"out/html\"\n\n[[export]]\nname = \"word\"\nformat = \"docx\"\npath = \"out/design.docx\"\n"),
     )
     .unwrap();
     ok(d, &["new", "requirement", "--title", "Fast"]);
@@ -217,6 +217,9 @@ fn export_writes_markdown_and_check_notices_staleness() {
     assert!(md.starts_with("# Demo\n"), "{md}");
     assert!(md.contains("### 1.1 REQ-001 Fast"), "{md}");
     assert!(d.join("out/html/index.html").is_file() && d.join("out/html/.kiln-export").is_file());
+    let word = std::fs::read(d.join("out/design.docx")).unwrap();
+    assert!(word.starts_with(b"PK\x03\x04"), "a .docx is a zip");
+    // A second process renders the same bytes, Word included.
     assert_eq!(kiln_in(d, &["export", "--check"]).status.code(), Some(0));
 
     ok(d, &["set", "REQ-001", "status=approved"]);
@@ -226,7 +229,7 @@ fn export_writes_markdown_and_check_notices_staleness() {
     );
     let unknown = kiln_in(d, &["export", "nope"]);
     assert_eq!(unknown.status.code(), Some(2));
-    assert!(stderr(&unknown).contains("no export target `nope` (doc, page)"));
+    assert!(stderr(&unknown).contains("no export target `nope` (doc, page, word)"));
 }
 
 #[test]
@@ -702,4 +705,93 @@ fn confluence_comments_are_listed_per_item() {
             .code(),
         Some(2)
     );
+}
+
+fn kiln_jira(dir: &Path, token: &str, args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_kiln"))
+        .args(args)
+        .current_dir(dir)
+        .env("FENIX_HOME", dir.join("no-fenix"))
+        .env("KILN_HOME", dir.join("kiln-home"))
+        .env("KILN_JIRA_TOKEN", token)
+        .output()
+        .expect("the kiln binary runs")
+}
+
+#[test]
+fn list_jira_and_k207_read_the_mirror_once_per_ten_minutes() {
+    use kiln_jira::fake::{Fake, State, TOKEN};
+    let fake = Fake::start(
+        State::default()
+            .issue("FLINT-1", "In Review", "indeterminate", Some("Alice"))
+            .issue("FLINT-2", "Closed", "done", None),
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    std::fs::write(
+        d.join("kiln.toml"),
+        format!(
+            "{config}\n[jira]\nurl = \"{}\"\n\n[check]\nK207 = \"error\"\n",
+            fake.url
+        ),
+    )
+    .unwrap();
+    std::fs::create_dir_all(d.join("design/tasks")).unwrap();
+    let task = |id: &str, status: &str, jira: &str| {
+        format!("+++\nid = \"{id}\"\ntype = \"task\"\ntitle = \"{id} title\"\nstatus = \"{status}\"\njira = \"{jira}\"\n+++\n")
+    };
+    std::fs::write(
+        d.join("design/tasks/TASK-001.md"),
+        task("TASK-001", "done", "FLINT-1"),
+    )
+    .unwrap();
+    std::fs::write(
+        d.join("design/tasks/TASK-002.md"),
+        task("TASK-002", "done", "FLINT-2"),
+    )
+    .unwrap();
+
+    let out = kiln_jira(d, TOKEN, &["list", "--jira"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let text = stdout(&out);
+    assert!(
+        text.contains("TASK-001 title  [FLINT-1 In Review · Alice]"),
+        "{text}"
+    );
+    assert!(text.contains("TASK-002 title  [FLINT-2 Closed]"), "{text}");
+    assert_eq!(fake.requests(), 1);
+
+    // K207 from the cached mirror: no second request.
+    let out = kiln_jira(d, TOKEN, &["check"]);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert!(
+        stdout(&out).contains("design/tasks/TASK-001.md:5:10: K207 error: TASK-001 is done but its Jira ticket isn't resolved: FLINT-1 (In Review)"),
+        "{}",
+        stdout(&out)
+    );
+    assert!(!stdout(&out).contains("TASK-002"), "{}", stdout(&out));
+    assert_eq!(fake.requests(), 1);
+    let json = kiln_jira(d, TOKEN, &["list", "--jira", "--format", "json"]);
+    assert!(
+        stdout(&json).contains("\"resolved\": false"),
+        "{}",
+        stdout(&json)
+    );
+
+    // Jira unreachable for K207 is a note, not a failed check; for an
+    // explicit --jira it is an error. The token never shows.
+    std::fs::remove_dir_all(d.join("kiln-home")).unwrap();
+    let out = kiln_jira(d, "wrong-secret", &["check"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("K207 not checked: Jira at"),
+        "{}",
+        stderr(&out)
+    );
+    let out = kiln_jira(d, "wrong-secret", &["list", "--jira"]);
+    assert_ne!(out.status.code(), Some(0));
+    assert_eq!(stderr(&out).lines().count(), 1, "{}", stderr(&out));
+    assert!(!stderr(&out).contains("wrong-secret"));
 }

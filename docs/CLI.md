@@ -1,6 +1,6 @@
 # Command line
 
-How to run `kiln`, as it stands (K7). The commands planned for later
+How to run `kiln`, as it stands (K8). The commands planned for later
 milestones are in [DESIGN.md](DESIGN.md), "Command line"; each is
 documented here when it ships. The file format is
 [FORMAT.md](FORMAT.md); `kiln.toml` is summed up in
@@ -52,7 +52,7 @@ which. The item is created either way.
 
 ## Reading
 
-### `kiln list [--type TYPE] [--status STATUS] [--tag TAG] [--format text|json]`
+### `kiln list [--type TYPE] [--status STATUS] [--tag TAG] [--jira] [--format text|json]`
 
 Items in type order (as `kiln.toml` lists types), then by ID; the filters
 combine.
@@ -65,6 +65,18 @@ REQ-002  approved  Readable without Kiln
 
 JSON gives each item's `id`, `type`, `title`, `status`, `parent`, `tags`,
 `path` and `line`.
+
+`--jira` adds each linked ticket's status and assignee from the Jira
+mirror (read-only, cached ten minutes; INTEGRATION.md, "Jira"), and in
+JSON a `jira` array of `{key, summary, status, resolved, assignee}` (or
+`{key, missing: true}` for a key Jira doesn't know). It needs `[jira] url`
+and a token: `KILN_JIRA_TOKEN`, or the one `kiln auth jira` stored.
+
+```
+$ kiln list --type task --jira
+TASK-003  doing  Measure the hotkey  [FLINT-88 In Review · Alice]
+TASK-004  done   Ship the loader     [FLINT-90 Done]
+```
 
 ### `kiln show ID [--format text|json]`
 
@@ -143,6 +155,11 @@ error, 0 otherwise (warnings don't fail).
 
 A `kiln.toml` Kiln can't read at all (K001, or a newer `format`) is
 reported as a finding in the chosen format, with exit 1, so CI shows it.
+
+K207 (off by default) compares items with their Jira tickets, from the
+Jira mirror as `kiln list --jira` reads it. When Jira can't be read (no
+token, no network, Jira Cloud), stderr says `kiln: K207 not checked: …`
+and the other rules decide the exit code: Kiln works without Jira.
 
 ## Exporting
 
@@ -308,6 +325,20 @@ Token for https://confluence.example.com:
 stored the token for https://confluence.example.com (signed in as Thomas) in the credential store as fenix-suite/confluence:https://confluence.example.com
 ```
 
+### `kiln auth jira [--forget]`
+
+The same for `[jira] url`: asks for a personal access token, checks it
+with one search and stores it as `fenix-suite`/`jira:<url>`, the name
+Flint uses, so one stored token serves both. `KILN_JIRA_TOKEN`, when set,
+is used instead. Jira Server and Data Center only: a Jira Cloud URL is
+refused with a line naming INTEGRATION.md's G6.
+
+```
+$ kiln auth jira
+Personal access token for https://jira.example.com:
+stored the token for https://jira.example.com in the credential store as fenix-suite/jira:https://jira.example.com
+```
+
 ## Editing
 
 The editing commands change only what they are about, keep comments,
@@ -378,4 +409,4 @@ kiln: a requirement can't be the source of `verifies` (from: test, code)
 | 0 | fine |
 | 1 | `kiln check` found an error, `kiln export --check` found changes, a Confluence plan was refused, or a change was refused (a file changed on disk) |
 | 2 | usage or configuration error: unknown command or ID, no `kiln.toml`, a `kiln.toml` Kiln can't read, a value the configuration doesn't allow |
-| 3 | network or server error (Confluence) |
+| 3 | network or server error (Confluence, or Jira for `list --jira` and `auth jira`) |

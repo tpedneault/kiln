@@ -39,12 +39,7 @@ impl FileContext<'_> {
             None => Some(page_file(self.target, self.split, key, ext)),
             Some(name) => {
                 let (_, target, split) = self.others.iter().find(|(n, _, _)| n == name)?;
-                let ext = if target.format == kiln_model::ExportFormat::Html {
-                    "html"
-                } else {
-                    "md"
-                };
-                Some(page_file(target, split, key, ext))
+                Some(page_file(target, split, key, target.format.ext()))
             }
         }
     }

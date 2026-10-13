@@ -3,7 +3,7 @@
 //! or one section per type; the three layouts (`document`, `sections`,
 //! `tree`) as splits of that one document with references resolved across
 //! pages; diagram rasterising through `fenix-diagram` and its cache; and
-//! the Markdown and HTML back ends with their file destination.
+//! the Markdown, HTML and Word back ends with their file destination.
 //!
 //! Every target runs the same pipeline (select and assemble, split,
 //! resolve, back end, destination), so a layout or a format is added once
@@ -18,6 +18,7 @@
 
 mod assemble;
 mod document;
+mod docx;
 pub mod files;
 mod html;
 mod markdown;
@@ -28,6 +29,7 @@ mod split;
 
 pub use assemble::{assemble, capitalised, short, Assembled, Assembly, Revision};
 pub use document::{Document, Node, Section, SectionKind};
+pub use docx::{bookmark as docx_bookmark, Reference as DocxReference};
 pub use files::{apply, plan_files, FilePlan, MANIFEST};
 pub use markdown::{escape as markdown_escape, github_slug, gitlab_slug, FileContext};
 pub use paths::{encode, page_file, relative, RepoLinks};
@@ -117,6 +119,7 @@ pub fn render_files(
     match p.target.format {
         ExportFormat::Markdown => markdown::render(&ctx),
         ExportFormat::Html => html::render(&ctx, files),
+        ExportFormat::Docx => docx::render(&ctx, files),
         ExportFormat::Confluence => Vec::new(),
     }
 }

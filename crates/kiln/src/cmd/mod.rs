@@ -9,6 +9,7 @@ pub mod export;
 pub mod gui;
 pub mod impact;
 pub mod init;
+pub mod jira;
 pub mod list;
 pub mod new;
 pub mod renumber;

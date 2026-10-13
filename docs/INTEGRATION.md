@@ -1,7 +1,7 @@
 # Kiln with Fenix, Flint and Jira
 
 What Kiln uses from each, how it degrades without them, and the changes
-that would make the integration better (G1–G6). Statements about Fenix
+that would make the integration better (G1–G9). Statements about Fenix
 were checked against its source at
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a`, about Flint at
 `eb23547eb5939a52b8de06c298271ce4c8604927` (both 2026-10-12). File
@@ -105,10 +105,24 @@ pins in DESIGN.md and renders a flowchart.
 
 ### Jira: `fenix-jira` (K8)
 
-`fenix_jira::JiraClient::new(base_url, token)` with `get_issue` /
-`search_issues` / `build_keys_jql` for the read-only mirror of linked
-tickets. It speaks Jira **Server/Data Center** with a personal access
-token only (`crates/fenix-jira/src/client.rs`); Jira Cloud would need G6.
+`fenix_jira::JiraClient::new(base_url, token)` with `search_issues` and
+`build_keys_jql` for the read-only mirror of linked tickets (`kiln-jira`),
+and one search to check a token in `kiln auth jira`. It speaks Jira
+**Server/Data Center** with a personal access token only
+(`crates/fenix-jira/src/client.rs`): a Jira Cloud URL (`*.atlassian.net`)
+is refused by name, naming G6. Built and tested in K8 against a fake Jira
+over HTTP, so the real client is what runs.
+
+Two things it doesn't give, worked around:
+
+- **Resolution.** `IssueSummary` has the status and its category, not the
+  `resolution` field. Kiln counts a ticket in Jira's **Done** category as
+  resolved, which is what every workflow agrees on whatever its statuses
+  are called; a workflow that resolves tickets outside the Done category
+  would read differently (not seen so far).
+- **Proxy.** It builds no agent of its own, so requests go out directly:
+  `HTTPS_PROXY` is not used (G9). A Jira inside the network, the usual Data
+  Center case, needs none.
 
 ### Fenix's agenda: clock in on an item (K5)
 
@@ -195,6 +209,18 @@ terminal, a `git pull`). Kiln works around it by polling: item files and
 Sending `didChangeWatchedFiles` would make that immediate and free (Kiln
 handles it already), and `didClose` would let a closed buffer's file
 count from disk again.
+
+#### G9. A proxy for `fenix-jira` <a id="g9"></a>
+
+**Noticed by K8, only behind a proxy.** `fenix-jira` sends every request
+through `ureq::get`/`ureq::request` with ureq's default agent, which (without
+ureq's `proxy-from-env` feature) uses no proxy, so a Jira reachable only
+through a corporate proxy can't be read. Kiln can't turn the feature on
+for it: features unify across the build, and `kiln-confluence` would then
+lose its own `NO_PROXY` handling. Either let a caller pass a
+`ureq::Agent` to `JiraClient` (the simplest, and Kiln's Confluence agent
+would serve), or read `HTTPS_PROXY`/`NO_PROXY` itself as Kiln's
+`proxy_for` does.
 
 ## Flint
 
@@ -300,10 +326,17 @@ None blocking. Five small ones worth raising in Flint's own repository
 - **Links**: `jira = "KEY-1"` on an item (FORMAT.md). Rendered as the Jira
   macro or a link in Confluence (CONFLUENCE.md, "Jira"); opened from Flint.
 - **Mirror (K8)**: `kiln list --jira` and the GUI show each linked
-  ticket's status, assignee and resolution, fetched read-only through
-  `fenix-jira`, cached in the state folder for 10 minutes. `kiln check`
-  rule (K207, off by default): a work item `done` whose ticket isn't
-  resolved, or the reverse.
+  ticket's status and assignee, and whether it is resolved (in the Done
+  category), fetched read-only through `fenix-jira` in searches of up to
+  100 keys (`key IN (…)`; when Jira refuses one because a key doesn't
+  exist, that batch is asked again key by key and the unknown keys are
+  reported as such). The mirror is cached in the state folder
+  (`jira/<host>.json`) for 10 minutes, so `list --jira`, `check` and the
+  GUI share one fetch. The GUI loads it on a thread of its own and shows
+  each ticket after the item's status. `kiln check` rule K207 (off by
+  default): an item done whose ticket isn't resolved, or the reverse
+  (FORMAT.md); when Jira can't be read, the rest is checked and stderr
+  says why K207 wasn't.
 - **Never**: creating, editing or transitioning tickets. That is Fenix's
   Jira page and Jira's own job.
 - **Token**: `KILN_JIRA_TOKEN`, else the credential store under the suite's
@@ -331,5 +364,6 @@ token work in all three.
 | G6 | Jira Cloud in `fenix-jira` | Fenix | K8, Cloud only | small |
 | G7 | File create/rename in workspace edits | Fenix | K4 | medium |
 | G8 | `didChangeWatchedFiles` (and `didClose`) to language servers | Fenix | K4 | small |
+| G9 | A proxy (or a caller's agent) for `fenix-jira` | Fenix | K8, behind a proxy | small |
 
-Nothing here blocks K0–K6.
+Nothing here blocks K0–K8.

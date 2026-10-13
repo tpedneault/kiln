@@ -14,6 +14,7 @@ members = [
     "crates/kiln-git",
     "crates/kiln-lsp",
     "crates/kiln-flint",
+    "crates/kiln-jira",
     "crates/kiln-gui",
     "crates/kiln-fenix",
     "crates/kiln-secrets",
@@ -47,6 +48,7 @@ kiln-secrets = { path = "crates/kiln-secrets" }
 kiln-lsp = { path = "crates/kiln-lsp" }
 kiln-flint = { path = "crates/kiln-flint" }
 kiln-gui = { path = "crates/kiln-gui" }
+kiln-jira = { path = "crates/kiln-jira" }
 
 clap = { version = "4.5", features = ["derive"] }
 dirs = "6"
@@ -70,6 +72,9 @@ regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
+# Word export (K8, ADR-011): reading a reference document and writing the
+# package; pure-Rust deflate, no time feature (the zip time is fixed).
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 fontdb = "0.23"
 tempfile = "3"
 # The same minor as `fenix-storage`, so the build carries one copy.
@@ -85,6 +90,7 @@ winit = { version = "0.30.13", default-features = false }
 fenix-storage = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
 fenix-diagram = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
 fenix-control = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
+fenix-jira = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
 fenix-keymap = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
 flint-protocol = { git = "https://github.com/tpedneault/flint", rev = "eb23547eb5939a52b8de06c298271ce4c8604927" }
 

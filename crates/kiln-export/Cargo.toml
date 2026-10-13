@@ -18,6 +18,8 @@ sha2.workspace = true
 fenix-diagram.workspace = true
 fenix-storage.workspace = true
 fontdb.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+quick-xml.workspace = true

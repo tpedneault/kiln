@@ -1,4 +1,5 @@
-//! `kiln list`: items, filtered by type, status and tag.
+//! `kiln list`: items, filtered by type, status and tag; with `--jira`,
+//! each linked ticket's status and assignee from the Jira mirror.
 
 use std::path::Path;
 
@@ -6,13 +7,14 @@ use serde_json::json;
 
 use super::json_out;
 use crate::project::load;
-use crate::{Fail, TextOrJson};
+use crate::{Fail, TextOrJson, EXIT_NETWORK};
 
 pub fn run(
     project: Option<&Path>,
     type_name: Option<String>,
     status: Option<String>,
     tag: Option<String>,
+    jira: bool,
     format: TextOrJson,
 ) -> Result<u8, Fail> {
     let loaded = load(project)?;
@@ -29,12 +31,56 @@ pub fn run(
         .filter(|i| status.as_ref().is_none_or(|s| &i.status == s))
         .filter(|i| tag.as_ref().is_none_or(|t| i.tags.contains(t)))
         .collect();
+    let mirror = if jira {
+        if p.config.jira_url.is_none() {
+            return Err(Fail::usage(
+                "kiln.toml has no [jira] url to read tickets from",
+            ));
+        }
+        Some(super::jira::mirror(p).map_err(|e| Fail::new(EXIT_NETWORK, e))?)
+    } else {
+        None
+    };
+    let tickets = |keys: &[String]| -> Vec<serde_json::Value> {
+        let Some(m) = &mirror else {
+            return Vec::new();
+        };
+        keys.iter()
+            .map(|k| match m.ticket(k) {
+                Some(t) => json!({
+                    "key": t.key,
+                    "summary": t.summary,
+                    "status": t.status,
+                    "resolved": t.resolved,
+                    "assignee": t.assignee,
+                }),
+                None => json!({ "key": k, "missing": true }),
+            })
+            .collect()
+    };
+    let column = |keys: &[String]| -> String {
+        let Some(m) = &mirror else {
+            return String::new();
+        };
+        let cells: Vec<String> = keys
+            .iter()
+            .map(|k| match m.ticket(k) {
+                Some(t) => format!("{k} {}", t.line()),
+                None => format!("{k} (not in Jira)"),
+            })
+            .collect();
+        if cells.is_empty() {
+            String::new()
+        } else {
+            format!("  [{}]", cells.join("; "))
+        }
+    };
     match format {
         TextOrJson::Json => {
             let array: Vec<_> = items
                 .iter()
                 .map(|i| {
-                    json!({
+                    let mut v = json!({
                         "id": i.id.to_string(),
                         "type": i.type_name,
                         "title": i.title,
@@ -43,7 +89,11 @@ pub fn run(
                         "tags": i.tags,
                         "path": i.path,
                         "line": i.id_span.line,
-                    })
+                    });
+                    if mirror.is_some() {
+                        v["jira"] = json!(tickets(&i.jira));
+                    }
+                    v
                 })
                 .collect();
             print!("{}", json_out(&json!(array)));
@@ -61,10 +111,11 @@ pub fn run(
                 .unwrap_or(0);
             for i in &items {
                 println!(
-                    "{:id_width$}  {:status_width$}  {}",
+                    "{:id_width$}  {:status_width$}  {}{}",
                     i.id.to_string(),
                     i.status,
-                    i.title
+                    i.title,
+                    column(&i.jira)
                 );
             }
         }

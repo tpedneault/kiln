@@ -1,0 +1,22 @@
+[package]
+name = "kiln-jira"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# The in-process fake Jira, for the `kiln` binary's tests.
+fake = []
+
+[dependencies]
+kiln-model.workspace = true
+kiln-index.workspace = true
+fenix-jira.workspace = true
+serde.workspace = true
+serde_json.workspace = true

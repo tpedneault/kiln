@@ -30,6 +30,7 @@ kiln-secrets.workspace = true
 kiln-lsp.workspace = true
 kiln-flint.workspace = true
 kiln-gui.workspace = true
+kiln-jira.workspace = true
 dirs.workspace = true
 
 [[bin]]
@@ -44,4 +45,5 @@ path = "src/bin/kilnw.rs"
 
 [dev-dependencies]
 kiln-confluence = { workspace = true, features = ["fake"] }
+kiln-jira = { workspace = true, features = ["fake"] }
 tempfile.workspace = true

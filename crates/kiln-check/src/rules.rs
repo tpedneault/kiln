@@ -54,10 +54,33 @@ fn diagram_rules(project: &Project, out: &mut Vec<Finding>) {
 }
 
 /// K112: each export target's template exists and its directives are
-/// valid. A template shared by several targets is checked once.
+/// valid, and a Word target's reference document exists. A template shared by several targets is checked once.
 fn template_rules(project: &Project, files: &dyn FileSource, out: &mut Vec<Finding>) {
     let mut seen = HashSet::new();
     for target in &project.config.exports {
+        // A Word reference document is a template too: it must exist and
+        // be a zip (a `.docx` is one); its styles are read at export.
+        if let Some(path) = &target.docx.reference {
+            if seen.insert(path.clone())
+                && !files.read(path).is_ok_and(|b| b.starts_with(b"PK\x03\x04"))
+            {
+                report(
+                    out,
+                    Rule::K112,
+                    kiln_parse::CONFIG_FILE,
+                    kiln_model::Span {
+                        start: 0,
+                        end: 0,
+                        line: 1,
+                        column: 1,
+                    },
+                    format!(
+                        "export `{}`: reference {path} doesn't exist or isn't a .docx",
+                        target.name
+                    ),
+                );
+            }
+        }
         let Some(path) = &target.template else {
             continue;
         };
