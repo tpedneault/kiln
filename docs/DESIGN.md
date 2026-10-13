@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0–K6 done (the format, `kiln check`, the editing commands, exports to Markdown and HTML, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, this repository's own `design/` and generated design document); K7 next. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
+Status: K0–K7 done (the format, `kiln check`, the editing commands, exports to Markdown and HTML, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI, this repository's own `design/` and generated design document); K8 next. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -19,6 +19,7 @@ Status: K0–K6 done (the format, `kiln check`, the editing commands, exports to
 | [CONFLUENCE.md](CONFLUENCE.md) | the Confluence format: pages, planner, drift, the API |
 | [INTEGRATION.md](INTEGRATION.md) | Fenix, Flint and Jira: what Kiln uses, and what they need to add |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | the workspace as built: crates, dependency direction, lints |
+| [GUI.md](GUI.md) | the GUI: pages, keys, looks, how it is built |
 
 ## Why the name
 
@@ -102,7 +103,7 @@ FORMAT.md defines all of these precisely.
   │                              │                                  └─► kiln-confluence ──► Confluence (REST)
   │                              ├──► kiln-lsp ◄────── Fenix (LSP client, stdio)
   │                              ├──► kiln-flint ◄──── Flint (provider protocol, stdio)
-  │                              ├──► kiln-gui (later)
+  │                              ├──► kiln-gui
   │                              └──► kiln-git (baselines, commit ids; shells out to git)
   └────────────────────────────────────────────────────────────────┘
           kiln-fenix ──► Fenix control channel (open at a line, agenda)
@@ -127,8 +128,8 @@ own unit tests; I/O only where the crate's role is I/O.
 | `kiln-flint` | Flint provider over stdio, built on `flint-protocol`. | no |
 | `kiln-fenix` | Fenix control-channel client use (`fenix-control`): open at a line, agenda lookups. | no |
 | `kiln-secrets` | Tokens from environment variables or the OS credential store (`keyring`, the suite's names), and prompting without echo. | no |
-| `kiln-gui` | Later (K7). wgpu + winit + glyphon, like Fenix and Flint. | no |
-| `kiln` | The binary: `clap` CLI, `--console` on Windows. | no |
+| `kiln-gui` | The GUI (K7, GUI.md). wgpu + winit + glyphon, like Fenix and Flint. | pages and app yes; window no |
+| `kiln` | The binary: `clap` CLI; and `kilnw`, which opens the GUI without a console on Windows (ADR-010). | no |
 
 ### Dependencies on Fenix and Flint crates
 
@@ -193,13 +194,13 @@ nearest `kiln.toml` (`--project <dir>` overrides).
 | `kiln lsp` | language server on stdio | K4 |
 | `kiln provider` | Flint provider on stdio | K5 |
 | `kiln diff <REV>[..<REV>]` | item-level changes between revisions, or a revision and the working tree (FORMAT.md, "Baselines") | K6 |
-| `kiln` (no arguments) | the GUI | K7 |
+| `kiln` (no arguments), `kiln gui [--since REV] [--item ID]` | the GUI (GUI.md) | K7 |
 
 Errors are one line on stderr naming what failed and why, with the file
 and line when there is one. Exit codes: 0 fine, 1 findings or a refused
 plan, 2 usage or configuration error, 3 network or server error.
 
-## GUI (K7, outline only)
+## GUI (K7)
 
 Pages, each a full window like Fenix's pages, with Vim keys and the `SPC`
 leader: **Tree** (items by parent, filtered), **Trace** (coverage table,
@@ -207,8 +208,8 @@ gaps highlighted), **Impact** (pick an item, see what depends on it),
 **Board** (work items by status), **Roadmap** (milestones with progress
 computed from `part-of` items), **Decisions** (the ADR log with
 supersession chains), **Changes** (baseline diff). `Enter` on an item opens
-it in Fenix at its title line; the GUI never edits prose. It is designed
-in detail when K6 is done; nothing before it depends on it.
+it in Fenix at its title line; the GUI never edits prose. Designed in
+detail in [GUI.md](GUI.md).
 
 ## Performance
 

@@ -212,10 +212,15 @@ fn registers_open_items_with_their_actions() {
             "copy-reference",
             "status",
             "impact",
+            "open-in-kiln",
             "open-jira",
             "clock-in"
         ]
     );
+    let kiln = &req1["actions"][5];
+    assert_eq!(kiln["kind"], "run");
+    assert_eq!(kiln["argv"][1], "gui");
+    assert_eq!(kiln["argv"][5], "REQ-001");
     let open = &req1["actions"][0];
     assert_eq!(open["kind"], "fenix");
     assert_eq!(open["method"], "fenix/open");
@@ -229,7 +234,7 @@ fn registers_open_items_with_their_actions() {
     assert_eq!(req1["actions"][3]["kind"], "query");
     assert_eq!(req1["actions"][3]["text"], "k status REQ-001 ");
     assert_eq!(
-        req1["actions"][5]["target"],
+        req1["actions"][6]["target"],
         "https://jira.example.com/browse/FLINT-88"
     );
 }

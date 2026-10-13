@@ -50,10 +50,16 @@ fn version_prints_name_and_version_and_exits_0() {
 }
 
 #[test]
-fn no_arguments_prints_help_and_exits_2() {
+fn no_arguments_outside_a_project_is_one_line_and_exits_2() {
+    // `kiln` alone opens the GUI; outside a project it stops before any
+    // window. (No test opens a window: CI may have a desktop to open it on.)
     let out = kiln(&[]);
     assert_eq!(out.status.code(), Some(2));
-    assert!(stderr(&out).contains("Usage: kiln"));
+    let err = stderr(&out);
+    assert!(err.starts_with("kiln: no kiln.toml"), "{err}");
+    assert_eq!(err.lines().count(), 1);
+    let gui = kiln(&["gui", "--item", "REQ-7"]);
+    assert_eq!(gui.status.code(), Some(2));
 }
 
 #[test]

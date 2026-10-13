@@ -52,16 +52,16 @@ impl Fail {
 #[command(
     name = "kiln",
     version,
-    about = "Requirements, design decisions and project progress, kept as Markdown in the repository they describe",
-    arg_required_else_help = true
+    about = "Requirements, design decisions and project progress, kept as Markdown in the repository they describe"
 )]
 struct Cli {
     /// Use the project at or above this folder instead of the current one.
     #[arg(long, global = true, value_name = "DIR")]
     project: Option<PathBuf>,
 
+    /// What to do; none opens the GUI.
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 /// Plain text for people, JSON for tools.
@@ -208,6 +208,15 @@ enum Command {
         #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
         format: TextOrJson,
     },
+    /// The window: Tree, Trace, Impact, Board, Roadmap, Decisions, Changes (also `kiln` alone).
+    Gui {
+        /// The baseline for the Changes page (default: the most recent tag).
+        #[arg(long, value_name = "REV")]
+        since: Option<String>,
+        /// Put the cursor on this item.
+        #[arg(long, value_name = "ID")]
+        item: Option<String>,
+    },
     /// Language server on stdin and stdout, for Fenix or any LSP editor.
     Lsp,
     /// Flint provider on stdin and stdout: items, drill-downs, actions.
@@ -273,7 +282,11 @@ fn main() -> ExitCode {
         Err(err) => return report(&err),
     };
     let project = cli.project.as_deref();
-    let result = match cli.command {
+    let command = cli.command.unwrap_or(Command::Gui {
+        since: None,
+        item: None,
+    });
+    let result = match command {
         Command::Init { name, fenix } => cmd::init::run(project, name, fenix),
         Command::Provider { name, prefix } => kiln_flint::serve_stdio(kiln_flint::Options {
             name,
@@ -284,6 +297,7 @@ fn main() -> ExitCode {
         })
         .map(|()| 0)
         .map_err(|e| Fail::new(EXIT_USAGE, format!("provider: {e}"))),
+        Command::Gui { since, item } => cmd::gui::run(project, since, item),
         Command::Lsp => kiln_lsp::serve_stdio(project::today)
             .map(|()| 0)
             .map_err(|e| Fail::new(EXIT_USAGE, format!("lsp: {e}"))),

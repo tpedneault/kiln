@@ -5,12 +5,12 @@ Where Kiln's code lives and which way its dependencies point.
 map of the workspace that does it, and is updated whenever a crate gains
 a role or a dependency.
 
-Status: K6. The format crates (`kiln-model`, `kiln-parse`, `kiln-index`,
+Status: K7. The format crates (`kiln-model`, `kiln-parse`, `kiln-index`,
 `kiln-check`), the export crates (`kiln-render`, `kiln-export`,
 `kiln-confluence` with publishing), `kiln-git`, `kiln-secrets` (environment
 variables and the OS credential store through `keyring`), `kiln-fenix`
 (opening a file, clocking in, opening a URL), `kiln-lsp`, `kiln-flint` and
-the binary's K1–K6 commands are built.
+the binary's K1–K7 commands and the GUI (`kiln-gui`) are built.
 
 ## Layout
 
@@ -53,12 +53,12 @@ access except through a value or trait the caller passes in.
 | `kiln-flint` | `kiln provider`: items and drill-downs as pure functions of the project (`items`), Confluence page lookup, the protocol loop with project following and polling | no | K5 |
 | `kiln-fenix` | Fenix control channel: open at a line, clock in on an agenda task by Jira key; opening a URL with the OS | no | K1 (`new --open`), K5 |
 | `kiln-secrets` | tokens from the environment (K2) or the OS credential store (K3); a `Token` that never formats | no | K2, K3 |
-| `kiln` | the binary: `clap` CLI, exit codes, project discovery, reading and writing files | no | K0 onward |
-| `kiln-gui` | the GUI | no | K7 (not in the workspace until then) |
+| `kiln` | the binary: `clap` CLI, exit codes, project discovery, reading and writing files; and `kilnw`, the GUI without a console on Windows (ADR-010) | no | K0 onward |
+| `kiln-gui` | the GUI (GUI.md): pages as rows and the application as a state machine (pure, tested as text); the window (`winit`), GPU (`wgpu`) and text (`glyphon`) that draw a `Screen` | pages and app yes; window no | K7 |
 
-`kiln-gui` is deliberately absent rather than an empty shell: it is the
-one crate that will pull in `wgpu` and `winit`, and nothing before K7
-depends on it.
+`kiln-gui` is the one crate that pulls in `wgpu` and `winit`, which is
+why it waited for K7. It loads display libraries at run time (`dlopen`),
+so it builds in a CI container with none.
 
 ## Dependency direction
 
@@ -77,6 +77,7 @@ needs it lands):
 | `kiln-git`, `kiln-secrets`, `kiln-fenix` | `kiln-model` at most |
 | `kiln-lsp` | `kiln-model`, `kiln-parse`, `kiln-index`, `kiln-check` |
 | `kiln-flint` | `kiln-model`, `kiln-parse` (the status edit), `kiln-index`, `kiln-fenix`, `kiln-confluence` and `kiln-secrets` ("Open in Confluence") |
+| `kiln-gui` | `kiln-model`, `kiln-index`, `kiln-fenix` (opening an item); the baseline arrives as a loaded project, so it needs no `kiln-git` |
 | `kiln` | all of them |
 
 The rules:
@@ -117,7 +118,7 @@ crate nothing compiles:
 | `fenix-control` | `kiln-fenix` (`kiln new --open`) | K1, added |
 | `fenix-diagram` | `kiln-render` (validation), `kiln-export` (pictures) | K2, added |
 | `flint-protocol` | `kiln-flint`; the benchmark (`kiln-check`'s example, for the message limit) | K5, added |
-| `fenix-keymap` | `kiln-gui` | K7 |
+| `fenix-keymap` | `kiln-gui` (the `SPC` leader's key trie) | K7, added |
 | `fenix-jira` | the Jira mirror | K8 |
 
 Never `fenix-gui`, `fenix-project` or `fenix-notebook`.
@@ -190,6 +191,8 @@ and Linux. Test fixtures that need CRLF mark themselves `-text`.
 ## Platforms
 
 Windows is the primary platform and Linux the second; CI runs every gate
-on both ([CI.md](CI.md)). Every crate except `kiln-gui` (K7) builds and
-runs headless, because Kiln is also a CI tool that runs in Linux
-containers: no display, no console window, no desktop session assumed.
+on both ([CI.md](CI.md)). Every crate builds headless, and every command
+but `kiln gui` runs headless, because Kiln is also a CI tool that runs in
+Linux containers: no display, no console window, no desktop session
+assumed. Without a display `kiln gui` fails with one line, like any other
+error.

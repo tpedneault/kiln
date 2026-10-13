@@ -1,6 +1,6 @@
 # Command line
 
-How to run `kiln`, as it stands (K6). The commands planned for later
+How to run `kiln`, as it stands (K7). The commands planned for later
 milestones are in [DESIGN.md](DESIGN.md), "Command line"; each is
 documented here when it ships. The file format is
 [FORMAT.md](FORMAT.md); `kiln.toml` is summed up in
@@ -248,6 +248,22 @@ spec → space FLINT: 2 unresolved comments
 It needs the same token as publishing, reads only, and exits 3 on a
 server or network error.
 
+## The window
+
+### `kiln gui [--since REV] [--item ID]`, or `kiln` alone
+
+Opens the GUI ([GUI.md](GUI.md)): Tree, Trace, Impact, Board, Roadmap,
+Decisions and Changes, with Vim keys and the `SPC` leader; `Enter` opens
+the item under the cursor in Fenix at its title. `--since REV` is the
+baseline for the Changes page (default: the most recent tag); `--item ID`
+puts the cursor on that item. The window follows edits to the files
+within two seconds.
+
+On Windows, `kilnw` (next to `kiln.exe`) does the same without a console
+window, for shortcuts and Flint; a failure to open goes to `kilnw.log` in
+the temporary folder. Without a display, `kiln gui` fails with one line
+and exit 2.
+
 ## In Flint
 
 ### `kiln provider [--name NAME] [--prefix KEY]`
@@ -345,8 +361,7 @@ kiln: left alone: design/tests/TEST-004-x.md:7 (may mean either REQ-015)
 | `kiln --help`, `kiln <command> --help` | usage |
 | `kiln --version` | `kiln <version>` |
 
-`kiln` with no arguments prints usage and exits 2 (from K7 it opens the
-GUI).
+`kiln` with no arguments opens the GUI, as `kiln gui` does.
 
 ## Errors and exit codes
 

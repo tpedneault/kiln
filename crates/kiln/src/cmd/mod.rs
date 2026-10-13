@@ -6,6 +6,7 @@ pub mod confluence;
 pub mod diff;
 pub mod edit;
 pub mod export;
+pub mod gui;
 pub mod impact;
 pub mod init;
 pub mod list;

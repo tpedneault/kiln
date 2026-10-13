@@ -11,8 +11,9 @@ this repository's own `design/`), K2 (exports; Confluence planning
 without writes; the committed design document) and K3 (Confluence
 publishing, `kiln auth confluence`; every **verify** still unconfirmed
 live), K4 (`kiln lsp`; Fenix gaps G7 and G8 worked around), K5
-(`kiln provider` for Flint) and K6 (`kiln diff`, `export --since`,
-`kiln confluence comments`) are done.
+(`kiln provider` for Flint), K6 (`kiln diff`, `export --since`,
+`kiln confluence comments`) and K7 (the GUI, `kiln gui`, `kilnw` on
+Windows) are done.
 
 ## Read first, in this order
 
@@ -119,6 +120,7 @@ docs/EXPORT.md        exports: targets, layouts, templates, formats
 docs/CONFLUENCE.md    the Confluence format
 docs/INTEGRATION.md   Fenix, Flint, Jira (G1–G6)
 docs/ARCHITECTURE.md  the crates as built and which way they depend
+docs/GUI.md           the GUI: pages, keys, looks, how it is built
 docs/CI.md            the gates and how to run them
 docs/CLI.md           the command line as it stands
 docs/CONFIGURATION.md kiln.toml and environment, the overview

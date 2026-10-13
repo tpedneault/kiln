@@ -77,6 +77,13 @@ All notable changes to Kiln are recorded here. The format follows
   published pages, placed on the item they quote
   ([docs/CLI.md](docs/CLI.md), [docs/FORMAT.md](docs/FORMAT.md),
   "Baselines").
+- K7: the GUI. `kiln` (or `kiln gui`) opens a window onto the project:
+  Tree, Trace, Impact, Board, Roadmap, Decisions and Changes (against
+  the latest tag or `--since`), Vim-style keys with a Space leader,
+  Enter opening the item in Fenix, live reload, Fenix's themes; `kilnw`
+  opens it on Windows without a console (ADR-010); Flint's item actions
+  gain "Open in Kiln" ([docs/GUI.md](docs/GUI.md),
+  [docs/CLI.md](docs/CLI.md)).
 
 ### Changed
 

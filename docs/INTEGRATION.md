@@ -252,7 +252,7 @@ type the keyword.)
 | Open in Confluence | `provider`, offered when a Confluence target exists: the page from the local page cache `kiln export` keeps (the item's own page, else the page holding it), else looked up by title in the space with the stored or environment token; opened in the browser at `#<ID>`; an error in the footer names what's missing (no token, not published) |
 | Open in Jira | `open` with `<[jira] url>/browse/<KEY>`, when the item has a `jira` key |
 | Start working on it | `provider` → `fenix/agenda.clockIn` on the open agenda task with the item's Jira key (see "Fenix's agenda"); offered only for items with a `jira` key; without such a task the footer says "no agenda task for FLINT-88 (needs Fenix G1 to create one)" |
-| Open in Kiln | `run` `["kiln", "--item", ID]`, after K7 |
+| Open in Kiln | `run` `["kilnw", "gui", "--project", ROOT, "--item", ID]` (`kiln` instead of `kilnw` off Windows), key `g`: Kiln's window on that item (GUI.md) |
 
 Drill-down results: `k status REQ-014` lists the type's statuses as
 `status REQ-014 → verified` (the current one marked), each a `provider`
