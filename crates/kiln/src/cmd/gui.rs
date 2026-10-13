@@ -36,8 +36,18 @@ pub fn run(
         .and_then(|p| std::fs::read_to_string(p).ok())
         .map(|text| kiln_gui::parse_settings(&text))
         .unwrap_or_default();
+    // The Jira mirror loads beside the window, so a slow Jira never holds
+    // it up; a project without `[jira] url` or keys asks for nothing.
+    let keys = kiln_jira::keys(&loaded.project);
+    let jira: Option<kiln_gui::JiraLoad> = match loaded.project.config.jira_url.clone() {
+        Some(url) if !keys.is_empty() => {
+            Some(Box::new(move || super::jira::mirror_for(&url, &keys)))
+        }
+        _ => None,
+    };
     kiln_gui::run(kiln_gui::Options {
         root,
+        jira,
         project: loaded.project,
         baseline,
         settings,

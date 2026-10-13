@@ -8,6 +8,8 @@ pub enum ExportFormat {
     Confluence,
     Markdown,
     Html,
+    /// Word (K8).
+    Docx,
 }
 
 impl ExportFormat {
@@ -16,6 +18,7 @@ impl ExportFormat {
             "confluence" => Some(ExportFormat::Confluence),
             "markdown" => Some(ExportFormat::Markdown),
             "html" => Some(ExportFormat::Html),
+            "docx" => Some(ExportFormat::Docx),
             _ => None,
         }
     }
@@ -25,6 +28,17 @@ impl ExportFormat {
             ExportFormat::Confluence => "confluence",
             ExportFormat::Markdown => "markdown",
             ExportFormat::Html => "html",
+            ExportFormat::Docx => "docx",
+        }
+    }
+
+    /// A file format's extension; empty for Confluence.
+    pub fn ext(self) -> &'static str {
+        match self {
+            ExportFormat::Confluence => "",
+            ExportFormat::Markdown => "md",
+            ExportFormat::Html => "html",
+            ExportFormat::Docx => "docx",
         }
     }
 
@@ -152,6 +166,7 @@ pub struct ExportTarget {
     pub path: Option<String>,
     pub markdown: MarkdownOptions,
     pub html: HtmlOptions,
+    pub docx: DocxOptions,
     pub confluence: ConfluenceTarget,
 }
 
@@ -183,6 +198,14 @@ impl Default for MarkdownOptions {
 pub struct HtmlOptions {
     /// Only the built-in light theme so far.
     pub theme: Option<String>,
+}
+
+/// `[export.docx]`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DocxOptions {
+    /// A project-relative `.docx` whose styles (and page setup) the
+    /// export takes, as Word's own "reference document" idea.
+    pub reference: Option<String>,
 }
 
 /// `[export.confluence]`: one target's Confluence settings.

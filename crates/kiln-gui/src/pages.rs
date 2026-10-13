@@ -2,7 +2,7 @@
 //! project, the baseline's changes and the page's options, so each is
 //! tested as text without a window.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use kiln_index::{ChangeKind, ItemChange, Project, Source};
 use kiln_model::{Item, ItemId};
@@ -142,7 +142,41 @@ fn item_row(p: &Project, item: &Item, depth: u16, extra: Line) -> Row {
 }
 
 /// The rows of `page`.
-pub fn rows(page: Page, p: &Project, changes: Option<&Changes>, o: &Options) -> Vec<Row> {
+pub fn rows(
+    page: Page,
+    p: &Project,
+    changes: Option<&Changes>,
+    o: &Options,
+    jira: Option<&kiln_jira::Mirror>,
+) -> Vec<Row> {
+    let mut rows = page_rows(page, p, changes, o);
+    if let Some(mirror) = jira {
+        with_tickets(&mut rows, p, mirror);
+    }
+    rows
+}
+
+/// Each item row gains its tickets' status from the Jira mirror: green
+/// when resolved, muted otherwise.
+fn with_tickets(rows: &mut [Row], p: &Project, mirror: &kiln_jira::Mirror) {
+    let items: HashMap<&ItemId, &Item> = p.items.iter().map(|i| (&i.id, i)).collect();
+    for row in rows.iter_mut() {
+        let Some(item) = row.item.as_ref().and_then(|id| items.get(id)) else {
+            continue;
+        };
+        for key in &item.jira {
+            match mirror.ticket(key) {
+                Some(t) => row.line.push(span(
+                    format!("  {key} {}", t.line()),
+                    if t.resolved { Role::Good } else { Role::Muted },
+                )),
+                None => row.line.push(span(format!("  {key} ?"), Role::Muted)),
+            }
+        }
+    }
+}
+
+fn page_rows(page: Page, p: &Project, changes: Option<&Changes>, o: &Options) -> Vec<Row> {
     match page {
         Page::Tree => tree(p, o),
         Page::Trace => trace(p, o),

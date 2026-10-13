@@ -472,3 +472,13 @@ fn k112_templates_and_k005_targets() {
         ["design/templates/spec.md:4:1 K112", "kiln.toml:1:1 K112"]
     );
 }
+
+#[test]
+fn k112_a_word_reference_that_isnt_a_docx() {
+    let config = "\n[[export]]\nname = \"word\"\nformat = \"docx\"\npath = \"out/d.docx\"\n[export.docx]\nreference = \"design/templates/company.docx\"\n";
+    let f = files(vec![req("REQ-001", "draft", "")]);
+    assert_eq!(run(config, &f), ["kiln.toml:1:1 K112"]);
+    let mut with = f.clone();
+    with.push(("design/templates/company.docx", "PK\u{3}\u{4}rest".into()));
+    assert!(run(config, &with).is_empty());
+}

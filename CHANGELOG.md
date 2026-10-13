@@ -84,6 +84,16 @@ All notable changes to Kiln are recorded here. The format follows
   opens it on Windows without a console (ADR-010); Flint's item actions
   gain "Open in Kiln" ([docs/GUI.md](docs/GUI.md),
   [docs/CLI.md](docs/CLI.md)).
+- K8: Word and Jira. `format = "docx"` exports to Word, in every layout:
+  Word's own heading styles, item bookmarks and links, a filled-in table
+  of contents, tables, embedded images and diagrams, deterministic bytes,
+  and `[export.docx] reference` for a house style (written directly,
+  ADR-011). The Jira mirror reads linked tickets read-only through
+  `fenix-jira`, cached ten minutes: `kiln list --jira`, ticket status in
+  the GUI, `kiln check` rule K207, and `kiln auth jira`; Jira Cloud (G6)
+  and a proxy for Jira (G9) wait on Fenix
+  ([docs/EXPORT.md](docs/EXPORT.md), [docs/INTEGRATION.md](docs/INTEGRATION.md),
+  [docs/CLI.md](docs/CLI.md)).
 
 ### Changed
 

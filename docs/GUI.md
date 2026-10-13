@@ -39,6 +39,13 @@ by the cursor). Columns are aligned by padding, in the monospace font.
 top line shows the pages, the current one marked, and the project's name;
 the bottom line shows the filter, a message, or the keys that work here.
 
+With `[jira] url` and items that link tickets, every item row ends with
+its tickets once the Jira mirror has arrived: `FLINT-12 In Review ·
+Alice`, green when resolved, muted otherwise (`FLINT-12 ?` when Jira
+doesn't know the key). The mirror loads on a thread of its own, from the
+cache when it is fresh (INTEGRATION.md, "Jira"), so a slow or absent Jira
+never holds up the window; when it can't be read, the footer says why.
+
 Every page keeps its own cursor and scroll position. When the project
 reloads, the cursor stays on the same item (by ID), or on the row where
 it was when that item went away.
@@ -94,7 +101,9 @@ presses. Tests drive `app` with keys and compare screens as text.
 The binary loads the project (and the baseline's project, from git, once)
 and hands them over; the window polls the item files and `kiln.toml` every
 two seconds and reloads the project when they change, recomputing the
-baseline's diff against the new project.
+baseline's diff against the new project. The Jira mirror arrives the same
+way, as a function the binary hands over and the window runs once on a
+thread, so the GUI never handles a token.
 
 ## Windows: two executables
 
@@ -107,8 +116,8 @@ there is one `kiln`. (ADR-010 records the tradeoff; DESIGN.md's earlier
 "`--console` on Windows" was Fenix's and Flint's answer, for programs
 that are GUIs first.)
 
-## Not in K7
+## Not built
 
 Editing anything; a detail pane with the item's body (Fenix shows it);
-the Jira mirror (K8); Kiln-specific themes; remembering the last page
-between runs.
+refreshing the Jira mirror while the window is open (it is read once, at
+start); Kiln-specific themes; remembering the last page between runs.

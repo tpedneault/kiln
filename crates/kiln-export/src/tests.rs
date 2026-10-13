@@ -210,6 +210,18 @@ name = "html"
 format = "html"
 template = "design/templates/doc.md"
 path = "out/doc.html"
+
+[[export]]
+name = "word"
+format = "docx"
+template = "design/templates/doc.md"
+path = "out/doc.docx"
+
+[[export]]
+name = "word-tree"
+format = "docx"
+layout = "tree"
+path = "out/word"
 "#;
 
 #[test]
@@ -330,7 +342,7 @@ fn html_is_self_contained_and_golden() {
 #[test]
 fn exporting_twice_gives_the_same_bytes() {
     let (project, source) = project(TARGETS);
-    let names = ["doc", "sections", "tree", "html"];
+    let names = ["doc", "sections", "tree", "html", "word", "word-tree"];
     let render = || {
         let all = prepared(&project, &source, &names);
         all.iter()
@@ -483,4 +495,164 @@ fn since_marks_new_and_changed_items_next_to_their_heading() {
         out
     };
     assert_eq!(ids(&resolved[0]), ids(&without[0]));
+}
+
+/// The named part of a `.docx`, as text.
+fn docx_part(bytes: &[u8], name: &str) -> String {
+    use std::io::Read;
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+    let mut out = String::new();
+    zip.by_name(name).unwrap().read_to_string(&mut out).unwrap();
+    out
+}
+
+/// Every XML part of a `.docx` parses, and every relationship id the
+/// document uses is declared.
+fn assert_valid_docx(bytes: &[u8]) {
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+    let names: Vec<String> = zip.file_names().map(|n| n.unwrap().into_owned()).collect();
+    for name in &names {
+        if !(name.ends_with(".xml") || name.ends_with(".rels")) {
+            continue;
+        }
+        let mut text = String::new();
+        std::io::Read::read_to_string(&mut zip.by_name(name).unwrap(), &mut text).unwrap();
+        let mut reader = quick_xml::Reader::from_str(&text);
+        let mut depth = 0i32;
+        loop {
+            match reader.read_event() {
+                Ok(quick_xml::events::Event::Start(_)) => depth += 1,
+                Ok(quick_xml::events::Event::End(_)) => depth -= 1,
+                Ok(quick_xml::events::Event::Eof) => break,
+                Ok(_) => {}
+                Err(e) => panic!("{name}: {e}"),
+            }
+        }
+        assert_eq!(depth, 0, "{name} is unbalanced");
+    }
+    let document = docx_part(bytes, "word/document.xml");
+    let rels = docx_part(bytes, "word/_rels/document.xml.rels");
+    for part in document
+        .split("r:id=\"")
+        .chain(document.split("r:embed=\""))
+        .skip(1)
+    {
+        let id = &part[..part.find('"').unwrap()];
+        if id.starts_with("rId") {
+            assert!(
+                rels.contains(&format!("Id=\"{id}\"")),
+                "{id} isn't declared"
+            );
+        }
+    }
+    for part in rels.split("Target=\"media/").skip(1) {
+        let media = &part[..part.find('"').unwrap()];
+        assert!(
+            names.contains(&format!("word/media/{media}")),
+            "{media} is missing"
+        );
+    }
+}
+
+#[test]
+// verifies: REQ-002
+fn word_uses_word_headings_bookmarks_and_links_and_is_golden() {
+    let (project, source) = project(TARGETS);
+    let all = prepared(&project, &source, &["word", "word-tree"]);
+    let files = render_files(
+        &all[0],
+        &all,
+        &web(&project),
+        project.config.jira_url.as_deref(),
+        &FakePictures,
+        &source,
+    );
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].0, "out/doc.docx");
+    assert_valid_docx(&files[0].1);
+    let document = docx_part(&files[0].1, "word/document.xml");
+    for expected in [
+        "<w:pStyle w:val=\"Heading1\"/>",
+        "<w:pStyle w:val=\"Heading2\"/>",
+        "w:name=\"REQ_002\"",
+        "<w:hyperlink w:anchor=\"ADR_002\"",
+        "TOC \\o",
+        "<w:pStyle w:val=\"TOC1\"/>",
+        "<w:drawing>",
+        "<w:tblHeader/>",
+    ] {
+        assert!(document.contains(expected), "no {expected} in {document}");
+    }
+    let rels = docx_part(&files[0].1, "word/_rels/document.xml.rels");
+    assert!(rels
+        .contains("Target=\"https://jira.example.com/browse/FLINT-12\" TargetMode=\"External\""));
+    golden(
+        "docx-word.xml",
+        &document
+            .replace("<w:p>", "\n<w:p>")
+            .replace("<w:p ", "\n<w:p ")
+            .replace("<w:tbl>", "\n<w:tbl>"),
+    );
+
+    let tree = render_files(&all[1], &all, &web(&project), None, &FakePictures, &source);
+    assert!(tree.len() > 1);
+    for (path, bytes) in &tree {
+        assert!(
+            path.starts_with("out/word/") && path.ends_with(".docx"),
+            "{path}"
+        );
+        assert_valid_docx(bytes);
+    }
+    let all_text: String = tree
+        .iter()
+        .map(|(_, b)| docx_part(b, "word/_rels/document.xml.rels"))
+        .collect();
+    // An item with a page of its own is linked to as the page.
+    assert!(
+        all_text.contains("Target=\"../decisions/ADR-002.docx\""),
+        "{all_text}"
+    );
+}
+
+#[test]
+fn a_reference_document_lends_its_styles_and_page_setup() {
+    use std::io::Write;
+    let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let options = zip::write::SimpleFileOptions::default();
+    zip.start_file("word/styles.xml", options).unwrap();
+    zip.write_all(b"<?xml version=\"1.0\"?><w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:style w:type=\"paragraph\" w:styleId=\"Heading1\"><w:name w:val=\"heading 1\"/><w:rPr><w:color w:val=\"C00000\"/></w:rPr></w:style></w:styles>").unwrap();
+    zip.start_file("word/document.xml", options).unwrap();
+    zip.write_all(b"<w:document><w:body><w:sectPr><w:footerReference r:id=\"rId8\"/><w:pgSz w:w=\"12240\" w:h=\"15840\"/></w:sectPr></w:body></w:document>").unwrap();
+    zip.start_file("word/theme/theme1.xml", options).unwrap();
+    zip.write_all(b"<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" name=\"Company\"/>").unwrap();
+    let reference = zip.finish().unwrap().into_inner();
+
+    let targets =
+        format!("{TARGETS}\n[export.docx]\nreference = \"design/templates/company.docx\"\n");
+    let (project, mut source) = project(&targets);
+    source.insert("design/templates/company.docx", reference);
+    let all = prepared(&project, &source, &["word-tree"]);
+    let files = render_files(
+        &all[0],
+        &all,
+        &RepoLinks::None,
+        None,
+        &FakePictures,
+        &source,
+    );
+    let bytes = &files[0].1;
+    assert_valid_docx(bytes);
+    let styles = docx_part(bytes, "word/styles.xml");
+    assert!(styles.contains("C00000"), "the reference's heading");
+    assert!(
+        styles.contains("w:styleId=\"Heading3\""),
+        "Kiln's missing styles added"
+    );
+    let document = docx_part(bytes, "word/document.xml");
+    assert!(
+        document.contains("<w:pgSz w:w=\"12240\" w:h=\"15840\"/>"),
+        "the reference's page"
+    );
+    assert!(!document.contains("footerReference"));
+    assert!(docx_part(bytes, "word/theme/theme1.xml").contains("Company"));
 }

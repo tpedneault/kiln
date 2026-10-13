@@ -20,9 +20,9 @@ named like a token or password is an error (K004).
 | `[links.<role>]` | each link role: `from`, `to`, `inverse` | implements, verifies, part-of, supersedes, mitigates, depends-on |
 | `[coverage]` `roles` | which roles count toward coverage | `["implements", "verifies"]` |
 | `[render]` `link_bare_ids` | whether a bare `REQ-014` in prose is a reference | `true` |
-| `[jira]` `url` | where `jira` keys point (read-only) | none |
+| `[jira]` `url` | where `jira` keys point (read-only), and the Jira the mirror reads (`kiln list --jira`, K207, the GUI); Server or Data Center | none |
 | `[check]` | severity per rule: `K201 = "error"`, `K105 = "off"` | each rule's default (FORMAT.md, "Check rules") |
-| `[[export]]` | export targets: `name`, `format` (markdown, html, confluence), `layout`, `title`, `template`, `types`, `exclude_status`, `reports`, `numbering`, `item_style`, `link_to`, `path`, and `[export.markdown]` (`flavour`, `diagrams`), `[export.html]` (`theme`), `[export.confluence]` (`parent` or `page`, `space`, `labels`, `toc_levels`) — EXPORT.md | none |
+| `[[export]]` | export targets: `name`, `format` (markdown, html, docx, confluence), `layout`, `title`, `template`, `types`, `exclude_status`, `reports`, `numbering`, `item_style`, `link_to`, `path`, and `[export.markdown]` (`flavour`, `diagrams`), `[export.html]` (`theme`), `[export.docx]` (`reference`), `[export.confluence]` (`parent` or `page`, `space`, `labels`, `toc_levels`) — EXPORT.md | none |
 | `[confluence]` | the connection: `url`, `space`, `flavour`, `user`, `auth`, `labels`, `jira_macro`, `jira_server_id`, `on_drift`, `diagrams`, `max_page_kib`, … — CONFLUENCE.md | none |
 
 Mistakes in `kiln.toml` are findings with the line they are on: `kiln
@@ -43,7 +43,8 @@ K201 = "error"
 |---|---|
 | `KILN_CONFLUENCE_TOKEN` | the Confluence token (a personal access token on Data Center, an API token on Cloud); never put it in a file. When unset, the token `kiln auth confluence` stored in the OS credential store is used |
 | `KILN_CONFLUENCE_USER` | Cloud: the account e-mail the token belongs to (overrides `[confluence] user`) |
-| `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, `NO_PROXY` | the proxy for Confluence calls, honouring `NO_PROXY` (CONFLUENCE.md, "The API, by flavour") |
+| `KILN_JIRA_TOKEN` | the Jira personal access token for the mirror; when unset, the token `kiln auth jira` stored is used |
+| `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, `NO_PROXY` | the proxy for Confluence calls, honouring `NO_PROXY` (CONFLUENCE.md, "The API, by flavour"). Jira calls don't use a proxy yet (INTEGRATION.md, G9) |
 | `KILN_HOME` | puts Kiln's own folders (settings, state, logs) in one folder |
 | `FENIX_HOME` | which Fenix `kiln new --open` talks to (the one started with the same `FENIX_HOME`) |
 
@@ -51,14 +52,16 @@ K201 = "error"
 
 Settings in `%AppData%\kiln` / `~/.config/kiln`; state in
 `%LocalAppData%\kiln\state` / `~/.local/state/kiln/state`, logs beside it;
-all three under `KILN_HOME` when it is set. Two things live there: the
+all three under `KILN_HOME` when it is set. These live there: the
 cache of rasterised diagrams (`state/diagrams`), which CI may cache
 between runs, and one Confluence page cache per target
 (`state/confluence/<space>-<project>-<export>.json`: page id → version and
 `kiln` property), which saves a call per unchanged page and lets the Flint
-provider open an item's page without asking the server; and
+provider open an item's page without asking the server;
 `state/flint-project`, the project the Flint provider last followed Fenix
-to. Any of them can be deleted at any time.
+to; and the Jira mirror (`state/jira/<host>.json`: each linked ticket's
+status and assignee, used for ten minutes). Any of them can be deleted at
+any time.
 
 ## The GUI's settings
 
@@ -83,3 +86,5 @@ Secret Service on Linux, as KDE Wallet and GNOME Keyring provide) under
 service `fenix-suite`, account `confluence:<url>`, the URL as configured
 without a trailing slash: the same entry Flint reads, so storing it once
 serves both. `KILN_CONFLUENCE_TOKEN` takes precedence when set.
+`kiln auth jira` does the same for `[jira] url` as `jira:<url>`, the
+entry Flint's Jira support reads; `KILN_JIRA_TOKEN` takes precedence.

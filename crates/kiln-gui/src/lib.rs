@@ -27,7 +27,7 @@ mod window;
 pub use app::{App, Baseline, Effect};
 pub use screen::Screen;
 pub use settings::{parse as parse_settings, Settings};
-pub use window::{run, Options};
+pub use window::{run, JiraLoad, Options};
 
 #[cfg(test)]
 mod tests;

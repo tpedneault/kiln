@@ -6,8 +6,8 @@ to arrange it (a **layout**), and what to write it as (a **format**). The
 default is the simplest useful thing: the whole design as **one
 document**, on one Confluence page or in one file.
 
-Implemented in `kiln-export` (assembly, layouts, the Markdown and HTML
-back ends) and `kiln-confluence` (the Confluence back end, see
+Implemented in `kiln-export` (assembly, layouts, the Markdown, HTML and
+Word back ends) and `kiln-confluence` (the Confluence back end, see
 [CONFLUENCE.md](CONFLUENCE.md)).
 
 ## The pipeline
@@ -16,7 +16,7 @@ back ends) and `kiln-confluence` (the Confluence back end, see
 index ──► select ──► assemble ──► split (layout) ──► back end ──► destination
           which      one document   into pages       storage /      Confluence
           items      tree, ordered  (or not)         Markdown /     pages, or
-                     and numbered                    HTML           files
+                     and numbered                    HTML / Word    files
 ```
 
 1. **Select** the items the target includes (by template directives, or
@@ -75,7 +75,7 @@ path = "target/kiln/design.html"
 | Key | Default | Meaning |
 |---|---|---|
 | `name` | required | unique; what `kiln export <name>` runs; part of every published page's identity |
-| `format` | required | `confluence`, `markdown`, `html` (`docx` later, K8) |
+| `format` | required | `confluence`, `markdown`, `html`, `docx` |
 | `layout` | `document` | `document`, `sections`, `tree` |
 | `title` | the project `name` | the document's title; for Confluence, the (root) page title |
 | `template` | none | a Markdown file in the repo that arranges the document |
@@ -93,10 +93,10 @@ broken export fails the merge request, not the publish after it.
 
 ## Layouts
 
-| Layout | Confluence | Markdown / HTML |
+| Layout | Confluence | Markdown / HTML / Word |
 |---|---|---|
 | **`document`** | one page holding the whole document | one file |
-| **`sections`** | a page with the opening material and a list of its child pages; one child page per top-level section (each type section, each report) | `index.md` / `index.html` plus one file per section |
+| **`sections`** | a page with the opening material and a list of its child pages; one child page per top-level section (each type section, each report) | `index.md` / `index.html` / `index.docx` plus one file per section |
 | **`tree`** | as `sections`, and each item its own page under its section, nested by `parent` | a folder per section, a file per item |
 
 `document` is the default because it is what a design document is: one
@@ -316,14 +316,50 @@ name>"` will use one of the suite's palettes (only `light` exists so far;
 another name is K005). A remote image (an `https:` URL) is never fetched:
 it shows as its alt text, so the file stays self-contained.
 
-### Later: `docx` (K8)
+### `docx`
 
-Word, for organisations whose formal reviews run on Word documents:
-headings as Word's own Heading 1–6 styles (so Word's table of contents and
-navigation pane work), tables, images embedded, numbering as text, an
-optional reference `.docx` for styles (`[export.docx] reference =
-"templates/company.docx"`). Built on the `docx-rs` crate. Designed here so
-nothing earlier assumes three formats; built after K7.
+Word, for organisations whose formal reviews run on Word documents. One
+`.docx` per page, written directly as WordprocessingML (ADR-011):
+
+- headings are Word's own **Heading 1–6** styles (a top-level section is
+  Heading 1), so the navigation pane and Word's table of contents work;
+  a heading deeper than six is a bold paragraph;
+- every item heading is a **bookmark** named after its ID with `-` as `_`
+  (`REQ_014`: Word's bookmark names allow only letters, digits and `_`),
+  and references are links to it; across files (`sections`, `tree`) they
+  link to the other file, and to its bookmark when the item isn't the
+  page;
+- `<!-- kiln:toc -->` is Word's TOC field over headings 1–3, already
+  filled with links, so the document reads right before Word updates it;
+  the settings ask Word to update fields on opening, which adds page
+  numbers (Word asks first);
+- top-level sections after the first start a new page; tables have their
+  own borders and a header row repeated across pages; repository images
+  (PNG, JPEG, GIF) and diagrams are embedded, scaled to the page's width;
+  a remote image is never fetched and shows as its alt text, as in HTML;
+- section numbers are text (`2.1.3`), and so are list bullets and
+  numbers, so a reference document's numbering can't clash with them;
+- status lozenges are white bold text on the colour Confluence uses;
+  callouts and quotes are indented paragraphs with a coloured bar.
+
+A **reference document** sets the house style, as Word users already
+share one:
+
+```toml
+[export.docx]
+reference = "design/templates/company.docx"   # project-relative
+```
+
+Kiln takes its styles (adding the ones Kiln uses that it lacks, such as
+latent heading styles Word never wrote down), theme, numbering
+definitions and the last section's page size and margins (without its
+headers and footers, whose parts aren't copied). Without one, the
+document is A4 with 2.54 cm margins in Calibri 11. `kiln check` reports a
+reference that doesn't exist or isn't a `.docx` (K112).
+
+The bytes are deterministic like every other format: parts in a fixed
+order, a fixed zip time, no creation date, ids counted per document. The
+one exception is the same as HTML's: diagram pictures.
 
 ### Adding a format
 
@@ -371,7 +407,7 @@ Windows and on Linux. Everything without an inherent order is sorted;
 line endings are normalised; the time of the export never appears (the
 summary shows the published commit and that commit's date). The one
 exception is rasterised diagrams: their pixels depend on the fonts a
-machine has, so an HTML export with diagrams (or Markdown with
+machine has, so an HTML or Word export with diagrams (or Markdown with
 `diagrams = "image"`) is identical only between machines with the same
 fonts. Picture names are content-addressed by the diagram source, not the
 pixels, so they don't change.
@@ -419,8 +455,9 @@ falls back to the exported commit for those files.
 Mermaid blocks are rendered with `fenix-diagram` (`render` in the
 `default` theme, then `png` at scale 2 on a white background) when the
 format wants pictures: Confluence always, HTML always (as `data:` URIs),
-Markdown only with `diagrams = "image"`. The source follows each picture
-in a collapsed block ("Diagram source").
+Word always (embedded), Markdown only with `diagrams = "image"`. The
+source follows each picture in a collapsed block ("Diagram source"),
+except in Word, which has no such block.
 
 **Fonts.** Rasterising needs fonts. `fenix-diagram` loads system fonts
 only, and slim CI images may have none, which produces diagrams without
@@ -445,6 +482,10 @@ dry run knows every attachment without drawing anything.
   not exported → `link_to` target or repository link).
 - **Back ends**: golden output per construct and for a whole sample
   document, per format; Markdown anchors checked against GitLab's and
-  GitHub's slug rules; HTML checked for no external references.
+  GitHub's slug rules; HTML checked for no external references; Word
+  checked part by part (every XML part well formed, every relationship id
+  declared, every picture present) with `document.xml` golden, and a
+  reference document's styles and page setup taken over; the files open
+  and convert in LibreOffice (checked by hand, not in CI).
 - **Determinism**: export twice, and on both CI operating systems, and
   compare bytes.

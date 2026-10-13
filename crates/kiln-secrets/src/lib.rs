@@ -21,6 +21,8 @@ use std::fmt;
 pub const CONFLUENCE_TOKEN: &str = "KILN_CONFLUENCE_TOKEN";
 /// The environment variable overriding `[confluence] user`.
 pub const CONFLUENCE_USER: &str = "KILN_CONFLUENCE_USER";
+/// The environment variable holding a Jira personal access token.
+pub const JIRA_TOKEN: &str = "KILN_JIRA_TOKEN";
 
 /// The service every suite tool files its secrets under.
 pub const SERVICE: &str = "fenix-suite";
@@ -82,6 +84,25 @@ pub fn confluence_token_for(url: &str) -> Result<Option<(Token, Origin)>, String
     }
     Ok(get(&account("confluence", url))
         .map_err(|e| format!("{e} (or set {CONFLUENCE_TOKEN})"))?
+        .map(|t| (Token(t), Origin::CredentialStore)))
+}
+
+/// Reads `KILN_JIRA_TOKEN` through `get`, so tests don't touch the
+/// process's environment.
+pub fn jira_from(get: impl Fn(&str) -> Option<String>) -> Option<Token> {
+    get(JIRA_TOKEN)
+        .filter(|t| !t.trim().is_empty())
+        .map(|t| Token(t.trim().to_owned()))
+}
+
+/// The Jira token for `url`: `KILN_JIRA_TOKEN` first, then the credential
+/// store under `jira:<url>`, the name Flint's M8 uses too.
+pub fn jira_token_for(url: &str) -> Result<Option<(Token, Origin)>, String> {
+    if let Some(token) = jira_from(|k| std::env::var(k).ok()) {
+        return Ok(Some((token, Origin::Environment)));
+    }
+    Ok(get(&account("jira", url))
+        .map_err(|e| format!("{e} (or set {JIRA_TOKEN})"))?
         .map(|t| (Token(t), Origin::CredentialStore)))
 }
 
@@ -170,5 +191,12 @@ mod tests {
             "t"
         );
         assert_eq!(confluence_from(|_| None), None);
+        let jira = |k: &str| (k == JIRA_TOKEN).then(|| " j ".to_owned());
+        assert_eq!(jira_from(jira).unwrap().expose(), "j");
+        assert_eq!(confluence_from(jira), None);
+        assert_eq!(
+            account("jira", "https://jira.example.com/"),
+            "jira:https://jira.example.com"
+        );
     }
 }

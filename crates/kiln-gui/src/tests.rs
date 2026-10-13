@@ -75,7 +75,7 @@ fn source() -> MemorySource {
                 "task",
                 "Write the loader",
                 "done",
-                "\n[links]\npart-of = [\"MS-001\"]\n",
+                "jira = \"FLINT-1\"\n\n[links]\npart-of = [\"MS-001\"]\n",
             ),
         )
         .with(
@@ -346,4 +346,34 @@ fn the_leader_shows_its_keys_and_reload_keeps_the_cursor() {
     );
     assert!(a.select(&"TEST-001".parse().unwrap()));
     assert!(a.screen().dump().contains(">TEST-001"));
+}
+
+#[test]
+fn tickets_show_once_the_jira_mirror_arrives() {
+    let mut app = app();
+    press(&mut app, "4");
+    assert!(
+        !app.text().join("\n").contains("FLINT-1"),
+        "{:?}",
+        app.text()
+    );
+    let mut mirror = kiln_jira::Mirror::default();
+    mirror.tickets.insert(
+        "FLINT-1".into(),
+        kiln_jira::Ticket {
+            key: "FLINT-1".into(),
+            summary: "Loader".into(),
+            status: "Done".into(),
+            resolved: true,
+            assignee: Some("Alice".into()),
+        },
+    );
+    app.set_jira(mirror);
+    let text = app.text();
+    let line = text
+        .iter()
+        .find(|l| l.contains("TASK-001"))
+        .cloned()
+        .unwrap_or_default();
+    assert!(line.ends_with("FLINT-1 Done · Alice"), "{text:?}");
 }

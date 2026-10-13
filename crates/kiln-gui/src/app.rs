@@ -71,6 +71,8 @@ pub struct App {
     /// How many rows fit; the window says.
     visible: usize,
     rows: Vec<Row>,
+    /// Linked tickets' status, once the mirror has arrived.
+    jira: Option<kiln_jira::Mirror>,
 }
 
 fn leader() -> KeyTrie<Action> {
@@ -109,6 +111,7 @@ impl App {
             message: None,
             visible: 30,
             rows: Vec::new(),
+            jira: None,
         };
         app.diff();
         app.refresh();
@@ -138,6 +141,12 @@ impl App {
     }
 
     /// A message for the footer.
+    /// The Jira mirror arrived: items show their tickets' status.
+    pub fn set_jira(&mut self, mirror: kiln_jira::Mirror) {
+        self.jira = Some(mirror);
+        self.refresh();
+    }
+
     pub fn say(&mut self, text: impl Into<String>, error: bool) {
         self.message = Some((text.into(), error));
     }
@@ -183,6 +192,7 @@ impl App {
             &self.project,
             self.changes.as_ref(),
             &self.options,
+            self.jira.as_ref(),
         );
         self.rows = pages::filter(rows, &self.filter);
         self.clamp();

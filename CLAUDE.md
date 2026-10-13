@@ -12,8 +12,9 @@ without writes; the committed design document) and K3 (Confluence
 publishing, `kiln auth confluence`; every **verify** still unconfirmed
 live), K4 (`kiln lsp`; Fenix gaps G7 and G8 worked around), K5
 (`kiln provider` for Flint), K6 (`kiln diff`, `export --since`,
-`kiln confluence comments`) and K7 (the GUI, `kiln gui`, `kilnw` on
-Windows) are done.
+`kiln confluence comments`), K7 (the GUI, `kiln gui`, `kilnw` on
+Windows) and K8 (the `docx` format, the Jira mirror with K207 and `kiln
+auth jira`; Fenix gaps G6 and G9 worked around) are done.
 
 ## Read first, in this order
 
@@ -22,13 +23,13 @@ Windows) are done.
 2. `docs/FORMAT.md` — the item file format and `kiln.toml`; the contract.
    `kiln-model`/`kiln-parse` implement exactly this; change both together.
 3. `docs/EXPORT.md` — export targets, the three layouts (one document is
-   the default), templates, reports, formats (Confluence, Markdown, HTML;
-   Word later), determinism, diagrams.
+   the default), templates, reports, formats (Confluence, Markdown, HTML,
+   Word), determinism, diagrams.
 4. `docs/CONFLUENCE.md` — the Confluence format: pages and their
    identity, planner, drift, storage format, the API by flavour, retries,
    CI, testing.
 5. `docs/INTEGRATION.md` — Fenix, Flint and Jira: what Kiln uses and the
-   gaps G1–G6.
+   gaps G1–G9.
 
 ## How to work
 
@@ -118,7 +119,7 @@ docs/DESIGN.md        the design
 docs/FORMAT.md        the file format (the contract)
 docs/EXPORT.md        exports: targets, layouts, templates, formats
 docs/CONFLUENCE.md    the Confluence format
-docs/INTEGRATION.md   Fenix, Flint, Jira (G1–G6)
+docs/INTEGRATION.md   Fenix, Flint, Jira (G1–G9)
 docs/ARCHITECTURE.md  the crates as built and which way they depend
 docs/GUI.md           the GUI: pages, keys, looks, how it is built
 docs/CI.md            the gates and how to run them

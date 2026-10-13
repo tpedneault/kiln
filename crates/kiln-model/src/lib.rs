@@ -24,8 +24,8 @@ mod item;
 
 pub use config::{default_config, slug, CodeConfig, Config, LinkRole, TypeDef, CODE};
 pub use export::{
-    ConfluenceConfig, ConfluenceFlavour, ConfluenceTarget, Diagrams, ExportFormat, ExportTarget,
-    Flavour, HtmlOptions, ItemStyle, Layout, MarkdownOptions, OnDrift, REPORTS,
+    ConfluenceConfig, ConfluenceFlavour, ConfluenceTarget, Diagrams, DocxOptions, ExportFormat,
+    ExportTarget, Flavour, HtmlOptions, ItemStyle, Layout, MarkdownOptions, OnDrift, REPORTS,
 };
 pub use finding::{Finding, Rule, Severity, Span};
 pub use folders::{Folders, Platform};

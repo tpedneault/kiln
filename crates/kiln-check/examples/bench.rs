@@ -247,6 +247,7 @@ fn export(root: &Path) -> (Duration, usize) {
         path: Some("out/bench.md".into()),
         markdown: Default::default(),
         html: Default::default(),
+        docx: Default::default(),
         confluence: Default::default(),
     };
     let revision = kiln_export::Revision::default();

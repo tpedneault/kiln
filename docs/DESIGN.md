@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0–K7 done (the format, `kiln check`, the editing commands, exports to Markdown and HTML, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI, this repository's own `design/` and generated design document); K8 next. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
+Status: K0–K8 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI, the read-only Jira mirror with K207 and `kiln auth jira`, this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -15,7 +15,7 @@ Status: K0–K7 done (the format, `kiln check`, the editing commands, exports to
 |---|---|
 | this one | goals, architecture, crates, CLI, milestones |
 | [FORMAT.md](FORMAT.md) | the item file format, `kiln.toml`, links, code references, the `kiln check` rules |
-| [EXPORT.md](EXPORT.md) | export targets, layouts (one document, sections, a page tree), templates, formats (Confluence, Markdown, HTML; Word later) |
+| [EXPORT.md](EXPORT.md) | export targets, layouts (one document, sections, a page tree), templates, formats (Confluence, Markdown, HTML, Word) |
 | [CONFLUENCE.md](CONFLUENCE.md) | the Confluence format: pages, planner, drift, the API |
 | [INTEGRATION.md](INTEGRATION.md) | Fenix, Flint and Jira: what Kiln uses, and what they need to add |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | the workspace as built: crates, dependency direction, lints |
@@ -99,11 +99,12 @@ FORMAT.md defines all of these precisely.
   ┌────────────────────────────────────────────────────────────────┐
   │ kiln-parse → kiln-model → kiln-index ──► kiln-check            │
   │                              │                                 │
-  │                              ├──► kiln-render ──► kiln-export ──┬─► Markdown / HTML files
+  │                              ├──► kiln-render ──► kiln-export ──┬─► Markdown / HTML / Word files
   │                              │                                  └─► kiln-confluence ──► Confluence (REST)
   │                              ├──► kiln-lsp ◄────── Fenix (LSP client, stdio)
   │                              ├──► kiln-flint ◄──── Flint (provider protocol, stdio)
   │                              ├──► kiln-gui
+  │                              ├──► kiln-jira ──► Jira (REST, read-only, fenix-jira)
   │                              └──► kiln-git (baselines, commit ids; shells out to git)
   └────────────────────────────────────────────────────────────────┘
           kiln-fenix ──► Fenix control channel (open at a line, agenda)
@@ -121,12 +122,13 @@ own unit tests; I/O only where the crate's role is I/O.
 | `kiln-index` | Loads a project: walks configured paths (`ignore` crate, so `.gitignore` is honoured), parses in parallel, builds the graph (forward and inverse links, parent tree), answers queries (children, ancestors, transitive impact, coverage). Incremental update of one file for the LSP. | yes, given a file source trait |
 | `kiln-check` | The rules in FORMAT.md, each with a code, a severity (overridable in `kiln.toml`) and a span. Output as text, JSON, GitLab Code Quality and GitHub annotations. | yes |
 | `kiln-render` | Markdown body → a small intermediate document tree (`pulldown-cmark`), with item references, callouts, tables, code blocks and Mermaid diagrams as distinct nodes. Report builders (traceability, findings, roadmap, risks, changes) produce the same tree. | yes |
-| `kiln-export` | Export targets: selection, templates and directives, assembly into one numbered document with anchors, the three layouts (splitting into pages and resolving links across them), diagram rasterising and its cache, and the Markdown and HTML back ends with their file destination. See EXPORT.md. | yes, except writing files |
+| `kiln-export` | Export targets: selection, templates and directives, assembly into one numbered document with anchors, the three layouts (splitting into pages and resolving links across them), diagram rasterising and its cache, and the Markdown, HTML and Word back ends with their file destination. See EXPORT.md. | yes, except writing files |
 | `kiln-confluence` | The Confluence back end: storage-format emitter, normaliser, planner (pure), the client trait with Cloud and Data Center implementations (`ureq`), and apply. See CONFLUENCE.md. | emitter and planner yes; client no |
 | `kiln-git` | Current commit, dirty state, file contents at a revision, tags. Shells out to `git`, as `fenix-git` does. | no |
 | `kiln-lsp` | Language server over stdio (`lsp-server` + `lsp-types`, synchronous, as rust-analyzer). | no |
 | `kiln-flint` | Flint provider over stdio, built on `flint-protocol`. | no |
 | `kiln-fenix` | Fenix control-channel client use (`fenix-control`): open at a line, agenda lookups. | no |
+| `kiln-jira` | The Jira mirror: linked tickets' status through `fenix-jira`, read-only, cached ten minutes; K207. | mirror and K207 yes; fetch no |
 | `kiln-secrets` | Tokens from environment variables or the OS credential store (`keyring`, the suite's names), and prompting without echo. | no |
 | `kiln-gui` | The GUI (K7, GUI.md). wgpu + winit + glyphon, like Fenix and Flint. | pages and app yes; window no |
 | `kiln` | The binary: `clap` CLI; and `kilnw`, which opens the GUI without a console on Windows (ADR-010). | no |
@@ -180,7 +182,7 @@ nearest `kiln.toml` (`--project <dir>` overrides).
 |---|---|---|
 | `kiln init` | writes a `kiln.toml` with the default types and a `design/` folder; never overwrites | K1 |
 | `kiln new <type> [--parent ID] [--title T]` | allocates the next ID, writes the file from the type's template, prints its path; `--open` opens it in Fenix at the title | K1 |
-| `kiln list [--type T] [--status S] [--tag X] [--format text\|json]` | items, filtered | K1 |
+| `kiln list [--type T] [--status S] [--tag X] [--jira] [--format text\|json]` | items, filtered; `--jira` adds each linked ticket's status from the Jira mirror | K1, K8 |
 | `kiln show <ID>` | one item with its computed links | K1 |
 | `kiln check [--format text\|json\|gitlab\|github]` | the rules; exit 1 on any error | K1 |
 | `kiln set <ID> status=<S>` (also `title`, `parent`, `owner`, `due`) / `link <ID> <role> <ID>` / `unlink …` | comment-preserving front-matter edits | K1 |
@@ -279,10 +281,10 @@ changelog line.
 | K5 | `kiln provider` for Flint: items, open in Fenix at a line, copy, set status, open in Confluence | — (G1 for clock-in without an existing agenda task) |
 | K6 | `kiln diff` and baselines; `export --since` (the changes report and the in-place markers); `kiln confluence comments` | — |
 | K7 | GUI: Tree, Trace, Impact first; Board, Roadmap, Decisions, Changes after | — |
-| K8 | The `docx` format (EXPORT.md); the Jira mirror (status of linked tickets, read-only, through `fenix-jira`) | — |
+| K8 | The `docx` format (EXPORT.md); the Jira mirror (status of linked tickets, read-only, through `fenix-jira`) | — (G6 for Jira Cloud, G9 for Jira behind a proxy) |
 
-Everything through K6 needs nothing new from Fenix or Flint. INTEGRATION.md
-lists the changes (G1–G6) that make the integration better and which
+Everything through K8 needs nothing new from Fenix or Flint to work. INTEGRATION.md
+lists the changes (G1–G9) that make the integration better and which
 milestone notices their absence.
 
 ## Risks

@@ -37,7 +37,13 @@ pub struct Options {
     pub notes: Vec<String>,
     /// `--item`: the item to put the cursor on.
     pub select: Option<ItemId>,
+    /// Reads the Jira mirror; run on a thread of its own.
+    pub jira: Option<JiraLoad>,
 }
+
+/// How the window gets the Jira mirror: the binary's, which knows where
+/// tokens and the cache live.
+pub type JiraLoad = Box<dyn FnOnce() -> Result<kiln_jira::Mirror, String> + Send>;
 
 /// Opens the window and runs until it is closed.
 pub fn run(o: Options) -> Result<(), String> {
@@ -53,7 +59,15 @@ pub fn run(o: Options) -> Result<(), String> {
         app.say(first.clone(), true);
     }
     let stamps = stamps(&o.root, app.project());
+    let jira = o.jira.map(|load| {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(load());
+        });
+        rx
+    });
     let mut win = Win {
+        jira,
         app,
         root: o.root,
         settings: o.settings,
@@ -100,6 +114,8 @@ fn event_loop() -> Result<EventLoop<()>, String> {
 }
 
 struct Win {
+    /// The Jira mirror, until it arrives.
+    jira: Option<std::sync::mpsc::Receiver<Result<kiln_jira::Mirror, String>>>,
     app: App,
     root: PathBuf,
     settings: Settings,
@@ -240,6 +256,14 @@ impl ApplicationHandler for Win {
 
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
         if let StartCause::ResumeTimeReached { .. } = cause {
+            if let Some(answer) = self.jira.as_ref().and_then(|rx| rx.try_recv().ok()) {
+                self.jira = None;
+                match answer {
+                    Ok(mirror) => self.app.set_jira(mirror),
+                    Err(e) => self.app.say(format!("Jira: {e}"), true),
+                }
+                self.redraw();
+            }
             if stamps(&self.root, self.app.project()) != self.stamps {
                 self.reload(false);
             }

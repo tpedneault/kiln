@@ -358,17 +358,19 @@ Severities: `error` (exit 1), `warning`, `off`, overridable in `[check]`.
 | K109 | warning | a link is written on its inverse side (e.g. `verified-by` in a requirement) |
 | K110 | error | relative link or image to a file that doesn't exist |
 | K111 | error | a Mermaid block fails to parse (the diagram's own line and message) |
-| K112 | error | an export template is invalid: unknown directive or attribute, unknown type, status or ID, a template file that doesn't exist |
+| K112 | error | an export template is invalid: unknown directive or attribute, unknown type, status or ID, a template file that doesn't exist; a Word target's `reference` document that doesn't exist or isn't a `.docx` |
 | K201 | warning | a requirement past its type's `initial` status (non-draft, by default) and not closed, with no `verifies` coverage |
 | K202 | warning | the same with no `implements` coverage |
 | K203 | warning | a non-closed item links to a closed one (e.g. implements an obsolete requirement) |
 | K204 | warning | a decision with status `superseded` that nothing `supersedes` |
 | K205 | warning | status `verified` but no passing `verifies` source (a test item with status `passing`, or a code reference) |
 | K206 | warning | a milestone past its `due` date (compared with today, UTC) and neither done nor closed |
-| K207 | off | a work item `done` whose linked Jira ticket isn't resolved, or the reverse (needs the Jira mirror, K8; INTEGRATION.md) |
+| K207 | off | an item with `jira` keys whose type has `done` statuses (a task, a milestone…) is done while one of its tickets isn't resolved (in Jira's Done category), or every ticket is resolved while the item is neither done nor closed; read from the Jira mirror (INTEGRATION.md, "Jira") |
 
-K207 is checked from K8 (the Jira mirror); `[check]` may name it before
-then. K111 parses each diagram with `fenix-diagram`, the renderer exports
+K207 reads the Jira mirror, so it needs `[jira] url` and a token
+(`KILN_JIRA_TOKEN` or `kiln auth jira`); when Jira can't be read, `kiln
+check` says "K207 not checked: …" on stderr and checks the rest, since
+Kiln works without Jira. Tickets Jira doesn't know are left out. K111 parses each diagram with `fenix-diagram`, the renderer exports
 draw with, so a diagram that passes draws. K112 checks each target's
 template once, even when several targets share it.
 

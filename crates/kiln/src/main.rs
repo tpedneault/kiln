@@ -120,6 +120,9 @@ enum Command {
         status: Option<String>,
         #[arg(long)]
         tag: Option<String>,
+        /// Each linked Jira ticket's status and assignee (read-only, cached 10 minutes).
+        #[arg(long)]
+        jira: bool,
         #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
         format: TextOrJson,
     },
@@ -274,6 +277,12 @@ enum AuthService {
         #[arg(long)]
         forget: bool,
     },
+    /// The personal access token for `[jira] url`, checked with one search first.
+    Jira {
+        /// Remove the stored token instead.
+        #[arg(long)]
+        forget: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -311,8 +320,9 @@ fn main() -> ExitCode {
             type_name,
             status,
             tag,
+            jira,
             format,
-        } => cmd::list::run(project, type_name, status, tag, format),
+        } => cmd::list::run(project, type_name, status, tag, jira, format),
         Command::Show { id, format } => cmd::show::run(project, &id, format),
         Command::Check { format } => cmd::check::run(project, format),
         Command::Set { id, assignments } => cmd::edit::set(project, &id, &assignments),
@@ -368,6 +378,9 @@ fn main() -> ExitCode {
         Command::Auth {
             service: AuthService::Confluence { forget },
         } => cmd::auth::confluence(project, forget),
+        Command::Auth {
+            service: AuthService::Jira { forget },
+        } => cmd::jira::auth(project, forget),
     };
     match result {
         Ok(code) => ExitCode::from(code),
