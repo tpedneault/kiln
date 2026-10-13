@@ -68,6 +68,15 @@ All notable changes to Kiln are recorded here. The format follows
   changes on disk; the benchmark gate covers its drill-downs (16 ms) and
   checks its items fit one Flint message ([docs/CLI.md](docs/CLI.md),
   [docs/INTEGRATION.md](docs/INTEGRATION.md)).
+- K6: baselines. `kiln diff REV[..REV]` lists the items added, changed and
+  removed since a tag, branch or commit (status, title, links, body…),
+  reading the old project from git; `kiln export --since REV` marks each
+  new or changed item next to its heading (Markdown, HTML, Confluence)
+  and fills the `changes` report; `<!-- kiln:value since -->`. `kiln
+  confluence comments` lists the unresolved footer comments on the
+  published pages, placed on the item they quote
+  ([docs/CLI.md](docs/CLI.md), [docs/FORMAT.md](docs/FORMAT.md),
+  "Baselines").
 
 ### Changed
 

@@ -123,7 +123,8 @@ impl Diagrams {
 }
 
 /// The reports a document can hold (EXPORT.md, "Reports"). `changes`
-/// needs `--since`, which arrives in K6.
+/// lists what changed when the export has `--since`, and says how to get
+/// that when it hasn't.
 pub const REPORTS: &[&str] = &["traceability", "findings", "roadmap", "risks", "changes"];
 
 /// One `[[export]]`.

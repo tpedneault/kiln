@@ -5,12 +5,12 @@ Where Kiln's code lives and which way its dependencies point.
 map of the workspace that does it, and is updated whenever a crate gains
 a role or a dependency.
 
-Status: K5. The format crates (`kiln-model`, `kiln-parse`, `kiln-index`,
+Status: K6. The format crates (`kiln-model`, `kiln-parse`, `kiln-index`,
 `kiln-check`), the export crates (`kiln-render`, `kiln-export`,
 `kiln-confluence` with publishing), `kiln-git`, `kiln-secrets` (environment
 variables and the OS credential store through `keyring`), `kiln-fenix`
 (opening a file, clocking in, opening a URL), `kiln-lsp`, `kiln-flint` and
-the binary's K1–K5 commands are built.
+the binary's K1–K6 commands are built.
 
 ## Layout
 
@@ -43,12 +43,12 @@ access except through a value or trait the caller passes in.
 |---|---|---|---|
 | `kiln-model` | `kiln.toml` schema (export targets and `[confluence]` too), `ItemId`, `Item`, `Ref`, `CodeRef`, `Finding`, the rules; Kiln's folders | yes | K1, K2 |
 | `kiln-parse` | front matter and `kiln.toml` with spans (`toml_edit`), references in bodies (`pulldown-cmark`) and code (`regex`), comment-preserving edits and front-matter formatting | yes | K1, K4 |
-| `kiln-index` | the loaded project: walk (`ignore`), parse in parallel (`rayon`), graph, queries (including the facts `kiln show` and hover print), renumber and new-item plans; re-reading one file (`update_file`) | yes, given a file-source trait | K1 (incremental, K4) |
+| `kiln-index` | the loaded project: walk (`ignore`), parse in parallel (`rayon`), graph, queries (including the facts `kiln show` and hover print), renumber and new-item plans; the item diff between two projects; re-reading one file (`update_file`) | yes, given a file-source trait | K1 (incremental, K4) |
 | `kiln-check` | the FORMAT.md rules and their output formats | yes | K1 |
 | `kiln-render` | Markdown and templates → document tree (`pulldown-cmark`); report builders; Mermaid validation (`fenix-diagram`) | yes | K2 |
 | `kiln-export` | assembly, numbering, layouts, reference resolution, Markdown and HTML, the file destination, diagram pictures and their cache | yes, except writing files and the cache | K2 |
-| `kiln-confluence` | storage emitter, normaliser, desired pages, planner, snapshots, the client (`ureq`); apply | emitter, normaliser and planner yes; client no | K2 (read), K3 (write) |
-| `kiln-git` | the current commit; later dirty state, last commit per file, shallow detection, revisions | no (shells out to `git`) | K1, K2, K6 |
+| `kiln-confluence` | storage emitter, normaliser, desired pages, planner, snapshots, the client (`ureq`); apply; reading and placing footer comments | emitter, normaliser and planner yes; client no | K2 (read), K3 (write) |
+| `kiln-git` | the current commit, dirty state, last commit per file, shallow detection; a revision resolved to its commit and the files at it (one `ls-tree`, one `cat-file --batch`) | no (shells out to `git`) | K1, K2, K6 |
 | `kiln-lsp` | `kiln lsp`: the protocol (`lsp-server`, `lsp-types`), open documents layered over the disk, features as functions of the project and a position, a thread watching the disk | no | K4 |
 | `kiln-flint` | `kiln provider`: items and drill-downs as pure functions of the project (`items`), Confluence page lookup, the protocol loop with project following and polling | no | K5 |
 | `kiln-fenix` | Fenix control channel: open at a line, clock in on an agenda task by Jira key; opening a URL with the OS | no | K1 (`new --open`), K5 |

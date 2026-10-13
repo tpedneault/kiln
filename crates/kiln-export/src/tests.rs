@@ -77,6 +77,7 @@ fn prepared(project: &Project, source: &MemorySource, names: &[&str]) -> Vec<Pre
         project,
         findings: &[],
         revision: &rev,
+        since: None,
     };
     let all: Vec<Prepared> = names
         .iter()
@@ -219,6 +220,7 @@ fn assembly_places_each_item_once_nested_and_numbered() {
         project: &project,
         findings: &[],
         revision: &rev,
+        since: None,
     };
     let template = String::from_utf8(
         kiln_index::FileSource::read(&source, "design/templates/doc.md").unwrap(),
@@ -350,6 +352,7 @@ fn in_tree_exports_link_relatively_and_name_no_commit() {
         project: &project,
         findings: &[],
         revision: &rev,
+        since: None,
     };
     let t = target(&project, "plain");
     let all = vec![prepare(&t, None, &a)];
@@ -402,4 +405,82 @@ fn file_plans_write_only_changes_and_remove_what_kiln_wrote() {
     assert_eq!(second.removes, ["out/sections/gone.md"]);
     assert!(second.manifest.is_some(), "the stale entry leaves the list");
     assert!(second.changes());
+}
+
+#[test]
+fn since_marks_new_and_changed_items_next_to_their_heading() {
+    use kiln_index::{ChangeKind, ItemChange};
+    let (project, source) = project(TARGETS);
+    let change = |id: &str, kind| ItemChange {
+        id: id.parse().unwrap(),
+        kind,
+        title: String::new(),
+        type_name: "requirement".into(),
+        path: String::new(),
+        details: Vec::new(),
+    };
+    let since = kiln_render::Since {
+        label: "v1.0".into(),
+        commit: "1a2b3c4d5e6f".into(),
+        changes: vec![
+            change("REQ-002", ChangeKind::Changed),
+            change("REQ-003", ChangeKind::Added),
+        ],
+    };
+    let rev = revision();
+    let a = Assembly {
+        project: &project,
+        findings: &[],
+        revision: &rev,
+        since: Some(&since),
+    };
+    let t = target(&project, "html");
+    let template = String::from_utf8(
+        kiln_index::FileSource::read(&source, "design/templates/doc.md").unwrap(),
+    )
+    .unwrap();
+    let all = vec![prepare(&t, Some(&template), &a)];
+    let mut resolved = all.clone();
+    resolve_all(&mut resolved, &all, &project);
+    let files = render_files(
+        &resolved[0],
+        &resolved,
+        &RepoLinks::None,
+        None,
+        &FakePictures,
+        &source,
+    );
+    let html = String::from_utf8(files[0].1.clone()).unwrap();
+    assert!(
+        html.contains(
+            "REQ-002 Fast enough to be a reflex <span class=\"status yellow\">Changed</span></h"
+        ),
+        "{html}"
+    );
+    assert!(
+        html.contains("REQ-003 Themes follow Fenix <span class=\"status green\">New</span></h"),
+        "{html}"
+    );
+    assert!(
+        !html.contains("REQ-001 Flint is a launcher <span"),
+        "unchanged: no marker"
+    );
+    // Anchors and titles don't move with a baseline.
+    let without = prepared(&project, &source, &["html"]);
+    let ids = |p: &Prepared| {
+        let mut out = Vec::new();
+        fn walk(nodes: &[Node], out: &mut Vec<String>) {
+            for n in nodes {
+                if let Node::Section(s) = n {
+                    out.push(s.heading_text());
+                    walk(&s.nodes, out);
+                }
+            }
+        }
+        for page in &p.split.pages {
+            walk(&page.nodes, &mut out);
+        }
+        out
+    };
+    assert_eq!(ids(&resolved[0]), ids(&without[0]));
 }

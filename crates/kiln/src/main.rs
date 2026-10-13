@@ -202,6 +202,9 @@ enum Command {
         /// Send pages retired more than DAYS days ago to the trash.
         #[arg(long, value_name = "DAYS")]
         prune_removed: Option<u32>,
+        /// Mark what changed since REV (a tag, branch or commit) and fill the changes report.
+        #[arg(long, value_name = "REV")]
+        since: Option<String>,
         #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
         format: TextOrJson,
     },
@@ -216,14 +219,39 @@ enum Command {
         #[arg(long, default_value = "k")]
         prefix: String,
     },
+    /// Confluence: read what readers left on the published pages.
+    Confluence {
+        #[command(subcommand)]
+        what: ConfluenceCommand,
+    },
     /// Store a token in the OS credential store, prompting without echo.
     Auth {
         #[command(subcommand)]
         service: AuthService,
     },
+    /// Items added, removed and changed between two revisions (or a revision and the working tree).
+    Diff {
+        /// `REV` (to the working tree) or `REV..REV`: a tag, branch or commit.
+        range: String,
+        #[arg(long = "type", value_name = "TYPE")]
+        type_name: Option<String>,
+        #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
+        format: TextOrJson,
+    },
     /// Everything that reaches an item by links or parents, transitively.
     Impact {
         id: String,
+        #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
+        format: TextOrJson,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfluenceCommand {
+    /// Unresolved footer comments on each target's pages, per item.
+    Comments {
+        /// Confluence targets (default: all).
+        names: Vec<String>,
         #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
         format: TextOrJson,
     },
@@ -283,6 +311,11 @@ fn main() -> ExitCode {
         }
         Command::Trace { type_name, format } => cmd::trace::run(project, type_name, format),
         Command::Impact { id, format } => cmd::impact::run(project, &id, format),
+        Command::Diff {
+            range,
+            type_name,
+            format,
+        } => cmd::diff::run(project, &range, type_name, format),
         Command::Export {
             names,
             dry_run,
@@ -295,6 +328,7 @@ fn main() -> ExitCode {
             force,
             adopt,
             prune_removed,
+            since,
             format,
         } => cmd::export::run(
             project,
@@ -310,9 +344,13 @@ fn main() -> ExitCode {
                 force,
                 adopt,
                 prune_removed,
+                since,
                 format,
             },
         ),
+        Command::Confluence {
+            what: ConfluenceCommand::Comments { names, format },
+        } => cmd::confluence::comments(project, names, format),
         Command::Auth {
             service: AuthService::Confluence { forget },
         } => cmd::auth::confluence(project, forget),

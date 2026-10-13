@@ -2,6 +2,8 @@
 
 pub mod auth;
 pub mod check;
+pub mod confluence;
+pub mod diff;
 pub mod edit;
 pub mod export;
 pub mod impact;

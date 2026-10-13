@@ -35,6 +35,8 @@ pub struct Extra {
     /// (attachment id, file name, bytes)
     pub attachments: Vec<(String, String, Vec<u8>)>,
     pub restricted_to: Option<String>,
+    /// Footer comments: (id, author, body, resolved).
+    pub comments: Vec<(String, String, String, bool)>,
 }
 
 #[derive(Default)]
@@ -269,6 +271,47 @@ fn respond(
                 items,
                 start,
                 format!("/rest/api/content/{id}/child/page?limit=2&"),
+            ))
+        }
+        ("GET", ["rest", "api", "content", id, "child", "comment"]) if !cloud => {
+            let id = num(id);
+            let items = comments(&s, id)
+                .into_iter()
+                .map(|(c, author, body, resolved)| {
+                    let mut v = json!({
+                        "id": c, "type": "comment",
+                        "history": { "createdBy": { "displayName": author }, "createdDate": "2026-10-12T09:00:00.000Z" },
+                        "body": { "storage": { "value": body, "representation": "storage" } },
+                    });
+                    if resolved {
+                        v["extensions"] = json!({ "resolution": { "status": "resolved" } });
+                    }
+                    v
+                })
+                .collect();
+            ok(paged(
+                items,
+                start,
+                format!("/rest/api/content/{id}/child/comment?limit=2&"),
+            ))
+        }
+        ("GET", ["api", "v2", "pages", id, "footer-comments"]) if cloud => {
+            let id = num(id);
+            let items = comments(&s, id)
+                .into_iter()
+                .map(|(c, author, body, resolved)| {
+                    json!({
+                        "id": c, "pageId": id.to_string(),
+                        "version": { "authorId": format!("acc-{author}"), "createdAt": "2026-10-12T09:00:00.000Z" },
+                        "body": { "storage": { "value": body, "representation": "storage" } },
+                        "resolutionStatus": if resolved { "resolved" } else { "open" },
+                    })
+                })
+                .collect();
+            ok(paged(
+                items,
+                start,
+                format!("/wiki/api/v2/pages/{id}/footer-comments?limit=2&"),
             ))
         }
         ("GET", ["rest", "api", "content", id, "descendant", "page"]) if !cloud => {
@@ -586,6 +629,13 @@ fn labels(s: &State, id: u64) -> Reply {
         .map(|e| e.labels.iter().map(|l| json!({ "name": l })).collect())
         .unwrap_or_default();
     ok(json!({ "results": names }))
+}
+
+fn comments(s: &State, id: u64) -> Vec<(String, String, String, bool)> {
+    s.extra
+        .get(&id)
+        .map(|e| e.comments.clone())
+        .unwrap_or_default()
 }
 
 fn attachments(s: &State, id: u64) -> Reply {

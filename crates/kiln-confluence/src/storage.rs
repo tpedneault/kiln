@@ -138,8 +138,12 @@ impl Emitter<'_> {
             SectionKind::Item(id) => macro_empty("anchor", &[("", &id.to_string())]),
             _ => String::new(),
         };
+        let marker = s
+            .marker_inline()
+            .map(|m| format!(" {}", self.inlines(&[m])))
+            .unwrap_or_default();
         format!(
-            "<h{level}>{anchor}{}</h{level}>{}",
+            "<h{level}>{anchor}{}{marker}</h{level}>{}",
             esc(&s.heading_text()),
             self.nodes(&s.nodes)
         )

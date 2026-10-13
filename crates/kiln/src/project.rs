@@ -57,6 +57,31 @@ pub fn load(project: Option<&Path>) -> Result<Loaded, Fail> {
     Ok(Loaded { source, project })
 }
 
+/// The project as it was at a git revision, and that revision's commit:
+/// its `kiln.toml` and Markdown files read from git, not the disk. Code
+/// isn't read (the item diff doesn't compare code references). A
+/// revision from before the project had a `kiln.toml` reads with today's
+/// configuration and no items, so everything shows as added.
+pub fn at_revision(root: &Path, rev: &str) -> Result<(Project, String), Fail> {
+    let commit = kiln_git::resolve(root, rev).map_err(|e| Fail::usage(format!("{rev}: {e}")))?;
+    let files = kiln_git::files_at(root, &commit, &|p| {
+        p == kiln_parse::CONFIG_FILE || p.ends_with(".md")
+    })
+    .map_err(|e| Fail::usage(format!("{rev}: {e}")))?;
+    let mut source = kiln_index::MemorySource::new();
+    let has_config = files.iter().any(|(p, _)| p == kiln_parse::CONFIG_FILE);
+    for (path, bytes) in &files {
+        source.insert(path, bytes);
+    }
+    if !has_config {
+        let today = std::fs::read(root.join(kiln_parse::CONFIG_FILE))
+            .map_err(|e| Fail::usage(format!("kiln.toml: {e}")))?;
+        source = kiln_index::MemorySource::new().with(kiln_parse::CONFIG_FILE, today);
+    }
+    let project = Project::load(&source).map_err(|e| Fail::usage(format!("{rev}: its {e}")))?;
+    Ok((project, commit))
+}
+
 /// Kiln's own folders: `KILN_HOME`, else the platform's.
 pub fn folders() -> Option<kiln_model::Folders> {
     let home = std::env::var_os("KILN_HOME").map(std::path::PathBuf::from);

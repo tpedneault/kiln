@@ -356,15 +356,7 @@ fn target(
         Some(list) => {
             let mut out = Vec::new();
             for (r, span) in list {
-                if r == "changes" {
-                    invalid(
-                        w,
-                        span,
-                        "the `changes` report needs `kiln export --since`, which arrives in K6"
-                            .into(),
-                    );
-                    ok = false;
-                } else if REPORTS.contains(&r.as_str()) {
+                if REPORTS.contains(&r.as_str()) {
                     out.push(r);
                 } else {
                     invalid(
@@ -730,8 +722,8 @@ path = "out/e2.html"
         assert_eq!(
             codes,
             [
-                "K005@4", "K005@7", "K005@15", "K005@11", "K005@22", "K005@22", "K003@28",
-                "K005@32", "K005@29"
+                // `changes` is a report now; only `gossip` on line 22 isn't.
+                "K005@4", "K005@7", "K005@15", "K005@11", "K005@22", "K003@28", "K005@32", "K005@29"
             ]
         );
     }

@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use serde_json::{json, Value};
 
 use crate::client::{
-    parse_property, query, Body, ClientError, Confluence, Created, Http, Identity,
+    parse_property, query, Body, ClientError, Comment, Confluence, Created, Http, Identity,
 };
 use crate::model::{KilnProperty, RemotePage};
 
@@ -339,5 +339,33 @@ impl Confluence for Cloud {
         self.http
             .request("DELETE", &format!("/api/v2/pages/{id}"), Body::None)?;
         Ok(())
+    }
+
+    fn comments(&self, id: u64) -> Result<Vec<Comment>, ClientError> {
+        let all = self.http.get_all(&format!(
+            "/api/v2/pages/{id}/footer-comments?body-format=storage&limit=100"
+        ))?;
+        Ok(all
+            .iter()
+            .map(|c| Comment {
+                id: c["id"].as_str().unwrap_or_default().to_owned(),
+                author: c
+                    .pointer("/version/authorId")
+                    .and_then(Value::as_str)
+                    .unwrap_or("someone")
+                    .to_owned(),
+                created: c
+                    .pointer("/version/createdAt")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                body: c
+                    .pointer("/body/storage/value")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                resolved: c["resolutionStatus"].as_str() == Some("resolved"),
+            })
+            .collect())
     }
 }

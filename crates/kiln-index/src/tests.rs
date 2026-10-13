@@ -418,3 +418,37 @@ fn updating_one_file_equals_loading_again() {
     }
     assert!(p.item(&id("REQ-077")).is_none());
 }
+
+#[test]
+// verifies: REQ-016
+fn diff_names_added_removed_and_changed_items() {
+    let old = source();
+    let mut new = old.clone();
+    new.insert(
+        "design/TEST-001.md",
+        item("TEST-001", "test", "failing", "tags = [\"slow\"]\n[links]\nverifies = [\"REQ-002\", \"REQ-004\"]\n+++\nSee [[REQ-003]] and REQ-001, again.\n"),
+    );
+    new.remove("design/TASK-003.md");
+    new.insert("design/RISK-001.md", item("RISK-001", "risk", "open", ""));
+    new.remove("design/MS-002.md");
+    new.insert(
+        "design/milestones/MS-002.md",
+        item("MS-002", "milestone", "planned", ""),
+    );
+    let changes = crate::diff(&Project::load(&old).unwrap(), &Project::load(&new).unwrap());
+    let lines: Vec<String> = changes
+        .iter()
+        .map(|c| format!("{} {} {}", c.kind.as_str(), c.id, c.summary()))
+        .collect();
+    assert_eq!(
+        lines,
+        [
+            "changed MS-002 moved design/MS-002.md → design/milestones/MS-002.md",
+            "changed TEST-001 status passing → failing; + verifies REQ-004; tags (none) → slow; body",
+            "added RISK-001 ",
+            "removed TASK-003 ",
+        ]
+    );
+    let same = crate::diff(&Project::load(&old).unwrap(), &Project::load(&old).unwrap());
+    assert!(same.is_empty());
+}

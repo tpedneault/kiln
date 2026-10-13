@@ -19,8 +19,8 @@ is a few keystrokes away).
 
 **Status:** the file format, `kiln check`, the editing commands,
 exports to Markdown and HTML, publishing to Confluence (Cloud and Data
-Center), the language server for Fenix and other editors, and the Flint
-provider work (K1–K5). Kiln's own requirements and decisions live
+Center), the language server for Fenix and other editors, the Flint
+provider, and diffs against a baseline work (K1–K6). Kiln's own requirements and decisions live
 in [design/](design/), and its generated design document in
 [docs/generated/DESIGN.md](docs/generated/DESIGN.md).
 

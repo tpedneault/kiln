@@ -1,21 +1,50 @@
 //! The report builders (EXPORT.md, "Reports"): traceability, findings,
-//! roadmap and risks, as the same document tree bodies render to. The
-//! `changes` report needs `--since` and arrives in K6.
+//! roadmap, risks and (with `kiln export --since`) changes, as the same
+//! document tree bodies render to.
 //!
 //! Some reports name FORMAT.md's default types on purpose (`milestone`,
 //! `risk`, `part-of`, `mitigates`): that is what they report on, and a
 //! project without them gets an empty report that says so.
 
-use kiln_index::{Project, Source};
+use kiln_index::{ChangeKind, ItemChange, Project, Source};
 use kiln_model::{Finding, Item};
 
 use crate::doc::{Align, Block, Inline, Table, Target, Tone};
 
-/// What a report directive or target may say.
+/// What a report directive or target may say, and the baseline when the
+/// export has one.
 #[derive(Debug, Clone, Default)]
-pub struct ReportOptions {
+pub struct ReportOptions<'a> {
     /// `traceability`: the type to trace (default `requirement`).
     pub type_name: Option<String>,
+    /// `--since`: what the `changes` report lists.
+    pub since: Option<&'a Since>,
+}
+
+/// The baseline of `kiln export --since REV`: the revision as given, its
+/// commit, and every item change from it to what is exported.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Since {
+    pub label: String,
+    pub commit: String,
+    pub changes: Vec<ItemChange>,
+}
+
+impl Since {
+    /// `v1.0 (1a2b3c4)`.
+    pub fn describe(&self) -> String {
+        let short = &self.commit[..self.commit.len().min(7)];
+        if self.label.starts_with(short) {
+            short.to_owned()
+        } else {
+            format!("{} ({short})", self.label)
+        }
+    }
+
+    /// Whether `id` was added or changed since the baseline.
+    pub fn kind_of(&self, id: &kiln_model::ItemId) -> Option<ChangeKind> {
+        self.changes.iter().find(|c| &c.id == id).map(|c| c.kind)
+    }
 }
 
 /// The lozenge colour for an item's status: initial grey, done green,
@@ -41,6 +70,7 @@ pub fn report(
         "findings" => Some(findings_report(findings)),
         "roadmap" => Some(roadmap(project)),
         "risks" => Some(risks(project)),
+        "changes" => Some(changes(options.since)),
         _ => None,
     }
 }
@@ -312,4 +342,69 @@ fn risks(project: &Project) -> Vec<Block> {
         })
         .collect();
     vec![table(&["Risk", "Title", "Status", "Mitigated by"], rows)]
+}
+
+/// Items added, changed and removed since the baseline, one row each; a
+/// paragraph saying how to get them when there is no baseline.
+fn changes(since: Option<&Since>) -> Vec<Block> {
+    let Some(since) = since else {
+        return vec![Block::Paragraph(vec![
+            Inline::text("No baseline: export with "),
+            Inline::Code("kiln export --since REV".into()),
+            Inline::text(" to list what changed."),
+        ])];
+    };
+    let count = |k| since.changes.iter().filter(|c| c.kind == k).count();
+    let intro = Block::Paragraph(vec![Inline::text(format!(
+        "Since {}: {} added, {} changed, {} removed.",
+        since.describe(),
+        count(ChangeKind::Added),
+        count(ChangeKind::Changed),
+        count(ChangeKind::Removed)
+    ))]);
+    if since.changes.is_empty() {
+        return vec![intro];
+    }
+    let rows = since
+        .changes
+        .iter()
+        .map(|c| {
+            let item = match c.kind {
+                // Gone from the document: nothing to link to.
+                ChangeKind::Removed => vec![Inline::text(format!("{} {}", c.id, c.title))],
+                _ => vec![
+                    Inline::Ref {
+                        id: c.id.clone(),
+                        text: Some(c.id.to_string()),
+                    },
+                    Inline::text(format!(" {}", c.title)),
+                ],
+            };
+            let (text, tone) = match c.kind {
+                ChangeKind::Added => ("New", Tone::Green),
+                ChangeKind::Changed => ("Changed", Tone::Yellow),
+                ChangeKind::Removed => ("Removed", Tone::Grey),
+            };
+            vec![
+                item,
+                vec![Inline::Status {
+                    text: text.into(),
+                    tone,
+                }],
+                vec![Inline::text(c.summary())],
+            ]
+        })
+        .collect();
+    vec![
+        intro,
+        Block::Table(Table {
+            align: vec![Align::None, Align::None, Align::None],
+            header: vec![
+                vec![Inline::text("Item")],
+                vec![Inline::text("Change")],
+                vec![Inline::text("What")],
+            ],
+            rows,
+        }),
+    ]
 }

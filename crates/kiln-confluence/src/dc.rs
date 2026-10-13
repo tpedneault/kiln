@@ -3,7 +3,7 @@
 use serde_json::{json, Value};
 
 use crate::client::{
-    parse_property, query, Body, ClientError, Confluence, Created, Http, Identity,
+    parse_property, query, Body, ClientError, Comment, Confluence, Created, Http, Identity,
 };
 use crate::model::{KilnProperty, RemotePage};
 
@@ -276,6 +276,38 @@ impl Confluence for DataCenter {
         self.http
             .request("DELETE", &format!("/rest/api/content/{id}"), Body::None)?;
         Ok(())
+    }
+
+    fn comments(&self, id: u64) -> Result<Vec<Comment>, ClientError> {
+        let all = self.http.get_all(&format!(
+            "/rest/api/content/{id}/child/comment?expand=body.storage,history,extensions.resolution&depth=all&limit=100"
+        ))?;
+        Ok(all
+            .iter()
+            .map(|c| Comment {
+                id: c["id"].as_str().unwrap_or_default().to_owned(),
+                author: c
+                    .pointer("/history/createdBy/displayName")
+                    .or_else(|| c.pointer("/history/createdBy/username"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("someone")
+                    .to_owned(),
+                created: c
+                    .pointer("/history/createdDate")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                body: c
+                    .pointer("/body/storage/value")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                resolved: c
+                    .pointer("/extensions/resolution/status")
+                    .and_then(Value::as_str)
+                    == Some("resolved"),
+            })
+            .collect())
     }
 }
 

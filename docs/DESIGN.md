@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0–K4 done (the format, `kiln check`, the editing commands, exports to Markdown and HTML, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, this repository's own `design/` and generated design document); K6 next. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
+Status: K0–K6 done (the format, `kiln check`, the editing commands, exports to Markdown and HTML, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, this repository's own `design/` and generated design document); K7 next. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -188,11 +188,11 @@ nearest `kiln.toml` (`--project <dir>` overrides).
 | `kiln impact <ID>` | everything that links to it, transitively, by path | K1 |
 | `kiln export [NAME…] --dry-run` / `--check` | renders every (or the named) export target and shows what would change; `--check` exits 1 if anything would; Confluence targets plan against the live space or `--snapshot FILE` | K2 |
 | `kiln export [NAME…]` | writes file targets (K2) and publishes Confluence targets (K3); all flags in EXPORT.md and CONFLUENCE.md | K2 / K3 |
-| `kiln confluence comments` | unresolved footer comments on published pages, per item, with links | K6 |
+| `kiln confluence comments [EXPORT…]` | unresolved footer comments on published pages, per item, with links | K6 |
 | `kiln auth confluence` / `auth jira` | stores a token in the OS credential store, prompting without echo | K3 / K8 |
 | `kiln lsp` | language server on stdio | K4 |
 | `kiln provider` | Flint provider on stdio | K5 |
-| `kiln diff <REV>[..<REV>]` | item-level changes between revisions | K6 |
+| `kiln diff <REV>[..<REV>]` | item-level changes between revisions, or a revision and the working tree (FORMAT.md, "Baselines") | K6 |
 | `kiln` (no arguments) | the GUI | K7 |
 
 Errors are one line on stderr naming what failed and why, with the file

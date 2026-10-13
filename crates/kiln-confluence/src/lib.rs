@@ -22,6 +22,7 @@ mod apply;
 mod cache;
 mod client;
 mod cloud;
+pub mod comments;
 mod dc;
 mod desired;
 mod model;
@@ -32,7 +33,7 @@ mod storage;
 
 pub use apply::{apply, Applied, ApplyOptions};
 pub use cache::{cache_file_name, CachedPage, PageCache};
-pub use client::{connect, ClientError, Confluence, Created, ErrorKind, Http, Identity};
+pub use client::{connect, ClientError, Comment, Confluence, Created, ErrorKind, Http, Identity};
 pub use desired::{desired_pages, titles, DesiredContext, DesiredPage, MAX_TITLE};
 pub use model::{KilnProperty, RemotePage, Snapshot};
 pub use normalise::{body_hash, hash, normalise};
