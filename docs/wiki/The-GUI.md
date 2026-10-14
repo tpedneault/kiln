@@ -270,7 +270,7 @@ font_size = 15            # points, 8 to 40; default 15
 
 | Key | Values |
 |---|---|
-| `theme` | `Orbit Dark` (default), `TempleOS`, `Gruvbox Dark`, `Nord`, `Dracula`, `Solarized Dark`, `One Dark`, `Visual Studio Dark`. Case doesn't matter |
+| `theme` | `Orbit Dark` (default), `TempleOS`, `Gruvbox Dark`, `Nord`, `Dracula`, `Solarized Dark`, `One Dark`, `Visual Studio Dark`, `Catppuccin Latte`, `Catppuccin Frappé`, `Catppuccin Macchiato`, `Catppuccin Mocha`. Case doesn't matter |
 | `font` | the name of a monospace font family installed on the system |
 | `font_size` | a number from 8 to 40 |
 

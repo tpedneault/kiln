@@ -104,6 +104,9 @@ All notable changes to Kiln are recorded here. The format follows
   Linux after the CI gates pass on the building runner, and publishes
   them with checksums and the changelog section as a GitHub release
   ([docs/CI.md](docs/CI.md), "Releasing").
+- Catppuccin themes in the GUI: `theme` takes `Catppuccin Latte`,
+  `Catppuccin Frappé`, `Catppuccin Macchiato` and `Catppuccin Mocha`,
+  Fenix's colours for them.
 
 ### Changed
 
