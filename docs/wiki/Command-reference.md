@@ -63,7 +63,7 @@ Writes `kiln.toml` with the seven default types (requirement, design, decision, 
 | Option | Does |
 |---|---|
 | `--name NAME` | the project's name in reports and exports. Default: the folder's name |
-| `--fenix` | also registers `kiln lsp` as the Markdown language server in `.fenix/tools.json`, for the Fenix editor. It merges into an existing file and leaves another Markdown server alone. In a folder that already has a `kiln.toml`, `kiln init --fenix` does only this |
+| `--fenix` | also registers `kiln lsp` in `.fenix/tools.json` as an additional language server for the Fenix editor, beside each language's own, for Markdown and the languages of the code `[code] paths` scans. It merges into an existing file. In a folder that already has a `kiln.toml`, `kiln init --fenix` does only this; run it again after adding `[code] paths` |
 | `--project DIR` | writes the project in `DIR` instead of the current folder |
 
 ```console
@@ -77,14 +77,14 @@ $ echo $?
 2
 $ kiln init --fenix
 .fenix/tools.json
-kiln: Fenix now runs `kiln lsp` for Markdown in this project (restart its language server to pick it up)
+kiln: Fenix now runs `kiln lsp` beside each language's own server for markdown in this project (`:lsp-restart` to pick it up)
 ```
 
 Notes:
 
 - The files written go to stdout, one per line; the message goes to stderr.
 - Source code is not scanned for code references until you add a `[code]` section to `kiln.toml`. The generated file has one commented out. See [Configuration](Configuration).
-- When `.fenix/tools.json` already names another Markdown server, `--fenix` says `left it alone` and changes nothing.
+- `--fenix` keeps everything else in `.fenix/tools.json`, including another Markdown server, which stays the primary one. Kiln's older entry (Kiln as the Markdown server) is moved to the additional form. See [Editors and Flint](Editors-and-Flint#setting-it-up-in-fenix).
 
 ### kiln new
 
@@ -590,7 +590,7 @@ Notes: without a display, `kiln gui` fails with one line and exit 2. On Windows,
 kiln lsp
 ```
 
-A language server on stdin and stdout, for Fenix or any editor that speaks the Language Server Protocol (LSP). It finds the project from the editor's workspace folder, or from the first file opened. It never writes a file. You don't run it yourself; your editor starts it. [Editors and Flint](Editors-and-Flint) covers what it offers and how to set it up.
+A language server on stdin and stdout, for Fenix or any editor that speaks the Language Server Protocol (LSP). It serves item files, and code files when your editor runs it beside their own server. It finds the project from the editor's workspace folder, or from the first file opened. It never writes a file. You don't run it yourself; your editor starts it. [Editors and Flint](Editors-and-Flint) covers what it offers and how to set it up.
 
 ### kiln provider
 

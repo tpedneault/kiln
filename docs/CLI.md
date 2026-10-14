@@ -23,11 +23,15 @@ Never overwrites: with a `kiln.toml` already there it stops (exit 2). Add
 a `[code]` section yourself to have source code scanned for code
 references.
 
-`--fenix` also registers `kiln lsp` as the Markdown language server in
-`.fenix/tools.json` (`"lsp": {"markdown": {"executable": "kiln", "args":
-["lsp"]}}`), merging into an existing file and leaving another Markdown
-server alone. In a project that already has a `kiln.toml`, `kiln init
---fenix` does only that.
+`--fenix` also registers `kiln lsp` in `.fenix/tools.json` as an
+additional language server (`"lsp": {"additional": [{"name": "kiln",
+"executable": "kiln", "args": ["lsp"], "languages": [...]}]}`), beside each
+language's own server, for Markdown and the language of every code file
+`[code] paths` scans. It merges into an existing file, keeps languages
+added by hand, and moves the older form (Kiln as the Markdown server) over.
+In a project that already has a `kiln.toml`, `kiln init --fenix` does only
+that; run it again after adding `[code] paths` to add their languages. It
+needs a Fenix with additional servers (`471ed09` or later).
 
 ### `kiln new TYPE [--parent ID] [--title TEXT] [--open]`
 
@@ -245,6 +249,14 @@ to run instead (`kiln new … --open`). Fenix can't yet (INTEGRATION.md,
 G7). Files changed outside the editor are noticed within a few seconds.
 A Markdown file outside the project gets empty answers. Messages from
 the server itself go nowhere: stdout is the protocol.
+
+Run beside a code file's own server (Fenix's additional servers, or any
+editor that allows several servers per file), it also answers in the code
+files `[code] paths` scans: IDs complete after a role word
+(`// implements: REQ-0`), IDs have hover, definition and references, and
+code references that name a missing ID or a role code may not use are
+diagnostics as you type. It leaves formatting and code actions in code
+files to that file's own server.
 
 ### `kiln confluence comments [EXPORT…] [--format text|json]`
 

@@ -277,7 +277,7 @@ changelog line.
 | K1 | The format: `kiln-model`, `kiln-parse`, `kiln-index`, `kiln-check`, `kiln-git` (commit id only); `init`, `new`, `list`, `show`, `check`, `set`/`link`/`unlink`, `renumber`, `trace`, `impact`; this repository's own `design/` folder describing Kiln (dogfooding); benchmark gate | — |
 | K2 | Exports without writes to Confluence: `kiln-render`, `kiln-export` (targets, templates, the three layouts, reports, diagrams), the Markdown and HTML formats end to end, and the Confluence emitter and planner with `--dry-run` against a recorded snapshot and a live space (read-only calls) | — |
 | K3 | Confluence publishing on Cloud and Data Center: create, update, move, adopt a page, labels, attachments, properties, drift detection, retired pages, size limits, rate limiting, `auth confluence`, CI recipes | — (G2 for fonts in slim CI images) |
-| K4 | `kiln lsp`: completion, hover, definition, references, rename, diagnostics, code actions, formatting, for item files | — (G3 for code files; G7 for file renames and creation, G8 for file notifications, both worked around) |
+| K4 | `kiln lsp`: completion, hover, definition, references, rename, diagnostics, code actions, formatting, for item files | — (G3 for code files, since resolved in Fenix; G7 for file renames and creation, G8 for file notifications, both worked around) |
 | K5 | `kiln provider` for Flint: items, open in Fenix at a line, copy, set status, open in Confluence | — (G1 for clock-in without an existing agenda task) |
 | K6 | `kiln diff` and baselines; `export --since` (the changes report and the in-place markers); `kiln confluence comments` | — |
 | K7 | GUI: Tree, Trace, Impact first; Board, Roadmap, Decisions, Changes after | — |

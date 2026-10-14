@@ -108,6 +108,15 @@ All notable changes to Kiln are recorded here. The format follows
   `Catppuccin Frappé`, `Catppuccin Macchiato` and `Catppuccin Mocha`,
   Fenix's colours for them.
 
+- Code files in the editor: run beside a language's own server (Fenix's
+  additional servers, which close INTEGRATION.md's G3), `kiln lsp`
+  completes IDs after `implements:` and `verifies:`, shows hover,
+  definition and references on IDs, and reports broken code references as
+  you type. `kiln init --fenix` registers Kiln as an additional server for
+  Markdown and the project's code languages, moving the older
+  Markdown-only form over ([docs/CLI.md](docs/CLI.md),
+  [docs/INTEGRATION.md](docs/INTEGRATION.md)).
+
 ### Changed
 
 - Exports written into the repository link files relatively and name no

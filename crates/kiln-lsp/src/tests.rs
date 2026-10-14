@@ -562,3 +562,69 @@ fn markdown_outside_the_project_is_harmless() {
     );
     assert_eq!(c.request("textDocument/formatting", json!({ "textDocument": { "uri": c.uri("README.md") }, "options": { "tabSize": 4, "insertSpaces": true } })), Value::Null);
 }
+
+#[test]
+// verifies: REQ-008
+fn code_files_beside_their_own_language_server() {
+    // As Fenix runs it as an additional server on a `.rs` buffer.
+    let dir = tempfile::tempdir().unwrap();
+    project(dir.path());
+    let mut c = Client::start(dir.path(), &[]);
+    let labels = |v: &Value| -> Vec<String> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|i| i["label"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let code = "src/lib.rs";
+    let role = "implements";
+
+    // After the role word: the IDs that role may point at (requirements),
+    // without those already listed; a finished list offers nothing.
+    let text = format!("fn main() {{}}\n// {role}: REQ-001, RE\n");
+    c.open(code, Some(&text));
+    let got = c.request("textDocument/completion", c.at(code, 1, 26));
+    assert_eq!(labels(&got), ["REQ-002"]);
+    assert_eq!(got[0]["textEdit"]["range"]["start"]["character"], 24);
+    c.change(code, &format!("fn main() {{}}\n// {role}: \n"));
+    let got = c.request("textDocument/completion", c.at(code, 1, 15));
+    assert_eq!(labels(&got), ["REQ-001", "REQ-002"]);
+    c.change(code, &format!("fn main() {{}}\n// {role}: REQ-001 \n"));
+    assert_eq!(
+        labels(&c.request("textDocument/completion", c.at(code, 1, 23))),
+        Vec::<String>::new()
+    );
+    // Ordinary code completes nothing: that is the primary server's.
+    c.change(code, "fn main() { let x = REQ }\n");
+    assert_eq!(
+        labels(&c.request("textDocument/completion", c.at(code, 0, 23))),
+        Vec::<String>::new()
+    );
+
+    // A code reference to an ID that doesn't exist is a diagnostic on the
+    // buffer, from the editor's text, not the disk's.
+    c.change(code, &format!("fn main() {{}}\n// {role}: REQ-099\n"));
+    let found = loop {
+        let d = c.diagnostics(code);
+        if !d.is_empty() {
+            break d;
+        }
+    };
+    assert_eq!(codes(&found), ["K102 1:15"]);
+
+    // Hover and definition on an ID in a comment.
+    c.change(code, &format!("fn main() {{}}\n// {role}: REQ-001\n"));
+    let hover = c.request("textDocument/hover", c.at(code, 1, 18));
+    let shown = hover["contents"]["value"].as_str().unwrap();
+    assert!(shown.starts_with("REQ-001 Fast start"), "{shown}");
+    let def = c.request("textDocument/definition", c.at(code, 1, 18));
+    assert!(def.to_string().contains("REQ-001-fast-start.md"), "{def}");
+
+    // Formatting is the code's own server's: nothing from Kiln.
+    let fmt = c.request(
+        "textDocument/formatting",
+        json!({ "textDocument": { "uri": c.uri(code) }, "options": { "tabSize": 4, "insertSpaces": true } }),
+    );
+    assert_eq!(fmt, Value::Null);
+}
