@@ -60,6 +60,44 @@ run writes its logs to a new folder under `target/ci/`, with a
 `summary.json` of exit codes and timings; CI uploads that folder even
 when a gate fails.
 
+## Releasing
+
+The `Release` workflow (`.github/workflows/release.yml`) runs when a tag
+`vX.Y.Z` is pushed, and nothing else publishes. `scripts/release.ps1`
+holds its steps, so they run the same locally:
+
+1. **prepare**: `release.ps1 -Step check` fails unless the tag's version
+   is the `[workspace.package] version` in `Cargo.toml` and
+   `CHANGELOG.md` has a dated `## [X.Y.Z] - YYYY-MM-DD` section, so the
+   tag, `kiln --version` and the notes agree. It then drafts the release
+   with that section as its notes (`-Step notes`, relative links pointed
+   at the tag). A version with a suffix (`v1.0.0-rc.1`) is a pre-release.
+2. **build**, on `windows-2022` and `ubuntu-22.04`: the same gates as CI
+   (`scripts/ci.ps1`), then `-Step package`: `cargo build --release
+   --locked -p kiln`, an archive `kiln-<version>-<target>` (`.zip` on
+   Windows, `.tar.gz` on Linux) with `kiln`, `kilnw`, the readme,
+   changelog and licences, a `.sha256` beside it, and a check that the
+   archived `kiln --version` says the tagged version. Both are uploaded
+   to the draft. Linux builds on the older runner so the binary needs
+   glibc 2.35 at most (Ubuntu 22.04, Debian 12 and newer); it links only
+   libc, libm and libgcc, the display and GPU libraries being loaded at
+   run time by the GUI alone.
+3. **publish**: undrafts the release once every archive is there.
+
+To release:
+
+1. On a branch, set `version` in `Cargo.toml`'s `[workspace.package]`
+   (and let `cargo` update `Cargo.lock`), and move everything under
+   `## [Unreleased]` into a new `## [X.Y.Z] - <today>` section below it,
+   leaving `## [Unreleased]` empty. Merge it.
+2. Tag the merge commit and push the tag: `git tag vX.Y.Z && git push
+   origin vX.Y.Z`.
+
+When a step fails, the release stays a draft: delete it and the tag
+(`git push origin :refs/tags/vX.Y.Z`), fix the cause on `master`, and tag
+again. The token the workflow uses can write releases (`contents:
+write`) only in its three jobs; nothing else in either workflow can.
+
 ## Limits
 
 Tests marked `#[ignore]` need a live service or a manual setup and are
