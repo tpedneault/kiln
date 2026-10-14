@@ -29,9 +29,11 @@ crates/kiln-check/examples/bench.rs   the benchmark gate (check and export)
 crates/*/golden/      golden files (KILN_BLESS=1 rewrites them)
 scripts/ci.ps1        the gates, locally and in CI (CI.md)
 scripts/release.ps1   a release's steps: check, notes, package (CI.md)
-.github/workflows/    CI on Windows and Linux; releases from a tag
+scripts/wiki-links.ps1  checks the links between wiki pages (CI.md)
+.github/workflows/    CI on Windows and Linux; releases from a tag; the wiki
 docs/                 design (DESIGN, FORMAT, EXPORT, CONFLUENCE,
-                      INTEGRATION) and user docs (CLI, later CONFIGURATION)
+                      INTEGRATION) and user docs (CLI, CONFIGURATION,
+                      wiki/: the user guide published to the GitHub wiki)
 ```
 
 

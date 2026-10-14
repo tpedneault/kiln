@@ -44,6 +44,8 @@ try {
     # Its committed design document (docs/generated/DESIGN.md) is current
     # (K2 dogfooding); when this fails, run `kiln export` and commit.
     Invoke-Gate 'kiln-export' 'cargo' @('run', '--locked', '--quiet', '-p', 'kiln', '--', 'export', '--check')
+    # The wiki's source (docs/wiki/): every link between pages resolves.
+    Invoke-Gate 'wiki-links' (Get-Process -Id $PID).Path @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'wiki-links.ps1'))
     # The budgets are requirements (DESIGN.md, "Performance"): fails when
     # `kiln check` on 2,000 items and 50k files is 50% over 2 s, or
     # `kiln export --dry-run` of that 2,000-item document 50% over 3 s.
