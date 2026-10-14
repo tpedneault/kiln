@@ -1,0 +1,1 @@
+This wiki is generated from [`docs/wiki/`](https://github.com/tpedneault/kiln/tree/master/docs/wiki) in Kiln's repository; edit it there, in a pull request. Pages edited here are overwritten on the next sync.

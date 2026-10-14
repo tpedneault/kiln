@@ -1,0 +1,56 @@
+name: Wiki
+
+# Publishes docs/wiki/ to the repository's GitHub wiki, so the wiki is
+# reviewed in pull requests like the rest of the docs (docs/CI.md,
+# "The wiki"). Pages are mirrored: a page removed or renamed in
+# docs/wiki/ disappears from the wiki, and edits made on the wiki are
+# overwritten. The wiki must exist first: create any page once on GitHub.
+
+on:
+  push:
+    branches: [master]
+    paths: ['docs/wiki/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish docs/wiki to the wiki
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Mirror the pages
+        env:
+          TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # The token travels in a header, never in a URL a log could show.
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)"
+          if ! git -c http.extraheader="$auth" clone --depth 1 "https://github.com/$REPO.wiki.git" wiki; then
+            echo "::error::The wiki isn't there yet: open the repository's Wiki tab on GitHub, create any page once, then run this workflow again."
+            exit 1
+          fi
+          find wiki -maxdepth 1 -name '*.md' -delete
+          cp docs/wiki/*.md wiki/
+          cd wiki
+          git add -A
+          if git diff --cached --quiet; then
+            echo "The wiki is already current."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Sync from $REPO@${SHA::7}"
+          git -c http.extraheader="$auth" push origin HEAD

@@ -94,6 +94,12 @@ All notable changes to Kiln are recorded here. The format follows
   and a proxy for Jira (G9) wait on Fenix
   ([docs/EXPORT.md](docs/EXPORT.md), [docs/INTEGRATION.md](docs/INTEGRATION.md),
   [docs/CLI.md](docs/CLI.md)).
+- The wiki: a user guide for designing a project with Kiln, from
+  installing and a tutorial to the design method and references for item
+  files, configuration, checks, exports, Confluence, Jira, the command
+  line, editors, the GUI and CI. Kept in `docs/wiki/`, published by the
+  `Wiki` workflow, its links checked by `scripts/ci.ps1`; the README
+  rewritten around it ([docs/CI.md](docs/CI.md), "The wiki").
 - Releases: a tag `vX.Y.Z` builds `kiln` and `kilnw` for Windows and
   Linux after the CI gates pass on the building runner, and publishes
   them with checksums and the changelog section as a GitHub release

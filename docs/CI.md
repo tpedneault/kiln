@@ -22,6 +22,7 @@ pages and keys are tested as a state machine producing text.
 | tests | `cargo test --locked --workspace --no-fail-fast` |
 | dogfood | `kiln check` on this repository's own `kiln.toml` and `design/` (errors fail; warnings are listed) |
 | dogfood export | `kiln export --check`: `docs/generated/DESIGN.md` is what `kiln export` would write now |
+| wiki links | `scripts/wiki-links.ps1`: every link between pages in `docs/wiki/` names a page that exists, and every `#anchor` a heading on it |
 | benchmark | `cargo run --release -p kiln-check --example bench -- --gate`: `kiln check` on a generated 2,000-item, 50,000-file project, failing above 3 s (50% over the 2 s budget); `kiln export --dry-run` of that project as one document, failing above 4.5 s (50% over 3 s); and a hundred keystrokes in one item file, each re-read alone and the project checked again as `kiln lsp` does, failing when the p95 is above 75 ms (50% over 50 ms); and the Flint provider's drill-down answers (`status`, `impact`, `all`), failing when the p95 is above 24 ms (50% over 16 ms) or the 2,000 static items come within 64 KiB of Flint's 4 MiB message limit |
 
 | Job | Runner | Notes |
@@ -59,6 +60,23 @@ The script uses the active toolchain and fails if any gate fails. Each
 run writes its logs to a new folder under `target/ci/`, with a
 `summary.json` of exit codes and timings; CI uploads that folder even
 when a gate fails.
+
+## The wiki
+
+The [wiki](https://github.com/tpedneault/kiln/wiki) is the user guide. Its
+source is `docs/wiki/`, one Markdown file per page, the file name being the
+page name (`Item-files.md` is the page "Item files"; `_Sidebar.md` and
+`_Footer.md` are GitHub's sidebar and footer). Pages link to each other as
+`[text](Page-Name)` or `[text](Page-Name#heading)`, without `.md`, which
+is how GitHub wikis link; the wiki-links gate checks every one.
+
+The `Wiki` workflow (`.github/workflows/wiki.yml`) publishes it: on each
+push to `master` that changes `docs/wiki/` (or when run by hand), it
+replaces the wiki's pages with those files and pushes, as
+`github-actions[bot]`, with the workflow's token. Edits made on GitHub's
+wiki pages are overwritten, so change the wiki in a pull request. The wiki
+must exist before the first run: open the repository's Wiki tab and
+create any page once.
 
 ## Releasing
 

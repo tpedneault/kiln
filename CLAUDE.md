@@ -83,8 +83,9 @@ auth jira`; Fenix gaps G6 and G9 worked around) are done.
   one line naming what failed and why, with file and line when known.
 - Secrets never in files, logs, plan output, errors or command lines.
 - Rendering is deterministic; golden files change only deliberately.
-- User docs (`docs/CONFIGURATION.md`, `docs/CLI.md`, and the five design
-  documents where behaviour changes) are updated in the same pull request.
+- User docs (`docs/CONFIGURATION.md`, `docs/CLI.md`, the wiki pages in
+  `docs/wiki/`, and the five design documents where behaviour changes) are
+  updated in the same pull request.
 - Licence: MIT OR Apache-2.0.
 
 ## What only Thomas can verify
@@ -125,6 +126,7 @@ docs/GUI.md           the GUI: pages, keys, looks, how it is built
 docs/CI.md            the gates and how to run them
 docs/CLI.md           the command line as it stands
 docs/CONFIGURATION.md kiln.toml and environment, the overview
+docs/wiki/            the user guide, published to the GitHub wiki (CI.md)
 kiln.toml, design/    Kiln's own Kiln project (dogfooding), checked in CI
 docs/generated/       its exported design document, `kiln export --check` in CI
 crates/               the workspace (kiln-* libraries, kiln binary)
