@@ -326,9 +326,12 @@ impl Server {
                 })
             }
             Formatting::METHOD => {
-                self.with_doc::<lsp_types::DocumentFormattingParams, _>(req, |_, _, _, doc, rel| {
-                    // Only item files have front matter to format.
-                    Ok(json(rel.map(|_| actions::format(doc))))
+                self.with_doc::<lsp_types::DocumentFormattingParams, _>(req, |s, _, _, doc, rel| {
+                    // Only item files have front matter to format; a code
+                    // file is its own language server's to format.
+                    let item_file = rel
+                        .filter(|r| s.world.project.as_ref().is_some_and(|p| p.in_item_paths(r)));
+                    Ok(json(item_file.map(|_| actions::format(doc))))
                 })
             }
             other => {

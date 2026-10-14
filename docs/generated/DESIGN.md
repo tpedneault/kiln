@@ -78,7 +78,7 @@ From DESIGN.md, goal 2.
 
 #### 2.2.1 REQ-016 Changes since a baseline are shown item by item
 
-**implemented** · under [REQ-002 Readable without Kiln](#22-req-002-readable-without-kiln) · implemented by [crates/kiln-index/src/diff.rs:240](../../crates/kiln-index/src/diff.rs#L240) · verified by [crates/kiln-index/src/tests.rs:423](../../crates/kiln-index/src/tests.rs#L423), [crates/kiln/tests/cli.rs:564](../../crates/kiln/tests/cli.rs#L564)
+**implemented** · under [REQ-002 Readable without Kiln](#22-req-002-readable-without-kiln) · implemented by [crates/kiln-index/src/diff.rs:240](../../crates/kiln-index/src/diff.rs#L240) · verified by [crates/kiln-index/src/tests.rs:423](../../crates/kiln-index/src/tests.rs#L423), [crates/kiln/tests/cli.rs:601](../../crates/kiln/tests/cli.rs#L601)
 
 A reader who saw the document at a release asks what changed since. `kiln diff v1.0` lists the items added, removed and changed (status, title, links, body…), and `kiln export --since v1.0` marks each new or changed item where it stands and lists them in the changes report.
 
@@ -126,7 +126,7 @@ Cold, on a laptop. The benchmark in `crates/kiln-check/examples/bench.rs` genera
 
 #### 2.4.2 REQ-008 Language server responds within 50 ms after a keystroke
 
-**implemented** · under [REQ-004 Fast and keyboard-first](#24-req-004-fast-and-keyboard-first) · implemented by [crates/kiln-index/src/project.rs:294](../../crates/kiln-index/src/project.rs#L294) · verified by [crates/kiln-check/examples/bench.rs:344](../../crates/kiln-check/examples/bench.rs#L344), [crates/kiln-index/src/tests.rs:365](../../crates/kiln-index/src/tests.rs#L365), [crates/kiln-lsp/src/tests.rs:207](../../crates/kiln-lsp/src/tests.rs#L207)
+**implemented** · under [REQ-004 Fast and keyboard-first](#24-req-004-fast-and-keyboard-first) · implemented by [crates/kiln-index/src/project.rs:294](../../crates/kiln-index/src/project.rs#L294) · verified by [crates/kiln-check/examples/bench.rs:344](../../crates/kiln-check/examples/bench.rs#L344), [crates/kiln-index/src/tests.rs:365](../../crates/kiln-index/src/tests.rs#L365), [crates/kiln-lsp/src/tests.rs:207](../../crates/kiln-lsp/src/tests.rs#L207), [crates/kiln-lsp/src/tests.rs:567](../../crates/kiln-lsp/src/tests.rs#L567)
 
 At the 95th percentile, re-indexing only the changed file (K4).
 
@@ -158,7 +158,7 @@ From DESIGN.md, goal 5.
 
 ### 2.6 REQ-006 No tool requires another
 
-**approved** · implemented by [crates/kiln/src/cmd/check.rs:47](../../crates/kiln/src/cmd/check.rs#L47) · verified by [crates/kiln/tests/cli.rs:722](../../crates/kiln/tests/cli.rs#L722)
+**approved** · implemented by [crates/kiln/src/cmd/check.rs:47](../../crates/kiln/src/cmd/check.rs#L47) · verified by [crates/kiln/tests/cli.rs:759](../../crates/kiln/tests/cli.rs#L759)
 
 Kiln works without Fenix, Flint, Jira or Confluence; each integration degrades and says so.
 
@@ -277,9 +277,9 @@ The cost: Kiln owns the subset of the format it writes, and a construct Word use
 | [REQ-003](#23-req-003-checkable-in-ci) | Checkable in CI | **approved** | through its children | through its children |
 | [REQ-004](#24-req-004-fast-and-keyboard-first) | Fast and keyboard-first | **approved** | through its children | through its children |
 | [REQ-005](#25-req-005-works-on-a-locked-down-corporate-machine-and-in-a-ci-container) | Works on a locked-down corporate machine and in a CI container | **approved** | through its children | through its children |
-| [REQ-006](#26-req-006-no-tool-requires-another) | No tool requires another | **approved** | [crates/kiln/src/cmd/check.rs:47](../../crates/kiln/src/cmd/check.rs#L47) | [crates/kiln/tests/cli.rs:722](../../crates/kiln/tests/cli.rs#L722) |
+| [REQ-006](#26-req-006-no-tool-requires-another) | No tool requires another | **approved** | [crates/kiln/src/cmd/check.rs:47](../../crates/kiln/src/cmd/check.rs#L47) | [crates/kiln/tests/cli.rs:759](../../crates/kiln/tests/cli.rs#L759) |
 | [REQ-007](#241-req-007-kiln-check-on-2000-items-and-50k-source-files-in-2-s) | kiln check on 2,000 items and 50k source files in 2 s | **verified** | [crates/kiln-index/src/project.rs:166](../../crates/kiln-index/src/project.rs#L166) | [crates/kiln-check/examples/bench.rs:344](../../crates/kiln-check/examples/bench.rs#L344) |
-| [REQ-008](#242-req-008-language-server-responds-within-50-ms-after-a-keystroke) | Language server responds within 50 ms after a keystroke | **implemented** | [crates/kiln-index/src/project.rs:294](../../crates/kiln-index/src/project.rs#L294) | [crates/kiln-check/examples/bench.rs:344](../../crates/kiln-check/examples/bench.rs#L344), [crates/kiln-index/src/tests.rs:365](../../crates/kiln-index/src/tests.rs#L365), [crates/kiln-lsp/src/tests.rs:207](../../crates/kiln-lsp/src/tests.rs#L207) |
+| [REQ-008](#242-req-008-language-server-responds-within-50-ms-after-a-keystroke) | Language server responds within 50 ms after a keystroke | **implemented** | [crates/kiln-index/src/project.rs:294](../../crates/kiln-index/src/project.rs#L294) | [crates/kiln-check/examples/bench.rs:344](../../crates/kiln-check/examples/bench.rs#L344), [crates/kiln-index/src/tests.rs:365](../../crates/kiln-index/src/tests.rs#L365), [crates/kiln-lsp/src/tests.rs:207](../../crates/kiln-lsp/src/tests.rs#L207), [crates/kiln-lsp/src/tests.rs:567](../../crates/kiln-lsp/src/tests.rs#L567) |
 | [REQ-009](#243-req-009-flint-provider-answers-within-16-ms-for-2000-items) | Flint provider answers within 16 ms for 2,000 items | **implemented** | [crates/kiln-flint/src/items.rs:205](../../crates/kiln-flint/src/items.rs#L205) | [crates/kiln-check/examples/bench.rs:344](../../crates/kiln-check/examples/bench.rs#L344), [crates/kiln-flint/src/tests.rs:177](../../crates/kiln-flint/src/tests.rs#L177) |
 | [REQ-010](#244-req-010-export-dry-run-of-a-2000-item-document-in-3-s) | Export dry run of a 2,000-item document in 3 s | **verified** | [crates/kiln-export/src/lib.rs:54](../../crates/kiln-export/src/lib.rs#L54) | [crates/kiln-check/examples/bench.rs:344](../../crates/kiln-check/examples/bench.rs#L344) |
 | [REQ-011](#231-req-011-findings-name-the-file-line-and-column) | Findings name the file, line and column | **verified** | [crates/kiln-model/src/finding.rs:142](../../crates/kiln-model/src/finding.rs#L142) | [crates/kiln-model/src/finding.rs:202](../../crates/kiln-model/src/finding.rs#L202) |
@@ -287,7 +287,7 @@ The cost: Kiln owns the subset of the format it writes, and a construct Word use
 | [REQ-013](#211-req-013-edits-keep-the-authors-formatting-and-never-fight-an-editor) | Edits keep the author's formatting and never fight an editor | **verified** | [crates/kiln-index/src/write.rs:48](../../crates/kiln-index/src/write.rs#L48), [crates/kiln-parse/src/edit.rs:58](../../crates/kiln-parse/src/edit.rs#L58) | [crates/kiln-parse/src/edit.rs:224](../../crates/kiln-parse/src/edit.rs#L224), [crates/kiln-parse/src/edit.rs:246](../../crates/kiln-parse/src/edit.rs#L246), [crates/kiln/src/project.rs:140](../../crates/kiln/src/project.rs#L140) |
 | [REQ-014](#251-req-014-no-secrets-in-kilntoml) | No secrets in kiln.toml | **verified** | [crates/kiln-parse/src/config.rs:224](../../crates/kiln-parse/src/config.rs#L224) | [crates/kiln-parse/src/config.rs:717](../../crates/kiln-parse/src/config.rs#L717) |
 | [REQ-015](#233-req-015-duplicate-ids-are-found-and-fixed-by-one-command) | Duplicate IDs are found and fixed by one command | **verified** | [crates/kiln-check/src/rules.rs:179](../../crates/kiln-check/src/rules.rs#L179), [crates/kiln-index/src/renumber.rs:44](../../crates/kiln-index/src/renumber.rs#L44) | [crates/kiln-check/src/tests.rs:113](../../crates/kiln-check/src/tests.rs#L113), [crates/kiln-index/src/tests.rs:270](../../crates/kiln-index/src/tests.rs#L270), [crates/kiln/tests/cli.rs:155](../../crates/kiln/tests/cli.rs#L155) |
-| [REQ-016](#221-req-016-changes-since-a-baseline-are-shown-item-by-item) | Changes since a baseline are shown item by item | **implemented** | [crates/kiln-index/src/diff.rs:240](../../crates/kiln-index/src/diff.rs#L240) | [crates/kiln-index/src/tests.rs:423](../../crates/kiln-index/src/tests.rs#L423), [crates/kiln/tests/cli.rs:564](../../crates/kiln/tests/cli.rs#L564) |
+| [REQ-016](#221-req-016-changes-since-a-baseline-are-shown-item-by-item) | Changes since a baseline are shown item by item | **implemented** | [crates/kiln-index/src/diff.rs:240](../../crates/kiln-index/src/diff.rs#L240) | [crates/kiln-index/src/tests.rs:423](../../crates/kiln-index/src/tests.rs#L423), [crates/kiln/tests/cli.rs:601](../../crates/kiln/tests/cli.rs#L601) |
 
 ## 7 Appendix: open findings
 

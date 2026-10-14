@@ -2,7 +2,11 @@
 //! body, in `parent = "`, and in `[links]` arrays filtered by what the
 //! role allows; statuses in `status = "`; types in `type = "`; link
 //! roles at the start of a `[links]` line; tags already used. In a
-//! Markdown file that isn't an item, only IDs after `[[`.
+//! Markdown file that isn't an item, only IDs after `[[`. In a code file
+//! (one `[code] paths` scans), IDs after a code reference's role word and
+//! its colon, while the ID is being typed, filtered by what the role may point at: an
+//! editor that runs Kiln beside the language's own server (Fenix's
+//! additional servers) completes them in comments.
 //!
 //! The context is read from the line up to the cursor, not from a parse:
 //! the file being typed is usually not valid TOML at that moment.
@@ -28,6 +32,9 @@ pub fn complete(
     let line_start = text[..offset].rfind('\n').map_or(0, |i| i + 1);
     let before = &text[line_start..offset];
     let after = &text[offset..];
+    if rel.is_some_and(|r| project.known_files().1.contains(r)) {
+        return code(project, doc, before, offset);
+    }
     let item = item_at(project, rel);
 
     let front_matter = match kiln_parse::sections(text) {
@@ -130,6 +137,67 @@ pub fn complete(
         }
         _ => Vec::new(),
     }
+}
+
+/// After `<role>:` in a code file, for a role code may use: the IDs it may
+/// point at, without those already on the line. Read from the text, not
+/// from `[code] patterns`, which match finished lines: the default
+/// pattern's shape (`role: ID, ID`) is what people type.
+fn code(project: &Project, doc: &Doc, before: &str, offset: usize) -> Vec<CompletionItem> {
+    let is_word = |c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_';
+    let found = project
+        .config
+        .links
+        .iter()
+        .filter(|r| r.allows_from("code"))
+        .filter_map(|r| {
+            let marker = format!("{}:", r.name);
+            let at = before.rfind(&marker)?;
+            let starts_word = before[..at].chars().next_back().is_none_or(|c| !is_word(c));
+            starts_word.then_some((at + marker.len(), r))
+        })
+        .max_by_key(|(end, _)| *end);
+    let Some((end, role)) = found else {
+        return Vec::new();
+    };
+    let rest = &before[end..];
+    if !rest
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == ',' || c == ' ' || c == '\t')
+    {
+        return Vec::new();
+    }
+    let partial_len = rest
+        .chars()
+        .rev()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
+        .count();
+    let partial_start = rest.len() - partial_len;
+    // A finished ID with no comma after it ends the list.
+    let listed: Vec<&str> = rest[..partial_start]
+        .split(',')
+        .map(str::trim)
+        .filter(|w| !w.is_empty())
+        .collect();
+    if rest[..partial_start]
+        .trim_end()
+        .ends_with(|c: char| c != ',' && c != ':')
+        && !listed.is_empty()
+    {
+        return Vec::new();
+    }
+    let words = ids(
+        project,
+        |i| role.allows_to(&i.type_name) && !listed.contains(&i.id.to_string().as_str()),
+        None,
+    );
+    items(
+        doc,
+        words,
+        offset - partial_len,
+        offset,
+        CompletionItemKind::REFERENCE,
+    )
 }
 
 /// `[[` in a body: every ID, closing the brackets unless they are there.

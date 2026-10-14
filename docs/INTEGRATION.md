@@ -24,27 +24,38 @@ The same as between Flint and Fenix:
 
 ## Fenix
 
-### Editing items: a language server (K4), no Fenix change
+### Editing items: a language server (K4)
 
-Fenix runs one language server per language and project root, chosen from
-the project's `.fenix/tools.json` first (`crates/fenix-gui/src/app.rs`,
-`ensure_lsp_session`), and Markdown is a language it knows
-(`crates/fenix-syntax/src/language.rs`; config name `markdown`). Its client
-already uses `completion`, `hover`, `definition`, `references`, `rename`
+Fenix runs each language's own server per project root, chosen from the
+project's `.fenix/tools.json` first, and since Fenix `471ed09` (its PR
+#61, closing G3) any number of **additional** servers beside it: one
+process per server and project, serving every language it lists, with
+diagnostics, completion, hover, definition, references and code actions
+merged and rename and formatting left to the language's own server. Its
+client uses `completion`, `hover`, `definition`, `references`, `rename`
 (with a multi-file preview), `publishDiagnostics`, `codeAction`,
-`formatting` and `workspace/applyEdit`. So a Kiln project adds:
+`formatting` and `workspace/applyEdit`. So a Kiln project adds Kiln as an
+additional server for Markdown and the languages of its code:
 
 ```json
 {
   "lsp": {
-    "markdown": { "executable": "kiln", "args": ["lsp"] }
+    "rust": { "executable": "rust-analyzer" },
+    "additional": [
+      { "name": "kiln", "executable": "kiln", "args": ["lsp"],
+        "languages": ["markdown", "rust"] }
+    ]
   }
 }
 ```
 
-and `kiln init --fenix` writes that (merging into an existing
-`tools.json`, never replacing it, and leaving another Markdown server
-alone). What `kiln lsp` provides in item files:
+`kiln init --fenix` writes that: Markdown plus the language of every code
+file `[code] paths` scans, merged into an existing `tools.json` (never
+replacing it, keeping languages added by hand), and moving the older
+form (`"markdown": {"executable": "kiln", …}`, from before G3) over so
+Kiln doesn't run twice. Running it again after adding `[code] paths` adds
+the new languages. A Fenix older than `471ed09` rejects `"additional"` as
+an unknown field: update Fenix. What `kiln lsp` provides in item files:
 
 | Request | Gives |
 |---|---|
@@ -60,6 +71,16 @@ alone). What `kiln lsp` provides in item files:
 Markdown files that aren't items (a README) get only ID completion and
 hover, so the server is harmless across a whole repository; outside a
 project (no `kiln.toml` above the file) every request gets an empty answer.
+
+In **code files** that `[code] paths` scans, beside the language's own
+server: completion of IDs after a code reference's role word
+(`// implements: REQ-0`, only the types that role may point at, without
+those already on the line), hover, definition and references on any ID,
+and diagnostics on the code references (an ID that doesn't exist, a role
+code may not use), from the editor's text as it is typed. Formatting and
+code actions stay with item files; a code file's formatting is its own
+server's. A code file outside `[code] paths` gets hover and definition
+only.
 
 Every change is a workspace edit computed by the same code as the
 command line (`set_field`, `add_link`, `plan_renumber`, `plan_new_item`);
@@ -155,15 +176,14 @@ benefit on minimal Linux installs.
 
 #### G3. More than one language server per file <a id="g3"></a>
 
-**Noticed by K4, for code files only.** Fenix keys sessions by
-(language, root), one server each, so `kiln lsp` can serve Markdown but
-cannot also attach to `.rs` or `.tcl` files alongside rust-analyzer to
-offer ID completion and hover in `// implements: REQ-014` comments.
-Supporting additional servers per buffer (`"additional": [...]` in
-`tools.json`, with requests fanned out and results merged for completion,
-hover and diagnostics) would make code references first-class in the
-editor. Until then, code references are checked by `kiln check` and shown
-by the LSP in item files, which is most of the value.
+**Noticed by K4; resolved in Fenix `471ed09` (PR #61).** Fenix keyed
+sessions by (language, root), one server each, so `kiln lsp` could serve
+Markdown but not also attach to `.rs` or `.tcl` files beside
+rust-analyzer. Fenix now runs **additional** servers per buffer
+(`"additional": [...]` under `"lsp"` in `tools.json`), with requests fanned
+out and results merged. Kiln uses it: `kiln init --fenix` registers `kiln
+lsp` as an additional server for Markdown and the project's code
+languages, and the server answers in code files ("Editing items" above).
 
 #### G4. `[[ID]]` in Fenix's Markdown reading view <a id="g4"></a>
 
@@ -358,7 +378,7 @@ token work in all three.
 |---|---|---|---|---|
 | G1 | `fenix/agenda.createTask` over the control channel | Fenix | K5 | small |
 | G2 | Fallback font in `fenix-diagram` | Fenix | K2/K3 in CI | small |
-| G3 | Additional language servers per buffer | Fenix | K4 (code files) | medium |
+| G3 | Additional language servers per buffer | Fenix | K4 (code files) | done (Fenix `471ed09`) |
 | G4 | `[[ID]]` follows LSP definition in the reading view | Fenix | cosmetic | small |
 | G5 | (handled) reload after outside edits | Fenix | — | — |
 | G6 | Jira Cloud in `fenix-jira` | Fenix | K8, Cloud only | small |

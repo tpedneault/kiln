@@ -413,30 +413,67 @@ fn init_registers_the_language_server_for_fenix() {
         "{\"tasks\": {\"build\": {\"executable\": \"cargo\", \"args\": [\"build\"]}}}\n",
     )
     .unwrap();
-    ok(d, &["init", "--name", "Demo", "--fenix"]);
-    let tools: serde_json::Value =
+    let read = || -> serde_json::Value {
         serde_json::from_str(&std::fs::read_to_string(d.join(".fenix/tools.json")).unwrap())
-            .unwrap();
-    assert_eq!(tools["lsp"]["markdown"]["executable"], "kiln");
-    assert_eq!(tools["lsp"]["markdown"]["args"][0], "lsp");
+            .unwrap()
+    };
+    ok(d, &["init", "--name", "Demo", "--fenix"]);
+    let tools = read();
+    let kiln = &tools["lsp"]["additional"][0];
+    assert_eq!(kiln["name"], "kiln");
+    assert_eq!(kiln["executable"], "kiln");
+    assert_eq!(kiln["args"][0], "lsp");
+    assert_eq!(kiln["languages"], serde_json::json!(["markdown"]));
     assert_eq!(
         tools["tasks"]["build"]["executable"], "cargo",
         "the rest is kept"
     );
 
-    // An existing project gets only the editor setup; another Markdown
-    // server is left alone.
+    // With code to scan, running it again adds the code's languages; the
+    // pre-G3 form (Kiln as the Markdown server) moves over, and another
+    // Markdown server stays as the primary.
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    std::fs::write(
+        d.join("kiln.toml"),
+        config.replace("# [code]\n# paths = [\"src\"]", "[code]\npaths = [\"src\"]"),
+    )
+    .unwrap();
+    std::fs::create_dir_all(d.join("src")).unwrap();
+    std::fs::write(d.join("src/lib.rs"), "fn x() {}\n").unwrap();
+    std::fs::write(d.join("src/run.tcl"), "puts x\n").unwrap();
     std::fs::write(
         d.join(".fenix/tools.json"),
-        "{\"lsp\": {\"markdown\": {\"executable\": \"marksman\"}}}\n",
+        "{\"lsp\": {\"markdown\": {\"executable\": \"kiln\", \"args\": [\"lsp\"]}, \"rust\": {\"executable\": \"rust-analyzer\"}}}\n",
     )
     .unwrap();
     let out = kiln_in(d, &["init", "--fenix"]);
-    assert_eq!(out.status.code(), Some(0));
-    assert!(stderr(&out).contains("already runs `marksman` for Markdown; left it alone"));
-    assert!(std::fs::read_to_string(d.join(".fenix/tools.json"))
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("moved `kiln lsp` from the Markdown server"),
+        "{}",
+        stderr(&out)
+    );
+    let tools = read();
+    assert!(tools["lsp"].get("markdown").is_none());
+    assert_eq!(tools["lsp"]["rust"]["executable"], "rust-analyzer");
+    assert_eq!(
+        tools["lsp"]["additional"][0]["languages"],
+        serde_json::json!(["markdown", "rust", "tcl"])
+    );
+
+    // Again: nothing to do. A language added by hand is kept.
+    let mut tools = read();
+    tools["lsp"]["additional"][0]["languages"]
+        .as_array_mut()
         .unwrap()
-        .contains("marksman"));
+        .push("python".into());
+    std::fs::write(d.join(".fenix/tools.json"), tools.to_string()).unwrap();
+    let out = kiln_in(d, &["init", "--fenix"]);
+    assert!(
+        stderr(&out).contains("already runs `kiln lsp` for markdown, rust, tcl, python"),
+        "{}",
+        stderr(&out)
+    );
     assert_eq!(
         kiln_in(d, &["init"]).status.code(),
         Some(2),

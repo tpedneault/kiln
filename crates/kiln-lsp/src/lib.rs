@@ -9,8 +9,11 @@
 //! (`kiln_index::Project::update_file`) keeps it within the 50 ms budget.
 //! A second thread watches the disk for changes made outside the editor.
 //!
-//! It deliberately serves Markdown only; code files need Fenix G3. It
-//! never writes a file itself: every change is a workspace edit the
+//! It serves item files and, for an editor that runs it beside a code
+//! file's own language server (Fenix's additional servers, once G3), the
+//! code files `[code] paths` scans: diagnostics on code references, hover,
+//! definition and references on IDs, and ID completion after a role word.
+//! Formatting and code actions stay with item files. It never writes a file itself: every change is a workspace edit the
 //! editor applies (and can undo), computed by the same functions as the
 //! command line (`set_field`, `add_link`, `plan_renumber`,
 //! `plan_new_item`), so the editor and `kiln set` never disagree. What a

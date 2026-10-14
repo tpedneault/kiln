@@ -46,12 +46,15 @@ Some actions create or rename a file: "New child …", "Create test that verifie
 
 ## Setting it up in Fenix
 
-From the project root:
+Fenix runs Kiln as an **additional** language server: beside each
+language's own server (rust-analyzer for Rust, for example), for Markdown
+and for the languages of your code. You need a Fenix recent enough to have
+additional servers (October 2026 or later). From the project root:
 
 ```console
 $ kiln init --fenix
 .fenix/tools.json
-kiln: Fenix now runs `kiln lsp` for Markdown in this project (restart its language server to pick it up)
+kiln: Fenix now runs `kiln lsp` beside each language's own server for markdown in this project (`:lsp-restart` to pick it up)
 ```
 
 In a new folder, `kiln init --name Demo --fenix` starts the project and does this in one step. The file it writes is:
@@ -59,36 +62,64 @@ In a new folder, `kiln init --name Demo --fenix` starts the project and does thi
 ```json
 {
   "lsp": {
-    "markdown": {
-      "args": [
-        "lsp"
-      ],
-      "executable": "kiln"
-    }
+    "additional": [
+      {
+        "args": [
+          "lsp"
+        ],
+        "executable": "kiln",
+        "languages": [
+          "markdown"
+        ],
+        "name": "kiln"
+      }
+    ]
   }
 }
 ```
 
-`kiln init --fenix` merges into an existing `.fenix/tools.json` and never replaces it. If another Markdown server is already configured, it leaves that one alone and tells you:
+The languages are Markdown plus the language of every code file Kiln
+scans (`[code] paths` in `kiln.toml`). A new project has no `[code]` yet,
+so it starts with Markdown only. After you add `[code] paths`, run `kiln
+init --fenix` again and it adds the code's languages:
 
 ```console
 $ kiln init --fenix
-kiln: .fenix/tools.json already runs `marksman` for Markdown; left it alone
+.fenix/tools.json
+kiln: Fenix now runs `kiln lsp` beside each language's own server for markdown, rust in this project (`:lsp-restart` to pick it up)
+$ kiln init --fenix
+kiln: .fenix/tools.json already runs `kiln lsp` for markdown, rust
 ```
 
-Running it twice is harmless (`already runs `kiln lsp` for Markdown`). Restart Fenix's language server, or reopen the project, to pick it up. `kiln` must be on your `PATH`.
+`kiln init --fenix` merges into an existing `.fenix/tools.json` and never
+replaces it: your tasks, your language servers and languages you added to
+Kiln's entry by hand are kept. A project set up before additional servers
+existed has Kiln as the Markdown server (`"markdown": {"executable":
+"kiln", …}`); running `kiln init --fenix` moves that over and says
+`moved `kiln lsp` from the Markdown server to an additional server`.
+Run `:lsp-restart` in Fenix, or reopen the project, to pick it up. `kiln`
+must be on your `PATH`.
 
-In Fenix you then have completion, hover, `gd` (definition), `gr` (references), rename with Fenix's multi-file preview, diagnostics, code actions and formatting.
+In Fenix you then have, in item files, completion, hover, `gd` (definition), `gr` (references), rename with Fenix's multi-file preview, diagnostics, code actions and formatting.
+
+In code files, beside the language's own server:
+
+- **Completion** of IDs after a code reference's role word: type `// verifies: ` and Kiln offers the requirements, with their titles, leaving out those already on the line.
+- **Hover** (`K`) on an ID shows what `kiln show` prints, after the language server's own hover.
+- **`gd` and `gr`** on an ID go to the item and to everything that links to it.
+- **Diagnostics** on code references as you type: `// implements: REQ-099` when REQ-099 doesn't exist (K102).
+
+Rename and formatting in code files stay with the language's own server.
 
 ### What Fenix can't do yet
 
 - **Actions that create or rename files.** Fenix's LSP client doesn't yet apply workspace edits that create or rename files. Fenix shows only code actions it can apply, so "New child …", "Create test that verifies …" and "Rename file to …" don't appear. Run the command instead, for example `kiln new test --title "…" --open`, then `kiln link TEST-002 verifies REQ-001`. Rename updates every reference but not the file name; `kiln check` then reports K105, and you rename the file yourself. (This is recorded in Kiln's integration notes as gap G7.)
 - **Files changed outside the editor.** Fenix doesn't tell language servers about files created, deleted or changed elsewhere (`kiln new` in a terminal, a `git pull`). Kiln polls instead: item files and `kiln.toml` every 2 seconds, code files every 10 seconds. Changes made outside the editor show up within a few seconds. (Gap G8.)
-- **Code files.** Fenix runs one language server per file type, so `kiln lsp` serves Markdown only. In source code, `// implements: REQ-014` comments are checked by `kiln check` and shown in item files, but get no completion or hover. (Gap G3.)
+- **Code files in older Fenix versions.** Before additional servers, Fenix ran one language server per file type, so Kiln served Markdown only. Update Fenix; an older one rejects the `"additional"` entry in `tools.json` as an unknown field.
 
 ## Setting it up in other editors
 
-Any editor with an LSP client can run `kiln lsp` for Markdown files. The server needs three things:
+Any editor with an LSP client can run `kiln lsp` for Markdown files, and, where it allows several servers per file, for your code files too. The server needs three things:
 
 - the command `kiln lsp` (or the full path to `kiln`, with the argument `lsp`);
 - Markdown files (language id `markdown`);
