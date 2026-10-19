@@ -442,7 +442,7 @@ A Confluence target prints each page's operation and why, then publishes (exampl
 
 ```console
 $ kiln export --yes
-spec (confluence, document) → space FLINT, page 123456789
+spec (confluence, document) → space FLINT, page 123456789 "Flint"
   update    "Flint — design document": REQ-014 changed; REQ-031 new (42 KiB)
   0 create, 1 update, 0 unchanged, 0 drift, 0 retire
 spec: published 0 created, 1 updated, 0 retired, 0 pruned

@@ -252,8 +252,40 @@ fn confluence_targets_plan_from_a_snapshot_and_never_write() {
 
     let plan = ok(d, &["export", "--dry-run", "--snapshot", "snapshot.json"]);
     assert!(
-        plan.contains("spec (confluence, document) → space DEMO, page 42"),
-        "{plan}"
+        plan.contains(
+            "spec (confluence, document) → space DEMO, page 42
+"
+        ),
+        "a snapshot without the parent's title names it by ID alone: {plan}"
+    );
+    std::fs::write(
+        d.join("named.json"),
+        "{\"anchorPage\": 42, \"anchorTitle\": \"Team space home\"}
+",
+    )
+    .unwrap();
+    let named = ok(d, &["export", "--dry-run", "--snapshot", "named.json"]);
+    assert!(
+        named.contains(
+            "spec (confluence, document) → space DEMO, page 42 \"Team space home\"
+"
+        ),
+        "{named}"
+    );
+    let json = ok(
+        d,
+        &[
+            "export",
+            "--dry-run",
+            "--snapshot",
+            "named.json",
+            "--format",
+            "json",
+        ],
+    );
+    assert!(
+        json.contains("\"parentTitle\": \"Team space home\""),
+        "{json}"
     );
     assert!(plan.contains("create    \"Demo design\": new"), "{plan}");
     assert!(

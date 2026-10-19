@@ -202,14 +202,15 @@ Proxies: Confluence calls go through `HTTPS_PROXY` (or `HTTP_PROXY`,
 
    ```console
    $ kiln export spec --dry-run
-   spec (confluence, document) → space DEMO, page 123456789
+   spec (confluence, document) → space DEMO, page 123456789 "Demo"
      create    "Demo — design document": new (7 KiB)
      1 create, 0 update, 0 unchanged, 0 drift, 0 retire
      leaves out: TASK-001, TEST-001, TEST-002
    ```
 
    The first line names the target, its format and layout, the space and
-   the parent page. Then one line per page: the operation, the title, why,
+   the parent page by ID and title: check that it is the page you meant
+   before publishing. Then one line per page: the operation, the title, why,
    and the page's size. Then totals, and the open items the document
    leaves out.
 
@@ -220,7 +221,7 @@ Proxies: Confluence calls go through `HTTPS_PROXY` (or `HTTP_PROXY`,
 
    ```console
    $ kiln export spec </dev/null
-   spec (confluence, document) → space DEMO, page 123456789
+   spec (confluence, document) → space DEMO, page 123456789 "Demo"
      create    "Demo — design document": new (7 KiB)
      1 create, 0 update, 0 unchanged, 0 drift, 0 retire
      leaves out: TASK-001, TEST-001, TEST-002
@@ -231,7 +232,7 @@ Proxies: Confluence calls go through `HTTPS_PROXY` (or `HTTP_PROXY`,
 
    ```console
    $ kiln export spec --yes
-   spec (confluence, document) → space DEMO, page 123456789
+   spec (confluence, document) → space DEMO, page 123456789 "Demo"
      create    "Demo — design document": new (7 KiB)
      1 create, 0 update, 0 unchanged, 0 drift, 0 retire
      leaves out: TASK-001, TEST-001, TEST-002
@@ -242,7 +243,7 @@ Proxies: Confluence calls go through `HTTPS_PROXY` (or `HTTP_PROXY`,
 
    ```console
    $ kiln export spec --yes
-   spec (confluence, document) → space DEMO, page 123456789
+   spec (confluence, document) → space DEMO, page 123456789 "Demo"
      unchanged "Demo — design document" (7 KiB)
      0 create, 0 update, 1 unchanged, 0 drift, 0 retire
      leaves out: TASK-001, TEST-001, TEST-002
@@ -254,7 +255,7 @@ Proxies: Confluence calls go through `HTTPS_PROXY` (or `HTTP_PROXY`,
    $ kiln set REQ-003 status=verified
    $ git commit -qam "REQ-003 verified"
    $ kiln export spec --yes
-   spec (confluence, document) → space DEMO, page 123456789
+   spec (confluence, document) → space DEMO, page 123456789 "Demo"
      update    "Demo — design document": REQ-003 changed (7 KiB)
      0 create, 1 update, 0 unchanged, 0 drift, 0 retire
      leaves out: TASK-001, TEST-001, TEST-002
@@ -342,7 +343,7 @@ By default (`on_drift = "stop"`) a drifted page stops the whole target:
 
 ```console
 $ kiln export spec --yes
-spec (confluence, document) → space DEMO, page 123456789
+spec (confluence, document) → space DEMO, page 123456789 "Demo"
   drift     "Demo — design document": drift: edited by alice at 2026-10-10T14:02:00.000Z, version 4 (7 KiB)
   0 create, 0 update, 0 unchanged, 1 drift, 0 retire
   refused: "Demo — design document" was edited in Confluence (edited by alice at 2026-10-10T14:02:00.000Z, version 4); copy the edit into the repository, then run again with --force, or set on_drift = "skip"
@@ -360,7 +361,7 @@ it:
 
    ```console
    $ kiln export spec --yes --force
-   spec (confluence, document) → space DEMO, page 123456789
+   spec (confluence, document) → space DEMO, page 123456789 "Demo"
      update    "Demo — design document": drift: edited by alice at 2026-10-10T14:02:00.000Z, version 4; overwritten (7 KiB)
      0 create, 1 update, 0 unchanged, 0 drift, 0 retire
      leaves out: TASK-001, TEST-001, TEST-002
@@ -396,7 +397,7 @@ Links to it keep working.
 $ git rm -q design/designs/DES-001-lazy-loading-of-plugins.md
 $ git commit -qam "Drop the design"
 $ kiln export spec --yes
-spec (confluence, tree) → space DEMO, page 123456789
+spec (confluence, tree) → space DEMO, page 123456789 "Demo"
   update    "Demo — design document": content changed (template, layout or references) (1 KiB)
   …
   unchanged "REQ-001 The app starts and responds quickly" (1 KiB)
@@ -510,7 +511,7 @@ The smallest snapshot, a parent page with nothing published under it yet:
 
 ```console
 $ kiln export spec --dry-run --snapshot first.json
-spec (confluence, document) → space DEMO, page 123456789
+spec (confluence, document) → space DEMO, page 123456789 "Demo"
   create    "Demo — design document": new (7 KiB)
   1 create, 0 update, 0 unchanged, 0 drift, 0 retire
   leaves out: TASK-001, TEST-001, TEST-002

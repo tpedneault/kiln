@@ -205,13 +205,16 @@ stored, prints each page's operation and why, and then publishes:
 
 ```
 $ kiln export --yes
-spec (confluence, document) → space FLINT, page 123456789
+spec (confluence, document) → space FLINT, page 123456789 "Flint"
   update    "Flint — design document": REQ-014 changed; REQ-031 new (42 KiB)
   0 create, 1 update, 0 unchanged, 0 drift, 0 retire
 spec: published 0 created, 1 updated, 0 retired, 0 pruned
 ```
 
-`--dry-run` stops after the plan. Without `--yes`, a run on a terminal
+The first line names the page the document goes under (or the adopted
+page) by ID and title, so a wrong `parent` shows before anything is
+published; JSON has the title as `parentTitle`. `--dry-run` stops after
+the plan. Without `--yes`, a run on a terminal
 asks before publishing each target; a run that isn't on a terminal stops
 after the plan and exits 1. `--snapshot FILE` plans offline and works
 only with `--dry-run` or `--check`. A plan that is refused (a page edited
