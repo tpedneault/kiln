@@ -339,6 +339,7 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
                     space,
                     anchor,
                     applied,
+                    snapshot,
                     ..
                 } = run.as_ref();
                 changed |= plan.changes();
@@ -346,13 +347,21 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
                 if o.format == TextOrJson::Json {
                     json_targets.push(json!({
                         "name": t.name, "format": "confluence", "layout": t.layout.as_str(), "space": space,
-                        "parent": anchor, "plan": plan, "leftOut": left_out,
+                        "parent": anchor, "parentTitle": snapshot.anchor_title, "plan": plan, "leftOut": left_out,
                         "applied": applied.as_ref().map(applied_json),
                     }));
                     continue;
                 }
+                // The title lets a wrong `parent` be caught before
+                // publishing; a snapshot saved before titles were kept has
+                // none, so the ID alone is printed.
+                let named = if snapshot.anchor_title.is_empty() {
+                    String::new()
+                } else {
+                    format!(" \"{}\"", snapshot.anchor_title)
+                };
                 println!(
-                    "{} (confluence, {}) → space {space}, page {anchor}",
+                    "{} (confluence, {}) → space {space}, page {anchor}{named}",
                     t.name,
                     t.layout.as_str()
                 );

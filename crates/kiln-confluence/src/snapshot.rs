@@ -38,6 +38,7 @@ pub fn take_snapshot(
         let mut root = client
             .page(page_id)?
             .ok_or_else(|| ClientError::new(format!("Confluence page {page_id} (export `{}`, page =) doesn't exist or the token can't see it", target.name)))?;
+        snapshot.anchor_title = root.title.clone();
         root.property = client.property(page_id)?;
         if root.property.is_none() {
             root.empty = client.body(page_id)?.trim().is_empty();
@@ -45,9 +46,8 @@ pub fn take_snapshot(
         snapshot.root = Some(root);
     } else if let Some(parent) = target.confluence.parent {
         snapshot.anchor_page = parent;
-        if client.page(parent)?.is_none() {
-            return Err(ClientError::new(format!("Confluence page {parent} (export `{}`, parent =) doesn't exist or the token can't see it", target.name)));
-        }
+        let page = client.page(parent)?.ok_or_else(|| ClientError::new(format!("Confluence page {parent} (export `{}`, parent =) doesn't exist or the token can't see it", target.name)))?;
+        snapshot.anchor_title = page.title;
         for mut child in client.children(parent)? {
             child.property = property(child.id, child.version)?;
             if ours(&child) && child.property.as_ref().is_some_and(|k| k.key == "doc") {

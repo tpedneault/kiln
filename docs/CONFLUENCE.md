@@ -244,7 +244,9 @@ Kiln never looks at or touches other pages:
    their identity").
 
 The snapshot is plain JSON (`id`, `title`, `parentId`, `version`, author,
-time, the `kiln` property, `bodyHash`; plus `takenTitles`):
+time, the `kiln` property, `bodyHash`; plus `anchorTitle`, the title of
+the parent or adopted page, which the plan prints beside its ID, and
+`takenTitles`):
 `--save-snapshot FILE` writes the one a live dry run read, `--snapshot
 FILE` plans against one offline, for tests, demos and planning without a
 token.

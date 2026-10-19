@@ -258,6 +258,7 @@ fn options() -> PlanOptions {
 fn planner_table() {
     let snapshot = |root: Option<RemotePage>, descendants: Vec<RemotePage>| Snapshot {
         anchor_page: 1,
+        anchor_title: String::new(),
         root,
         descendants,
         taken_titles: vec![],
@@ -547,6 +548,7 @@ fn snapshots_read_the_same_from_both_flavours() {
         // Authors are names on Data Center and account ids on Cloud; both
         // are "alice" here. Times are the same string in the fake.
         snapshot.descendants.sort_by_key(|p| p.id);
+        assert_eq!(snapshot.anchor_title, "Designs", "the parent, named");
         assert_eq!(snapshot.root.as_ref().map(|r| r.id), Some(200));
         assert_eq!(
             snapshot

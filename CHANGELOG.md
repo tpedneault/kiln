@@ -119,6 +119,9 @@ All notable changes to Kiln are recorded here. The format follows
 
 ### Changed
 
+- Confluence: the plan names the parent page by title as well as ID
+  (`→ space DEMO, page 123456789 "Demo"`, `parentTitle` in JSON), so a
+  wrong `parent` is caught before publishing. It costs no extra call.
 - Exports written into the repository link files relatively and name no
   commit, so a committed export can be kept current
   ([docs/EXPORT.md](docs/EXPORT.md), "Exports kept in the repository").

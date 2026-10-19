@@ -76,6 +76,12 @@ pub struct RemotePage {
 pub struct Snapshot {
     /// The page the target writes under (`parent`), or adopts (`page`).
     pub anchor_page: u64,
+    /// That page's title, so the plan says where the document goes in
+    /// words, not only by ID: a wrong `parent` is easy to miss as a
+    /// number. Planning reads the page anyway, so this costs no call.
+    /// Empty in snapshots saved before it existed.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub anchor_title: String,
     /// The root page: this target's `doc` page under `parent`, or the
     /// adopted page; `None` before the first publish.
     #[serde(default)]
