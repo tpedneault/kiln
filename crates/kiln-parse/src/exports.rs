@@ -264,21 +264,23 @@ fn target(
             invalid(
                 w,
                 name_span,
-                format!("export `{name}` needs a `format` (confluence, markdown, html or docx)"),
+                format!("export `{name}` needs a `format` (confluence, markdown, html, docx or confluence-wiki)"),
             );
             return None;
         }
-        Some((f, span)) => match ExportFormat::parse(&f) {
-            Some(f) => f,
-            None => {
-                invalid(
+        Some((f, span)) => {
+            match ExportFormat::parse(&f) {
+                Some(f) => f,
+                None => {
+                    invalid(
                     w,
                     span,
-                    format!("format `{f}` isn't confluence, markdown, html or docx"),
+                    format!("format `{f}` isn't confluence, markdown, html, docx or confluence-wiki"),
                 );
-                return None;
+                    return None;
+                }
             }
-        },
+        }
     };
     let layout = match string(w, "layout") {
         None => Layout::Document,

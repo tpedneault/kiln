@@ -22,7 +22,7 @@ named like a token or password is an error (K004).
 | `[render]` `link_bare_ids` | whether a bare `REQ-014` in prose is a reference | `true` |
 | `[jira]` `url` | where `jira` keys point (read-only), and the Jira the mirror reads (`kiln list --jira`, K207, the GUI); Server or Data Center | none |
 | `[check]` | severity per rule: `K201 = "error"`, `K105 = "off"` | each rule's default (FORMAT.md, "Check rules") |
-| `[[export]]` | export targets: `name`, `format` (markdown, html, docx, confluence), `layout`, `title`, `template`, `types`, `exclude_status`, `reports`, `numbering`, `item_style`, `link_to`, `path`, and `[export.markdown]` (`flavour`, `diagrams`), `[export.html]` (`theme`), `[export.docx]` (`reference`), `[export.confluence]` (`parent` or `page`, `space`, `labels`, `toc_levels`) — EXPORT.md | none |
+| `[[export]]` | export targets: `name`, `format` (markdown, html, docx, confluence, confluence-wiki), `layout`, `title`, `template`, `types`, `exclude_status`, `reports`, `numbering`, `item_style`, `link_to`, `path`, and `[export.markdown]` (`flavour`, `diagrams`), `[export.html]` (`theme`), `[export.docx]` (`reference`), `[export.confluence]` (`parent` or `page`, `space`, `labels`, `toc_levels`) — EXPORT.md | none |
 | `[confluence]` | the connection: `url`, `space`, `flavour`, `user`, `auth`, `labels`, `jira_macro`, `jira_server_id`, `on_drift`, `diagrams`, `max_page_kib`, … — CONFLUENCE.md | none |
 
 Mistakes in `kiln.toml` are findings with the line they are on: `kiln

@@ -165,6 +165,7 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
     }
     let in_tree = |t: &ExportTarget| {
         t.format.is_file()
+            && !t.format.read_in_confluence()
             && t.path
                 .as_deref()
                 .is_some_and(|path| !kiln_git::is_ignored(&root, path).unwrap_or(false))

@@ -3,7 +3,8 @@
 //! or one section per type; the three layouts (`document`, `sections`,
 //! `tree`) as splits of that one document with references resolved across
 //! pages; diagram rasterising through `fenix-diagram` and its cache; and
-//! the Markdown, HTML and Word back ends with their file destination.
+//! the Markdown, HTML, Word and Confluence wiki markup back ends with
+//! their file destination.
 //!
 //! Every target runs the same pipeline (select and assemble, split,
 //! resolve, back end, destination), so a layout or a format is added once
@@ -26,6 +27,7 @@ mod paths;
 mod pictures;
 mod resolve;
 mod split;
+mod wiki;
 
 pub use assemble::{assemble, capitalised, short, Assembled, Assembly, Revision};
 pub use document::{Document, Node, Section, SectionKind};
@@ -62,9 +64,11 @@ pub fn prepare(target: &ExportTarget, template: Option<&str>, assembly: &Assembl
 }
 
 /// Whether `a` can link into `b`: files link to files, Confluence pages
-/// to Confluence pages.
+/// to Confluence pages, and wiki markup only to wiki markup, whose links
+/// name pages by title.
 fn same_family(a: ExportFormat, b: ExportFormat) -> bool {
-    a.is_file() == b.is_file()
+    let wiki = |f| f == ExportFormat::ConfluenceWiki;
+    a.is_file() == b.is_file() && wiki(a) == wiki(b)
 }
 
 /// Resolves the references of every prepared target, through each one's
@@ -120,6 +124,7 @@ pub fn render_files(
         ExportFormat::Markdown => markdown::render(&ctx),
         ExportFormat::Html => html::render(&ctx, files),
         ExportFormat::Docx => docx::render(&ctx, files),
+        ExportFormat::ConfluenceWiki => wiki::render(&ctx, files),
         ExportFormat::Confluence => Vec::new(),
     }
 }

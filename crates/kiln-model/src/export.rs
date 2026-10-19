@@ -10,6 +10,8 @@ pub enum ExportFormat {
     Html,
     /// Word (K8).
     Docx,
+    /// Confluence wiki markup in a file, to paste into a page by hand.
+    ConfluenceWiki,
 }
 
 impl ExportFormat {
@@ -19,6 +21,7 @@ impl ExportFormat {
             "markdown" => Some(ExportFormat::Markdown),
             "html" => Some(ExportFormat::Html),
             "docx" => Some(ExportFormat::Docx),
+            "confluence-wiki" => Some(ExportFormat::ConfluenceWiki),
             _ => None,
         }
     }
@@ -29,6 +32,7 @@ impl ExportFormat {
             ExportFormat::Markdown => "markdown",
             ExportFormat::Html => "html",
             ExportFormat::Docx => "docx",
+            ExportFormat::ConfluenceWiki => "confluence-wiki",
         }
     }
 
@@ -39,12 +43,23 @@ impl ExportFormat {
             ExportFormat::Markdown => "md",
             ExportFormat::Html => "html",
             ExportFormat::Docx => "docx",
+            ExportFormat::ConfluenceWiki => "txt",
         }
     }
 
     /// Whether the target writes files (and so needs `path`).
     pub fn is_file(self) -> bool {
         !matches!(self, ExportFormat::Confluence)
+    }
+
+    /// Whether what it writes is read in Confluence, not beside the
+    /// repository: its links to the repository are web links naming a
+    /// commit, wherever the file is written.
+    pub fn read_in_confluence(self) -> bool {
+        matches!(
+            self,
+            ExportFormat::Confluence | ExportFormat::ConfluenceWiki
+        )
     }
 }
 
