@@ -361,6 +361,37 @@ The bytes are deterministic like every other format: parts in a fixed
 order, a fixed zip time, no creation date, ids counted per document. The
 one exception is the same as HTML's: diagram pictures.
 
+### `confluence-wiki`
+
+Confluence wiki markup in a `.txt` file per page, for pasting into a page
+by hand (in the editor, Insert → Markup → Confluence wiki) where Kiln
+can't publish: no token, no API access, a page someone else owns. It has
+the `confluence` format's look without its planner, so no drift
+detection and no idempotence: each paste replaces what you paste over.
+
+```toml
+[[export]]
+name = "wiki"
+format = "confluence-wiki"
+path = "out/design.txt"
+```
+
+- Sections start at `h1.` (the page title is Confluence's) and carry no
+  section numbers, whatever `numbering` says; each item heading starts
+  with `{anchor:REQ-014}`, so `…#REQ-014` and references land on it.
+- Status lozenges, callouts, the table of contents and code are the same
+  macros the `confluence` format uses (`status`, `info`/`tip`/`note`/
+  `warning`, `toc`, `code`); `sections` and `tree` root pages list their
+  children with `children`, and links between pages name the page by
+  title, so create each page under the title its file shows.
+- Diagrams and repository images are written beside the file
+  (`diagram-….png`, `image-….png`) and named in the markup: attach them
+  to the page for them to show.
+- Jira keys are links to `[jira] url`, not the Jira macro: a file can't
+  know whether the Confluence it is pasted into has Jira linked.
+- Repository links are web links naming a commit, wherever the file is
+  written, since they are read in Confluence.
+
 ### Adding a format
 
 A back end implements one trait: render a split page (the document tree

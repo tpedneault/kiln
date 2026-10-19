@@ -117,6 +117,11 @@ All notable changes to Kiln are recorded here. The format follows
   Markdown-only form over ([docs/CLI.md](docs/CLI.md),
   [docs/INTEGRATION.md](docs/INTEGRATION.md)).
 
+- Exports: `format = "confluence-wiki"` writes Confluence wiki markup to
+  a file, to paste into a page by hand where Kiln can't publish; headings
+  carry no section numbers ([docs/EXPORT.md](docs/EXPORT.md),
+  "`confluence-wiki`").
+
 ### Changed
 
 - Confluence: the plan names the parent page by title as well as ID
