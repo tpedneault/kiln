@@ -158,7 +158,7 @@ fn template_problems_name_their_line() {
     assert_eq!(
         problems,
         [
-            "3: kiln:items has no attribute `colour` (type, status, tag, root, jira, style, split)",
+            "3: kiln:items has no attribute `colour` (type, status, tag, root, jira, style, split, nest)",
             "3: `epic` isn't a type",
             "3: `gone` isn't a status of any type",
             "3: root `REQ-009` isn't an item",

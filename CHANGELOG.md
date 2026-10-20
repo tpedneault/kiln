@@ -94,6 +94,13 @@ All notable changes to Kiln are recorded here. The format follows
   and a proxy for Jira (G9) wait on Fenix
   ([docs/EXPORT.md](docs/EXPORT.md), [docs/INTEGRATION.md](docs/INTEGRATION.md),
   [docs/CLI.md](docs/CLI.md)).
+- Exports read more easily: the items of a `kiln:items` are a flat list
+  of headings at one level, each parent followed by its children, so a
+  table of contents (Confluence's stops at three levels) lists every one;
+  `nest="parent"` keeps the old nesting, which stays the default in
+  `tree`. Properties default to the new `item_style = "list"`: the status,
+  then one line per relationship with its label in bold, instead of one
+  long line (`line` is still there); ADR-013 ([docs/EXPORT.md](docs/EXPORT.md)).
 - The wiki: a user guide for designing a project with Kiln, from
   installing and a tutorial to the design method and references for item
   files, configuration, checks, exports, Confluence, Jira, the command

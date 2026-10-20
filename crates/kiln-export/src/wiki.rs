@@ -234,6 +234,15 @@ impl Writer<'_> {
         let status = self.inline(&props.status);
         match props.style {
             ItemStyle::None => String::new(),
+            // `\\` is wiki markup's line break.
+            ItemStyle::List => {
+                let mut lines = vec![status];
+                for e in &props.entries {
+                    let values: Vec<String> = e.values.iter().map(|v| self.inlines(v)).collect();
+                    lines.push(format!("*{}:* {}", esc(&e.label), values.join(", ")));
+                }
+                format!("{}\n\n", lines.join(" \\\\\n"))
+            }
             ItemStyle::Line => {
                 let mut parts = vec![status];
                 for e in &props.entries {

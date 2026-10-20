@@ -411,6 +411,21 @@ impl<'a> Writer<'a> {
         let status = self.inline(&props.status);
         match props.style {
             ItemStyle::None => String::new(),
+            // A backslash is CommonMark's hard line break, which GitLab
+            // and GitHub keep; trailing spaces would be lost to editors.
+            ItemStyle::List => {
+                let mut lines = vec![status];
+                for entry in &props.entries {
+                    let values: Vec<String> =
+                        entry.values.iter().map(|v| self.inlines(v)).collect();
+                    lines.push(format!(
+                        "**{}:** {}",
+                        escape(&entry.label),
+                        values.join(", ")
+                    ));
+                }
+                format!("{}\n", lines.join("\\\n"))
+            }
             ItemStyle::Line => {
                 let mut parts = vec![status];
                 for entry in &props.entries {

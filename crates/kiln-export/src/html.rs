@@ -246,6 +246,18 @@ impl Writer<'_> {
         let status = self.inline(&props.status);
         match props.style {
             ItemStyle::None => String::new(),
+            ItemStyle::List => {
+                let mut lines = vec![status];
+                for e in &props.entries {
+                    let values: Vec<String> = e.values.iter().map(|v| self.inlines(v)).collect();
+                    lines.push(format!(
+                        "<strong>{}:</strong> {}",
+                        esc(&e.label),
+                        values.join(", ")
+                    ));
+                }
+                format!("<p class=\"props\">{}</p>\n", lines.join("<br>\n"))
+            }
             ItemStyle::Line => {
                 let mut parts = vec![status];
                 for e in &props.entries {

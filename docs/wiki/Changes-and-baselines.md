@@ -211,17 +211,20 @@ review (markdown, document) → out/review.md
 An excerpt of `out/review.md`:
 
 ```markdown
-#### 1.1.1 REQ-002 Cold start under one second
+### 1.2 REQ-002 Cold start under one second
 
 *Changed*
 
-**approved** · under [REQ-001 The app starts quickly](#11-req-001-the-app-starts-quickly) · …
+**approved**\
+**Parent:** [REQ-001 The app starts quickly](#11-req-001-the-app-starts-quickly)\
+…
 
-### 1.2 REQ-003 Works offline
+### 1.3 REQ-003 Works offline
 
 *Changed*
 
-**approved** · verified by [TEST-002 Run with the network off](#22-test-002-run-with-the-network-off)
+**approved**\
+**Verified by:** [TEST-002 Run with the network off](#22-test-002-run-with-the-network-off)
 
 …
 
@@ -229,7 +232,8 @@ An excerpt of `out/review.md`:
 
 *New*
 
-**draft** · verifies [REQ-003 Works offline](#12-req-003-works-offline)
+**draft**\
+**Verifies:** [REQ-003 Works offline](#13-req-003-works-offline)
 
 ## A Changes
 
@@ -237,8 +241,8 @@ Since v1.0 (2ca625a): 1 added, 2 changed, 1 removed.
 
 | Item | Change | What |
 | --- | --- | --- |
-| [REQ-002](#111-req-002-cold-start-under-one-second) Cold start under one second | **Changed** | − mitigates RISK-001; body |
-| [REQ-003](#12-req-003-works-offline) Works offline | **Changed** | status proposed → approved |
+| [REQ-002](#12-req-002-cold-start-under-one-second) Cold start under one second | **Changed** | − mitigates RISK-001; body |
+| [REQ-003](#13-req-003-works-offline) Works offline | **Changed** | status proposed → approved |
 | [TEST-002](#22-test-002-run-with-the-network-off) Run with the network off | **New** |  |
 | RISK-001 Slow disks on old laptops | **Removed** |  |
 ```

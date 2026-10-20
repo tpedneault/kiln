@@ -85,7 +85,7 @@ Every key of `[[export]]`:
 | `exclude_status` | each type's `closed` statuses | Without a template (and for `kiln:items` without `status=`): items left out. |
 | `reports` | `["traceability", "findings"]` | Without a template: report sections added as appendices. `[]` for none. |
 | `numbering` | `true` | Section numbers (`2.1.3`) on headings. |
-| `item_style` | `line` for `document` and `sections`, `table` for `tree` | How an item's properties are shown (see [How items render](#how-items-render)). |
+| `item_style` | `list` for `document` and `sections`, `table` for `tree` | How an item's properties are shown (see [How items render](#how-items-render)). |
 | `link_to` | `[]` | Other targets to link into for items this one doesn't contain, in order (see [link_to](#linking-between-targets-link_to)). |
 | `path` | required for file formats | The output file (`document`) or folder (`sections`, `tree`), relative to the project root. |
 
@@ -172,8 +172,9 @@ Without `template`, a document contains, in order:
    "Requirements: implemented by 2 of 3, verified by 2 of 3"), and the
    progress of each milestone;
 3. a table of contents;
-4. one section per type listed in `types` that has items, each item in
-   it nested by `parent`;
+4. one section per type listed in `types` that has items, its items a
+   flat list in which each parent is followed by its children (nested by
+   `parent` in the `tree` layout);
 5. the `reports` as appendices, lettered `A`, `B`, …
 
 Items with a closed status (for example `obsolete` requirements) are left
@@ -222,7 +223,7 @@ outline on GitLab or GitHub.
 
 | Directive | Places |
 |---|---|
-| `<!-- kiln:items … -->` | the selected items, nested by `parent`, under the heading the directive sits in |
+| `<!-- kiln:items … -->` | the selected items, as a flat list, under the heading the directive sits in |
 | `<!-- kiln:item REQ-014 -->` | exactly one item |
 | `<!-- kiln:report NAME … -->` | a report: `traceability`, `findings`, `roadmap`, `risks` or `changes` (see [Reports](#reports)) |
 | `<!-- kiln:summary -->` | the commit and its date, counts by type and status, coverage, milestone progress |
@@ -248,6 +249,7 @@ all of them.
 | `tag="performance"` | items with this tag. One tag only, no negation: `tag="a,b"` looks for a tag literally named `a,b`, and `tag="!x"` for a tag named `!x` |
 | `root="REQ-002"` | that item and all its descendants by `parent` |
 | `jira="FLINT-*"` | items with a matching Jira key (see [Jira](Jira)) |
+| `nest="flat"` / `nest="parent"` | `flat` (the default, except in the `tree` layout): every item is a heading at the same level, each parent followed by its children, so the table of contents lists them all; `parent`: children are headings one level below their parent |
 | `style="full"` | the default: each item as a heading, with its properties line and body |
 | `style="row"` | all selected items as one table (ID, title, status, links), bodies left out. Suits many small items such as tests or decisions |
 | `split="auto"` / `split="no"` | in the `tree` layout, `no` keeps these items inline in their section page instead of a page each |
@@ -307,7 +309,7 @@ type, status or ID, a template file that doesn't exist, or a Word
 ```console
 $ kiln check
 design/templates/design-document.md:33:1: K112 error: `requirment` isn't a type
-design/templates/design-document.md:34:1: K112 error: kiln:items has no attribute `colour` (type, status, tag, root, jira, style, split)
+design/templates/design-document.md:34:1: K112 error: kiln:items has no attribute `colour` (type, status, tag, root, jira, style, split, nest)
 design/templates/design-document.md:35:1: K112 error: kiln:item `REQ-099` isn't an item
 design/templates/design-document.md:36:1: K112 error: unknown directive kiln:foo (items, item, report, summary, toc, value)
 kiln: 4 errors, 2 warnings
@@ -422,8 +424,8 @@ This document describes Demo, a desktop app that starts fast and works without a
 - [2 Scope](#2-scope)
 - [3 Requirements](#3-requirements)
   - [3.1 REQ-001 The app starts quickly](#31-req-001-the-app-starts-quickly)
-    - [3.1.1 REQ-002 Cold start under one second](#311-req-002-cold-start-under-one-second)
-  - [3.2 REQ-003 Works offline](#32-req-003-works-offline)
+  - [3.2 REQ-002 Cold start under one second](#32-req-002-cold-start-under-one-second)
+  - [3.3 REQ-003 Works offline](#33-req-003-works-offline)
 …
 
 ## 3 Requirements
@@ -432,9 +434,13 @@ This document describes Demo, a desktop app that starts fast and works without a
 
 **approved**
 
-#### 3.1.1 REQ-002 Cold start under one second
+### 3.2 REQ-002 Cold start under one second
 
-**approved** · under [REQ-001 The app starts quickly](#31-req-001-the-app-starts-quickly) · mitigates [RISK-001 Slow disks on old laptops](#9-appendix-risks) · implemented by [DES-001 Lazy loading of plugins](#41-des-001-lazy-loading-of-plugins), [TASK-001 Implement plugin loader](../design/tasks/TASK-001-implement-plugin-loader.md) · verified by [TEST-001 Measure cold start](#7-tests)
+**approved**\
+**Parent:** [REQ-001 The app starts quickly](#31-req-001-the-app-starts-quickly)\
+**Mitigates:** [RISK-001 Slow disks on old laptops](#9-appendix-risks)\
+**Implemented by:** [DES-001 Lazy loading of plugins](#41-des-001-lazy-loading-of-plugins), [TASK-001 Implement plugin loader](../design/tasks/TASK-001-implement-plugin-loader.md)\
+**Verified by:** [TEST-001 Measure cold start](#7-tests)
 
 Measured from launch to the first usable window on the reference laptop. See [ADR-001 Use SQLite for local storage](#5-decisions) for why storage opens fast.
 
@@ -444,7 +450,8 @@ Measured from launch to the first usable window on the reference laptop. See [AD
 
 ### 4.1 DES-001 Lazy loading of plugins
 
-**accepted** · implements [REQ-002 Cold start under one second](#311-req-002-cold-start-under-one-second)
+**accepted**\
+**Implements:** [REQ-002 Cold start under one second](#32-req-002-cold-start-under-one-second)
 
 Plugins load on first use, not at start.
 
@@ -475,8 +482,8 @@ flowchart LR
 | Requirement | Title | Status | Implemented by | Verified by |
 | --- | --- | --- | --- | --- |
 | [REQ-001](#31-req-001-the-app-starts-quickly) | The app starts quickly | **approved** | through its children | through its children |
-| [REQ-002](#311-req-002-cold-start-under-one-second) | Cold start under one second | **approved** | [DES-001](#41-des-001-lazy-loading-of-plugins), [TASK-001](../design/tasks/TASK-001-implement-plugin-loader.md) | [TEST-001](#7-tests) |
-| [REQ-003](#32-req-003-works-offline) | Works offline | **proposed** | **gap** | **gap** |
+| [REQ-002](#32-req-002-cold-start-under-one-second) | Cold start under one second | **approved** | [DES-001](#41-des-001-lazy-loading-of-plugins), [TASK-001](../design/tasks/TASK-001-implement-plugin-loader.md) | [TEST-001](#7-tests) |
+| [REQ-003](#33-req-003-works-offline) | Works offline | **proposed** | **gap** | **gap** |
 …
 ````
 
@@ -495,21 +502,26 @@ Things to notice:
 ## How items render
 
 An item placed with `style="full"` becomes a numbered heading with an
-anchor named by its ID, a properties line, its body, and its children one
-level deeper:
+anchor named by its ID, its properties, and its body. Its children follow
+it as headings of the same level (or one level deeper with
+`nest="parent"`):
 
 ```text
-2.1.3  REQ-014 Flint appears within 50 ms of the hotkey        ← heading, anchor "REQ-014"
-approved · under REQ-002 · verified by TEST-031 · Jira FLINT-88 ← properties (item_style = "line")
+2.1.3  REQ-014 Flint appears within 50 ms of the hotkey   ← heading, anchor "REQ-014"
+approved                                                  ← properties (item_style = "list")
+Parent: REQ-002 Flint is fast
+Verified by: TEST-031 Hotkey timing, TEST-032 Cold start
+Jira: FLINT-88
 <body>
-  2.1.3.1  REQ-031 …                                           ← children, one level deeper
+2.1.4  REQ-031 …                                          ← a child: the next heading, same level
 ```
 
 `item_style` sets how the properties are shown:
 
 | `item_style` | Shows | Default for |
 |---|---|---|
-| `line` | one line under the heading: status, parent, outgoing links, inverse links ("implemented by", "verified by", with code locations), Jira keys. Compact enough for a long document. | `document`, `sections` |
+| `list` | the status, then one line per relationship with its label in bold: parent, outgoing links, inverse links ("Implemented by", "Verified by", with code locations), Jira keys | `document`, `sections` |
+| `line` | the same on one line, joined with `·`: the most compact, for long documents whose items have few links | — |
 | `table` | the full properties table: status, type, parent, each link role, source file | `tree`, where each item is a page of its own |
 | `none` | heading and body only, for documents meant to read as prose | — |
 

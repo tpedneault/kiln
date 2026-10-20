@@ -102,7 +102,9 @@ fn directive(d: &Directive, project: &Project, out: &mut Vec<TemplateProblem>) {
         "items" => {
             no_positional(out);
             unknown_attrs(
-                &["type", "status", "tag", "root", "jira", "style", "split"],
+                &[
+                    "type", "status", "tag", "root", "jira", "style", "split", "nest",
+                ],
                 out,
             );
             if let Some(t) = d.attr("type") {
@@ -133,6 +135,14 @@ fn directive(d: &Directive, project: &Project, out: &mut Vec<TemplateProblem>) {
                     out.push(problem(
                         d.line,
                         format!("style `{style}` isn't full or row"),
+                    ));
+                }
+            }
+            if let Some(nest) = d.attr("nest") {
+                if nest != "flat" && nest != "parent" {
+                    out.push(problem(
+                        d.line,
+                        format!("nest `{nest}` isn't flat or parent"),
                     ));
                 }
             }

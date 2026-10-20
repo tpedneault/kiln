@@ -32,9 +32,11 @@ nothing the second time.
       1  Introduction                      (template prose)
       2  Requirements
          2.1  REQ-001 The app starts quickly
-              approved · verified by TEST-002 · Jira DEMO-12
+              approved
+              Verified by: TEST-002
+              Jira: DEMO-12
               <body>
-              2.1.1  REQ-002 Cold start under one second
+         2.2  REQ-002 Cold start under one second    (a child: the same level)
       3  Design
       4  Decisions
       A  Traceability

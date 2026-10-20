@@ -535,6 +535,24 @@ impl Writer<'_> {
         let status = self.inline(&props.status, &Fmt::default());
         match props.style {
             ItemStyle::None => String::new(),
+            ItemStyle::List => {
+                let bold = Fmt {
+                    bold: true,
+                    ..Fmt::default()
+                };
+                let mut runs = status;
+                for e in &props.entries {
+                    runs.push_str("<w:r><w:br/></w:r>");
+                    runs.push_str(&run(&format!("{}: ", e.label), &bold));
+                    for (i, v) in e.values.iter().enumerate() {
+                        if i > 0 {
+                            runs.push_str(&run(", ", &Fmt::default()));
+                        }
+                        runs.push_str(&self.inlines(v, &Fmt::default()));
+                    }
+                }
+                para(c, Some("KilnProps"), "", &runs)
+            }
             ItemStyle::Line => {
                 let mut runs = status;
                 for e in &props.entries {

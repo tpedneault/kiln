@@ -59,6 +59,7 @@ nav.toc ul { list-style: none; padding-left: 1.2em; } nav.toc > ul { padding-lef
 </li>
 <li><a href="#22-everything-else">2.2 Everything else</a><ul>
 <li><a href="#REQ-001">2.2.1 REQ-001 Flint is a launcher</a></li>
+<li><a href="#REQ-003">2.2.2 REQ-003 Themes follow Fenix</a></li>
 </ul>
 </li>
 </ul>
@@ -74,7 +75,10 @@ nav.toc ul { list-style: none; padding-left: 1.2em; } nav.toc > ul { padding-lef
 <h3 id="21-performance">2.1 Performance</h3>
 <section>
 <h4 id="REQ-002">2.1.1 REQ-002 Fast enough to be a reflex</h4>
-<p class="props"><span class="status blue">approved</span> · under <a href="#REQ-001">REQ-001 Flint is a launcher</a> · implemented by <a href="https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2">src/launcher.rs:2</a> · verified by <a href="https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/TEST-001-bench.md">TEST-001 Hotkey benchmark</a></p>
+<p class="props"><span class="status blue">approved</span><br>
+<strong>Parent:</strong> <a href="#REQ-001">REQ-001 Flint is a launcher</a><br>
+<strong>Implemented by:</strong> <a href="https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2">src/launcher.rs:2</a><br>
+<strong>Verified by:</strong> <a href="https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/TEST-001-bench.md">TEST-001 Hotkey benchmark</a></p>
 <div class="callout note">
 <p class="kind">Note</p>
 <p>Measured on the reference laptop.</p>
@@ -92,20 +96,22 @@ nav.toc ul { list-style: none; padding-left: 1.2em; } nav.toc > ul { padding-lef
 <h3 id="22-everything-else">2.2 Everything else</h3>
 <section>
 <h4 id="REQ-001">2.2.1 REQ-001 Flint is a launcher</h4>
-<p class="props"><span class="status blue">approved</span> · Jira <a href="https://jira.example.com/browse/FLINT-12">FLINT-12</a></p>
+<p class="props"><span class="status blue">approved</span><br>
+<strong>Jira:</strong> <a href="https://jira.example.com/browse/FLINT-12">FLINT-12</a></p>
 <p>Flint finds and opens things; see <a href="#ADR-002">ADR-002 TOML front matter</a>.</p>
 <h6>Scope</h6>
 <p>Windows and Linux.</p>
+</section>
 <section>
-<h5 id="REQ-003">2.2.1.1 REQ-003 Themes follow Fenix</h5>
-<p class="props"><span class="status grey">draft</span> · under <a href="#REQ-001">REQ-001 Flint is a launcher</a></p>
+<h4 id="REQ-003">2.2.2 REQ-003 Themes follow Fenix</h4>
+<p class="props"><span class="status grey">draft</span><br>
+<strong>Parent:</strong> <a href="#REQ-001">REQ-001 Flint is a launcher</a></p>
 <table>
 <thead><tr><th>Theme</th><th>Source</th></tr></thead>
 <tbody>
 <tr><td>dark</td><td>Fenix</td></tr>
 </tbody>
 </table>
-</section>
 </section>
 </section>
 </section>

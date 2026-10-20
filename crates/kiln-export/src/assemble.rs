@@ -1,8 +1,9 @@
 //! Assembly (EXPORT.md, "Templates", "Items in a document"): selecting
 //! items, placing them where the template's directives say (or one
-//! section per type without a template), each item once, nested by
-//! `parent`, with its properties and body; reports, the summary and the
-//! table of contents; then numbering.
+//! section per type without a template), each item once, as a flat list
+//! in tree order or nested by `parent` (`nest=`; nested in `tree`), with
+//! its properties and body; reports, the summary and the table of
+//! contents; then numbering.
 
 use std::collections::{HashMap, HashSet};
 
@@ -132,7 +133,8 @@ impl<'a> State<'a> {
             if selected.is_empty() {
                 continue;
             }
-            let children = self.place(&selected, 2, true);
+            let nest = self.target.nests_by_default();
+            let children = self.place(&selected, 2, true, nest);
             nodes.push(Node::Section(Section {
                 number: String::new(),
                 title: vec![Inline::text(ty.plural.clone())],
@@ -252,7 +254,7 @@ impl<'a> State<'a> {
                     .and_then(|id| self.project().indices(&id).first().copied());
                 match found {
                     Some(i) if !self.placed.contains(&self.project().items[i].id) => {
-                        self.place(&[i], depth, true)
+                        self.place(&[i], depth, true, false)
                     }
                     _ => Vec::new(),
                 }
@@ -268,7 +270,12 @@ impl<'a> State<'a> {
                     }
                     vec![Node::Block(self.row_table(&selected))]
                 } else {
-                    self.place(&selected, depth, d.attr("split") != Some("no"))
+                    let nest = match d.attr("nest") {
+                        Some("flat") => false,
+                        Some("parent") => true,
+                        _ => self.target.nests_by_default(),
+                    };
+                    self.place(&selected, depth, d.attr("split") != Some("no"), nest)
                 }
             }
             // `kiln check` reports anything else (K112).
@@ -332,9 +339,11 @@ impl<'a> State<'a> {
             .collect()
     }
 
-    /// Item sections for `selected` at `depth`, nested by `parent` within
-    /// the selection.
-    fn place(&mut self, selected: &[usize], depth: u8, own_page: bool) -> Vec<Node> {
+    /// Item sections for `selected` at `depth`: nested by `parent` within
+    /// the selection, or (`nest` false) all at `depth` in the same order,
+    /// each parent followed by its children, so related items stay
+    /// together while every one is a heading of the same level.
+    fn place(&mut self, selected: &[usize], depth: u8, own_page: bool, nest: bool) -> Vec<Node> {
         let p = self.project();
         let in_selection: HashSet<&ItemId> = selected.iter().map(|&i| &p.items[i].id).collect();
         let mut children: HashMap<ItemId, Vec<usize>> = HashMap::new();
@@ -349,6 +358,26 @@ impl<'a> State<'a> {
             }
         }
         let mut out = Vec::new();
+        if !nest {
+            let mut order = Vec::new();
+            let mut seen = HashSet::new();
+            for &i in &roots {
+                tree_order(p, i, &children, &mut seen, &mut order);
+            }
+            let none = HashMap::new();
+            for i in order {
+                if !self.placed.contains(&self.project().items[i].id) {
+                    out.push(Node::Section(self.item_section(
+                        i,
+                        depth,
+                        own_page,
+                        &none,
+                        &mut HashSet::new(),
+                    )));
+                }
+            }
+            return out;
+        }
         for i in roots {
             out.push(Node::Section(self.item_section(
                 i,
@@ -818,6 +847,28 @@ fn claim_report_rows(node: &mut Node, placed: &mut HashSet<ItemId>) {
             }
         }
         Node::Block(_) => {}
+    }
+}
+
+/// Appends `i` and its descendants among `children`, depth first, each
+/// once (a parent cycle can't loop).
+fn tree_order(
+    p: &Project,
+    i: usize,
+    children: &HashMap<ItemId, Vec<usize>>,
+    seen: &mut HashSet<usize>,
+    out: &mut Vec<usize>,
+) {
+    if !seen.insert(i) {
+        return;
+    }
+    out.push(i);
+    for &c in children
+        .get(&p.items[i].id)
+        .map(Vec::as_slice)
+        .unwrap_or(&[])
+    {
+        tree_order(p, c, children, seen, out);
     }
 }
 

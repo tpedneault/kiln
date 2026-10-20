@@ -4,25 +4,25 @@
 - Toc
 § [1] depth 1 heading: Requirements
   § [1.1] depth 2 item REQ-001 own-page: REQ-001 Flint is a launcher
-    - Props(Props { style: Line, status: Status { text: "approved", tone: Blue }, entries: [PropEntry { la
+    - Props(Props { style: List, status: Status { text: "approved", tone: Blue }, entries: [PropEntry { la
     - Paragraph([Text("Flint finds and opens things; see "), Ref { id: ItemId { prefix: "ADR", number: 2 }
     - Heading { level: 4, content: [Text("Scope")] }
     - Paragraph([Text("Windows and Linux.")])
-    § [1.1.1] depth 3 item REQ-002 own-page: REQ-002 Fast enough to be a reflex
-      - Props(Props { style: Line, status: Status { text: "approved", tone: Blue }, entries: [PropEntry { la
-      - Callout { kind: Note, content: [Paragraph([Text("Measured on the reference laptop.")])] }
-      - Diagram { source: "flowchart TD\n  hotkey --> frame\n", line: 14 }
-      - Paragraph([Image { target: Repo { path: "design/img/flow.png", line: None, fragment: None }, alt: "f
-    § [1.1.2] depth 3 item REQ-003 own-page: REQ-003 Themes follow Fenix
-      - Props(Props { style: Line, status: Status { text: "draft", tone: Grey }, entries: [PropEntry { label
-      - Table(Table { align: [None, None], header: [[Text("Theme")], [Text("Source")]], rows: [[[Text("dark"
+  § [1.2] depth 2 item REQ-002 own-page: REQ-002 Fast enough to be a reflex
+    - Props(Props { style: List, status: Status { text: "approved", tone: Blue }, entries: [PropEntry { la
+    - Callout { kind: Note, content: [Paragraph([Text("Measured on the reference laptop.")])] }
+    - Diagram { source: "flowchart TD\n  hotkey --> frame\n", line: 14 }
+    - Paragraph([Image { target: Repo { path: "design/img/flow.png", line: None, fragment: None }, alt: "f
+  § [1.3] depth 2 item REQ-003 own-page: REQ-003 Themes follow Fenix
+    - Props(Props { style: List, status: Status { text: "draft", tone: Grey }, entries: [PropEntry { label
+    - Table(Table { align: [None, None], header: [[Text("Theme")], [Text("Source")]], rows: [[[Text("dark"
 § [2] depth 1 heading: Decisions
   § [2.1] depth 2 item ADR-002 own-page: ADR-002 TOML front matter
-    - Props(Props { style: Line, status: Status { text: "accepted", tone: Blue }, entries: [PropEntry { la
+    - Props(Props { style: List, status: Status { text: "accepted", tone: Blue }, entries: [PropEntry { la
     - Paragraph([Text("Comments survive edits.")])
 § [3] depth 1 heading: Tests
   § [3.1] depth 2 item TEST-001 own-page: TEST-001 Hotkey benchmark
-    - Props(Props { style: Line, status: Status { text: "passing", tone: Blue }, entries: [PropEntry { lab
+    - Props(Props { style: List, status: Status { text: "passing", tone: Blue }, entries: [PropEntry { lab
 § [A] depth 1 report traceability: Traceability
   - Paragraph([Text("3 requirements: implemented by 1 of 3, verified by 1 of 3.")])
   - Table(Table { align: [None, None, None, None, None], header: [[Text("Requirement")], [Text("Title")]
