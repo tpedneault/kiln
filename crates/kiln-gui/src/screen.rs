@@ -19,12 +19,19 @@ pub enum Role {
     Good,
     /// Changed, in progress.
     Warn,
+    /// A done status.
+    Done,
+    /// A status between the first and done (approved, doing, active).
+    Active,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
     pub text: String,
     pub role: Role,
+    /// Drawn on a rounded band of its own colour (a status), so it stands
+    /// out from the text around it.
+    pub pill: bool,
 }
 
 /// One line of spans.
@@ -34,6 +41,18 @@ pub fn span(text: impl Into<String>, role: Role) -> Span {
     Span {
         text: text.into(),
         role,
+        pill: false,
+    }
+}
+
+/// A span drawn as a pill: ` text ` on a rounded band of its role's
+/// colour. The spaces are part of the text, so columns still line up and
+/// tests read it as text.
+pub fn pill(text: impl Into<String>, role: Role) -> Span {
+    Span {
+        text: format!(" {} ", text.into()),
+        role,
+        pill: true,
     }
 }
 

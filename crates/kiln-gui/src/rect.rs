@@ -1,6 +1,7 @@
-//! Solid rectangles, queued during a frame and drawn in one call: the
-//! bars, heading bands, the cursor's row and the popup. Flint's `rect.rs`
-//! (a cut-down Fenix one) as it is.
+//! Rectangles, queued during a frame and drawn in one call: the bars,
+//! heading bands, the cursor's row, the popup, and the rounded pills
+//! behind statuses. Flint's `rect.rs` (a cut-down Fenix one), with a
+//! corner radius added for the pills.
 
 use crate::render::Rect;
 
@@ -9,6 +10,9 @@ use crate::render::Rect;
 struct Vertex {
     position: [f32; 2],
     color: [f32; 4],
+    /// The whole rect in physical pixels, for the corners.
+    rect: [f32; 4],
+    radius: f32,
 }
 
 const INITIAL_RECTS: usize = 64;
@@ -43,7 +47,7 @@ impl Rects {
                 buffers: &[Some(wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
                     step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x4],
+                    attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x4, 2 => Float32x4, 3 => Float32],
                 })],
                 compilation_options: Default::default(),
             },
@@ -89,11 +93,26 @@ impl Rects {
 
     /// Queues `rect` (physical pixels) on a `width`×`height` surface.
     pub fn push(&mut self, rect: Rect, color: [f32; 4], width: f32, height: f32) {
+        self.push_rounded(rect, color, 0.0, width, height);
+    }
+
+    /// Queues `rect` with corners of `radius` physical pixels.
+    pub fn push_rounded(
+        &mut self,
+        rect: Rect,
+        color: [f32; 4],
+        radius: f32,
+        width: f32,
+        height: f32,
+    ) {
         let x = |px: f32| px / width * 2.0 - 1.0;
         let y = |py: f32| 1.0 - py / height * 2.0;
+        let radius = radius.min(rect.w / 2.0).min(rect.h / 2.0).max(0.0);
         let v = |px, py| Vertex {
             position: [x(px), y(py)],
             color,
+            rect: [rect.x, rect.y, rect.w, rect.h],
+            radius,
         };
         let (l, t, r, b) = (rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
         self.vertices

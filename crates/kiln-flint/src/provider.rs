@@ -23,7 +23,6 @@ use flint_protocol::provider::{
     Execute, ExecuteResult, LogLevel, LogParams, Query, Register, Results, SetItems, MAX_BATCH,
 };
 use kiln_index::{DiskSource, FileSource, Project, Stamp};
-use kiln_parse::{set_field, FieldValue};
 use serde_json::{json, Value};
 
 use crate::items::{self, Context};
@@ -444,39 +443,17 @@ impl<W: Write> Provider<W> {
         }
     }
 
-    /// The front-matter edit `kiln set ID status=…` makes.
+    /// The front-matter edit `kiln set ID status=…` makes, through the
+    /// same validation and write as the command line and the GUI.
     fn set_status(&mut self, id: &kiln_model::ItemId, status: &str) -> Result<String, String> {
         let l = self.current.as_ref().ok_or("no Kiln project is loaded")?;
-        let copies = l.project.indices(id);
-        let item = match copies {
-            [one] => &l.project.items[*one],
-            [] => return Err(format!("{id} doesn't exist")),
-            _ => {
-                return Err(format!(
-                    "{id} is in {} files; `kiln renumber` first",
-                    copies.len()
-                ))
-            }
-        };
-        let ty = l
-            .project
-            .type_of(item)
-            .ok_or_else(|| format!("{id}'s type isn't in kiln.toml"))?;
-        if !ty.statuses.iter().any(|s| s == status) {
-            return Err(format!("`{status}` isn't a status of {}", ty.name));
-        }
+        let item = kiln_index::unique(&l.project, id)?;
         let before = item.status.clone();
-        if before == status {
+        if before == status && kiln_index::plan_set(&l.project, item, "status", status).is_ok() {
             return Ok(format!("{id} is already {status}"));
         }
-        let path = l.root.join(&item.path);
-        let rel = item.path.clone();
-        let file = kiln_index::read_for_edit(&path).map_err(|e| e.to_string())?;
-        let text =
-            kiln_parse::normalize(&file.bytes).ok_or_else(|| format!("{rel} isn't UTF-8"))?;
-        let new = set_field(&text, "status", Some(FieldValue::String(status.to_owned())))
-            .map_err(|e| format!("{rel}: {e}"))?;
-        kiln_index::write_back(&path, &rel, &file.bytes, file.stamp, &new, true)
+        let pairs = [("status".to_owned(), status.to_owned())];
+        kiln_index::apply_set(&l.project, &DiskSource::new(&l.root), id, &pairs)
             .map_err(|e| e.to_string())?;
         let root = l.root.clone();
         if let Ok(l) = load(&root) {

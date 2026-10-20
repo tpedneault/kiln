@@ -7,6 +7,8 @@ use fenix_keymap::{KeyPress, NamedKey};
 use kiln_index::{MemorySource, Project};
 
 use crate::app::{App, Baseline, Effect};
+use crate::edit::Edit;
+use crate::host::{Comment, CommentGroup, Done, ExportReport, Job};
 use crate::pages::Page;
 
 fn item(id: &str, ty: &str, title: &str, status: &str, rest: &str) -> String {
@@ -376,4 +378,446 @@ fn tickets_show_once_the_jira_mirror_arrives() {
         .cloned()
         .unwrap_or_default();
     assert!(line.ends_with("FLINT-1 Done · Alice"), "{text:?}");
+}
+
+fn ctrl(app: &mut App, c: char) -> Effect {
+    app.key(KeyPress::char(c).with_ctrl())
+}
+
+fn id(s: &str) -> kiln_model::ItemId {
+    s.parse().unwrap()
+}
+
+/// The line the cursor is on.
+fn at(app: &App) -> String {
+    app.screen()
+        .dump()
+        .lines()
+        .find(|l| l.starts_with('>'))
+        .unwrap_or_default()
+        .to_owned()
+}
+
+#[test]
+fn edits_are_asked_for_checked_and_handed_to_the_window() {
+    let mut a = app();
+    // REQ-002: its status, picked from its type's statuses.
+    press(&mut a, "j");
+    press(&mut a, "s");
+    let popup = a.screen().dump();
+    assert!(popup.contains("-- Status of REQ-002:"), "{popup}");
+    assert!(popup.contains("draft  (now)"), "{popup}");
+    assert_eq!(
+        press(&mut a, "approved\n"),
+        Effect::Edit(Edit::Set {
+            id: id("REQ-002"),
+            key: "status".into(),
+            value: "approved".into()
+        })
+    );
+    // A bad date keeps the prompt open with the reason.
+    press(&mut a, " ed");
+    assert_eq!(press(&mut a, "soon\n"), Effect::None);
+    let screen = a.screen().dump();
+    assert!(screen.contains("isn't a date"), "{screen}");
+    ctrl(&mut a, 'u');
+    assert_eq!(
+        press(&mut a, "2026-12-01\n"),
+        Effect::Edit(Edit::Set {
+            id: id("REQ-002"),
+            key: "due".into(),
+            value: "2026-12-01".into()
+        })
+    );
+    // A link: the roles a test may start, then the items not yet linked.
+    press(&mut a, "G");
+    press(&mut a, "l");
+    let roles = a.screen().dump();
+    assert!(roles.contains("verifies  (to requirement)"), "{roles}");
+    press(&mut a, "verifies\n");
+    let targets = a.screen().dump();
+    assert!(
+        targets.contains("REQ-004 Small binary") && !targets.contains("REQ-002 Cold start"),
+        "REQ-002 is already verified by TEST-001:\n{targets}"
+    );
+    assert_eq!(
+        press(&mut a, "small\n"),
+        Effect::Edit(Edit::Link {
+            id: id("TEST-001"),
+            role: "verifies".into(),
+            target: id("REQ-004"),
+            add: true
+        })
+    );
+    // Unlinking asks first.
+    press(&mut a, "U\n");
+    assert!(a
+        .screen()
+        .dump()
+        .contains("Remove `verifies REQ-002` from TEST-001? y/n"));
+    assert_eq!(
+        press(&mut a, "y"),
+        Effect::Edit(Edit::Link {
+            id: id("TEST-001"),
+            role: "verifies".into(),
+            target: id("REQ-002"),
+            add: false
+        })
+    );
+    // A child of REQ-001, then a renumbering after a confirm.
+    press(&mut a, "gg");
+    press(&mut a, "N");
+    assert_eq!(
+        press(&mut a, "requirement\nWarm start\n"),
+        Effect::Edit(Edit::New {
+            type_name: "requirement".into(),
+            title: Some("Warm start".into()),
+            parent: Some(id("REQ-001"))
+        })
+    );
+    press(&mut a, " er");
+    assert!(a.screen().dump().contains("Renumber REQ-001 to: REQ-005"));
+    assert_eq!(press(&mut a, "\n"), Effect::None);
+    assert_eq!(
+        press(&mut a, "y"),
+        Effect::Edit(Edit::Renumber {
+            from: id("REQ-001"),
+            to: id("REQ-005"),
+            file: None
+        })
+    );
+    // Esc leaves a prompt without an edit.
+    press(&mut a, "s");
+    assert_eq!(press(&mut a, "\x1b"), Effect::None);
+    assert!(!a.screen().dump().contains("Status of"));
+}
+
+#[test]
+fn the_board_moves_an_item_along_its_statuses() {
+    let mut a = app();
+    press(&mut a, "4");
+    assert!(at(&a).contains("TASK-002"), "{}", a.screen().dump());
+    assert_eq!(
+        press(&mut a, "L"),
+        Effect::Edit(Edit::Set {
+            id: id("TASK-002"),
+            key: "status".into(),
+            value: "doing".into()
+        })
+    );
+    assert_eq!(press(&mut a, "H"), Effect::None, "todo is the first status");
+}
+
+#[test]
+fn the_item_page_shows_what_kiln_show_does_and_walks_the_graph() {
+    let mut a = app();
+    press(&mut a, "jv");
+    assert_eq!(a.page(), Page::Item);
+    let text = squash(a.text());
+    assert_eq!(text[0], "REQ-002 Cold start");
+    assert!(
+        text.iter().any(|l| l == "parent REQ-001 Fast start"),
+        "{text:?}"
+    );
+    assert!(
+        text.iter().any(|l| l.ends_with("TEST-001 Timing")),
+        "{text:?}"
+    );
+    // Down to TEST-001 and into it; C-o comes back, C-i goes forward.
+    for _ in 0..20 {
+        if at(&a).contains("TEST-001") {
+            break;
+        }
+        press(&mut a, "j");
+    }
+    press(&mut a, "v");
+    assert_eq!(squash(a.text())[0], "TEST-001 Timing");
+    ctrl(&mut a, 'o');
+    assert_eq!(squash(a.text())[0], "REQ-002 Cold start");
+    ctrl(&mut a, 'i');
+    assert_eq!(squash(a.text())[0], "TEST-001 Timing");
+}
+
+#[test]
+fn check_findings_are_a_page_and_a_count_on_every_page() {
+    let broken = source().with(
+        "design/TEST-002.md",
+        item(
+            "TEST-002",
+            "test",
+            "Broken",
+            "ready",
+            "\n[links]\nverifies = [\"REQ-099\"]\n",
+        ),
+    );
+    let project = Project::load(&broken).unwrap();
+    let findings = kiln_check::check(&project, &broken, kiln_model::Date::from_unix_days(20_000));
+    let mut a = App::new(PathBuf::from("/p"), project, None);
+    a.set_findings(findings);
+    let top = a.screen().dump();
+    assert!(top.lines().next().unwrap().contains("1 error"), "{top}");
+    press(&mut a, "9");
+    assert_eq!(a.page(), Page::Check);
+    let text = a.text().join("\n");
+    assert!(text.contains("design/TEST-002.md"), "{text}");
+    assert!(text.contains("K102 error"), "{text}");
+    while !at(&a).contains("K102") {
+        press(&mut a, "j");
+    }
+    match press(&mut a, "\n") {
+        Effect::Open { path, .. } => assert!(path.ends_with("TEST-002.md"), "{path:?}"),
+        other => panic!("{other:?}"),
+    }
+}
+
+fn reports() -> Vec<ExportReport> {
+    vec![
+        ExportReport {
+            name: "doc".into(),
+            confluence: false,
+            lines: vec![
+                "doc (markdown, document) → docs/DESIGN.md".into(),
+                "  would update docs/DESIGN.md".into(),
+            ],
+            error: None,
+        },
+        ExportReport {
+            name: "spec".into(),
+            confluence: true,
+            lines: vec![
+                "spec (confluence, document) → space FLINT, page 1 \"Flint\"".into(),
+                "  update    \"Flint — design document\": REQ-014 changed (42 KiB)".into(),
+                "  0 create, 1 update, 0 unchanged, 0 drift, 0 retire".into(),
+            ],
+            error: None,
+        },
+        ExportReport {
+            name: "edited".into(),
+            confluence: true,
+            lines: vec![
+                "edited (confluence, document) → space FLINT, page 2 \"Other\"".into(),
+                "  refused: \"Other\" was edited in Confluence by Alice".into(),
+            ],
+            error: None,
+        },
+    ]
+}
+
+#[test]
+fn exports_are_planned_on_a_thread_and_published_only_after_y() {
+    let mut a = app();
+    press(&mut a, " p");
+    assert_eq!(a.page(), Page::Exports);
+    assert_eq!(a.next_job(), Some(Job::PlanExports));
+    assert!(a.screen().dump().contains("Planning the exports…"));
+    assert_eq!(a.next_job(), None, "one job at a time");
+    a.done(Done::Exports(reports()));
+    assert!(a.text()[0].starts_with("doc (markdown"));
+    // w writes the file target under the cursor.
+    press(&mut a, "w");
+    assert_eq!(a.next_job(), Some(Job::WriteExports(vec!["doc".into()])));
+    a.done(Done::Wrote(Ok(vec![
+        "doc (markdown, document) → docs/DESIGN.md".into(),
+        "  update docs/DESIGN.md".into(),
+    ])));
+    assert!(a.screen().dump().contains("-- update docs/DESIGN.md"));
+    assert_eq!(a.next_job(), Some(Job::PlanExports), "planned again");
+    a.done(Done::Exports(reports()));
+    // P on the Confluence target asks; n publishes nothing.
+    press(&mut a, "j");
+    press(&mut a, "P");
+    let ask = a.screen().dump();
+    assert!(
+        ask.contains("-- Publish spec (confluence, document) → space FLINT, page 1 \"Flint\"? y/n"),
+        "{ask}"
+    );
+    press(&mut a, "n");
+    assert_eq!(a.next_job(), None);
+    press(&mut a, "Py");
+    assert_eq!(
+        a.next_job(),
+        Some(Job::Publish {
+            target: "spec".into(),
+            shown: reports()[1].plan()
+        })
+    );
+    a.done(Done::Published(Ok(vec![
+        "spec: published 0 created, 1 updated, 0 retired, 0 pruned".into(),
+    ])));
+    assert!(a
+        .screen()
+        .dump()
+        .contains("-- spec: published 0 created, 1 updated"));
+    a.next_job();
+    a.done(Done::Exports(reports()));
+    // A refused plan is the command line's to override.
+    press(&mut a, "G");
+    press(&mut a, "P");
+    let refused = a.screen().dump();
+    assert!(refused.contains("kiln export edited --force"), "{refused}");
+    assert_eq!(a.next_job(), None);
+    // w on a Confluence target says what to press instead.
+    press(&mut a, "w");
+    assert!(a.screen().dump().contains("P publishes it"));
+}
+
+#[test]
+fn comments_open_in_the_browser() {
+    let mut a = app();
+    press(&mut a, " m");
+    assert_eq!(a.next_job(), Some(Job::Comments));
+    a.done(Done::Comments(Ok(vec![CommentGroup {
+        target: "spec".into(),
+        space: "FLINT".into(),
+        published: true,
+        comments: vec![Comment {
+            item: Some("REQ-001".into()),
+            page_title: "Flint".into(),
+            author: "Alice Martin".into(),
+            date: "2026-10-12".into(),
+            text: "Is that measured cold?".into(),
+            url: "https://confluence.example.com/c/456".into(),
+        }],
+    }])));
+    let text = squash(a.text());
+    assert_eq!(text[0], "spec → space FLINT: 1 unresolved comment");
+    assert_eq!(
+        text[1],
+        "REQ-001 Alice Martin, 2026-10-12: Is that measured cold?"
+    );
+    assert_eq!(
+        press(&mut a, "\n"),
+        Effect::OpenUrl("https://confluence.example.com/c/456".into())
+    );
+    press(&mut a, "v");
+    assert_eq!(squash(a.text())[0], "REQ-001 Fast start");
+}
+
+#[test]
+fn another_baseline_is_picked_from_the_tags() {
+    let mut a = app();
+    press(&mut a, "7b");
+    assert_eq!(a.next_job(), Some(Job::Tags));
+    a.done(Done::Tags(Ok(vec!["v1.1".into(), "v1.0".into()])));
+    assert!(a.screen().dump().contains("| > v1.1"));
+    press(&mut a, "1.0\n");
+    assert_eq!(a.next_job(), Some(Job::Baseline("v1.0".into())));
+    let mut old = source();
+    old.remove("design/REQ-004.md");
+    a.done(Done::Baseline(Ok(Box::new(Baseline {
+        label: "v1.0 (1a2b3c4)".into(),
+        project: Project::load(&old).unwrap(),
+    }))));
+    assert!(
+        a.text()[0].starts_with("Since v1.0 (1a2b3c4): 1 added"),
+        "{:?}",
+        a.text()
+    );
+}
+
+#[test]
+// verifies: REQ-013
+fn edits_go_to_disk_the_way_the_commands_write_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    std::fs::write(root.join("kiln.toml"), kiln_model::default_config("Demo")).unwrap();
+    std::fs::create_dir_all(root.join("design")).unwrap();
+    let req = "+++\r\nid = \"REQ-001\" # keep me\r\ntype = \"requirement\"\r\ntitle = \"Fast start\"\r\nstatus = \"draft\"\r\n+++\r\n\r\nThe body.\r\n";
+    std::fs::write(root.join("design/REQ-001.md"), req).unwrap();
+    std::fs::write(
+        root.join("design/TEST-001.md"),
+        item("TEST-001", "test", "Timing", "ready", ""),
+    )
+    .unwrap();
+
+    let set = crate::edit::apply(
+        root,
+        &Edit::Set {
+            id: id("REQ-001"),
+            key: "status".into(),
+            value: "approved".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(set.message, "REQ-001: status draft → approved");
+    assert_eq!(
+        std::fs::read_to_string(root.join("design/REQ-001.md")).unwrap(),
+        req.replace("\"draft\"", "\"approved\""),
+        "only the status changed: the comment, CRLF and body are kept"
+    );
+
+    let refused = crate::edit::apply(
+        root,
+        &Edit::Set {
+            id: id("REQ-001"),
+            key: "status".into(),
+            value: "nonsense".into(),
+        },
+    )
+    .unwrap_err();
+    assert!(
+        refused.starts_with("`nonsense` isn't a requirement status"),
+        "{refused}"
+    );
+
+    let link = crate::edit::apply(
+        root,
+        &Edit::Link {
+            id: id("TEST-001"),
+            role: "verifies".into(),
+            target: id("REQ-001"),
+            add: true,
+        },
+    )
+    .unwrap();
+    assert_eq!(link.message, "TEST-001 verifies REQ-001");
+
+    let new = crate::edit::apply(
+        root,
+        &Edit::New {
+            type_name: "requirement".into(),
+            title: Some("Warm start".into()),
+            parent: Some(id("REQ-001")),
+        },
+    )
+    .unwrap();
+    assert_eq!(new.item, Some(id("REQ-002")));
+    let (path, line) = new.created.unwrap();
+    assert!(path.is_file() && line > 0, "{path:?}");
+
+    let renumbered = crate::edit::apply(
+        root,
+        &Edit::Renumber {
+            from: id("REQ-001"),
+            to: id("REQ-010"),
+            file: None,
+        },
+    )
+    .unwrap();
+    assert!(
+        renumbered.message.starts_with("REQ-001 → REQ-010"),
+        "{}",
+        renumbered.message
+    );
+    let test = std::fs::read_to_string(root.join("design/TEST-001.md")).unwrap();
+    assert!(test.contains("REQ-010"), "{test}");
+}
+
+#[test]
+fn the_check_page_says_when_a_check_is_still_running() {
+    let mut a = app();
+    a.set_checking();
+    press(&mut a, "9");
+    assert_eq!(
+        squash(a.text()),
+        [
+            "kiln check: 0 errors, 0 warnings (checking again…)",
+            "Running kiln check…"
+        ]
+    );
+    a.set_findings(Vec::new());
+    assert_eq!(
+        squash(a.text()),
+        ["kiln check: 0 errors, 0 warnings", "No findings."]
+    );
 }

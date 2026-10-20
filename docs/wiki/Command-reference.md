@@ -568,7 +568,7 @@ kiln gui [--since REV] [--item ID]
 kiln
 ```
 
-Opens the GUI: seven pages (Tree, Trace, Impact, Board, Roadmap, Decisions, Changes), driven with Vim keys. [The GUI](The-GUI) describes every page and key.
+Opens the GUI: eleven pages (Tree, Trace, Impact, Board, Roadmap, Decisions, Changes, Item, Check, Exports, Comments), driven with Vim keys. It also sets statuses and other front-matter values, links and unlinks, creates and renumbers items, writes exports and publishes to Confluence after a confirm, through the same code as the commands. [The GUI](The-GUI) describes every page and key.
 
 | Option | Does |
 |---|---|
