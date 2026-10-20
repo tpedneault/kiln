@@ -13,8 +13,8 @@ Requirements: implemented by 1 of 3, verified by 1 of 3.
 
 - [1 Requirements](#section:1 Requirements)
   - [1.1 REQ-001 Flint is a launcher](#REQ-001)
-    - [1.1.1 REQ-002 Fast enough to be a reflex](#REQ-002)
-    - [1.1.2 REQ-003 Themes follow Fenix](#REQ-003)
+  - [1.2 REQ-002 Fast enough to be a reflex](#REQ-002)
+  - [1.3 REQ-003 Themes follow Fenix](#REQ-003)
 - [2 Decisions](#section:2 Decisions)
   - [2.1 ADR-002 TOML front matter](#ADR-002)
 - [3 Tests](#section:3 Tests)
@@ -41,7 +41,7 @@ Flint finds and opens things; see [ADR-002 TOML front matter](#ADR-002).
 Windows and Linux.
 
 <a id="REQ-002"></a>
-#### 1.1.1 REQ-002 Fast enough to be a reflex
+### 1.2 REQ-002 Fast enough to be a reflex
 
 | Property | Value |
 | --- | --- |
@@ -64,7 +64,7 @@ flowchart TD
 ![flow](https://git.example.com/flint/-/raw/9f8e7d6c5b4a/design/img/flow.png)
 
 <a id="REQ-003"></a>
-#### 1.1.2 REQ-003 Themes follow Fenix
+### 1.3 REQ-003 Themes follow Fenix
 
 | Property | Value |
 | --- | --- |

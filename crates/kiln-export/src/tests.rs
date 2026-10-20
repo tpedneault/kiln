@@ -225,7 +225,7 @@ path = "out/word"
 "#;
 
 #[test]
-fn assembly_places_each_item_once_nested_and_numbered() {
+fn assembly_places_each_item_once_flat_or_nested_and_numbered() {
     let (project, source) = project(TARGETS);
     let rev = revision();
     let a = Assembly {
@@ -249,6 +249,17 @@ fn assembly_places_each_item_once_nested_and_numbered() {
             .collect::<Vec<_>>()
     ));
     golden("assembly-template.txt", &out);
+
+    // `nest="parent"` keeps the `parent` tree as heading levels.
+    let nested = template.replace(
+        "<!-- kiln:items type=\"requirement\" -->",
+        "<!-- kiln:items type=\"requirement\" nest=\"parent\" -->",
+    );
+    assert_ne!(nested, template);
+    let tree = crate::assemble(&target(&project, "doc"), Some(&nested), &a);
+    let mut out = String::new();
+    dump(&tree.document.nodes, 0, &mut out);
+    golden("assembly-nested.txt", &out);
 
     let without = crate::assemble(&target(&project, "plain"), None, &a);
     let mut out = String::new();

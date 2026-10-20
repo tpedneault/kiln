@@ -83,7 +83,7 @@ path = "target/kiln/design.html"
 | `exclude_status` | each type's `closed` statuses | items left out |
 | `reports` | `["traceability", "findings"]` | without a template: report sections appended as appendices |
 | `numbering` | `true` | section numbers (`2.1.3`) on headings |
-| `item_style` | `line` for `document` and `sections`, `table` for `tree` | how an item's properties are shown (see "Items in a document") |
+| `item_style` | `list` for `document` and `sections`, `table` for `tree` | how an item's properties are shown (see "Items in a document") |
 | `link_to` | `[]` | other exports to link into for items this one doesn't contain, in order |
 | `path` | required for file formats | output file (`document`) or folder (`sections`, `tree`), relative to the project |
 | `[export.<format>]` | — | settings only that format reads |
@@ -167,7 +167,7 @@ Flint covers Windows and Linux (KDE Plasma 6 on Wayland). It does not…
 
 | Directive | Places |
 |---|---|
-| `<!-- kiln:items … -->` | the selected items, nested by `parent`, under the heading it sits in |
+| `<!-- kiln:items … -->` | the selected items, as a flat list (in `tree`: nested by `parent`), under the heading it sits in |
 | `<!-- kiln:item REQ-014 -->` | one item |
 | `<!-- kiln:report traceability\|findings\|roadmap\|changes\|risks … -->` | a report (see "Reports") |
 | `<!-- kiln:summary -->` | the commit, its date, counts, coverage, progress |
@@ -184,6 +184,7 @@ Flint covers Windows and Linux (KDE Plasma 6 on Wayland). It does not…
 | `root="REQ-002"` | that item and its descendants |
 | `jira="FLINT-*"` | items with a matching Jira key |
 | `style="full\|row"` | `full` (default): each item as a heading with its properties and body; `row`: all of them as one table (ID, title, status, links), bodies left out, which suits many small items such as tests |
+| `nest="flat\|parent"` | `flat` (default, except in `tree`): every item a heading at the directive's level, in tree order, each parent followed by its children; `parent`: children one heading level below their parent (the default in `tree`, where it makes the page tree) |
 | `split="auto\|no"` | in `tree`, `no` keeps these items inline in their section page instead of a page each |
 
 Rules:
@@ -203,9 +204,15 @@ Rules:
   lists (the roadmap's milestones, the risks) and that nothing else
   placed are placed on their row the same way, after everything else,
   so a report never takes an item from a later `kiln:items`.
-- Items keep their `parent` nesting within a directive. An item whose
-  parent isn't placed by the same directive starts at the directive's
-  level.
+- Items are a flat list at the directive's level, in tree order: each
+  item is followed by its children (within the directive), depth first,
+  so related items stay together while every one is a heading of the
+  same level, and a table of contents a few levels deep (Confluence's
+  `toc` stops at `toc_levels`, 3 by default) lists every one. The parent
+  shows in the item's properties. `nest="parent"` (the default in `tree`)
+  puts children one heading level below their parent instead; an item
+  whose parent isn't placed by the same directive then starts at the
+  directive's level.
 - The template's own headings are the document's sections and are
   numbered with everything else. Template prose is rendered like any item
   body: references, diagrams and callouts all work.
@@ -217,18 +224,26 @@ Rules:
 An item placed with `style="full"` becomes:
 
 ```
-2.1.3  REQ-014 Flint appears within 50 ms of the hotkey        ← heading, with an anchor "REQ-014"
-approved · under REQ-002 · verified by TEST-031 · Jira FLINT-88 ← properties (item_style = "line")
+2.1.3  REQ-014 Flint appears within 50 ms of the hotkey   ← heading, with an anchor "REQ-014"
+approved                                                  ← properties (item_style = "list")
+Parent: REQ-002 Flint is fast
+Verified by: TEST-031 Hotkey timing, TEST-032 Cold start
+Jira: FLINT-88
 <body>
-  2.1.3.1  REQ-031 …                                           ← children, one level deeper
+2.1.4  REQ-031 …                                          ← a child: the next heading, same level
 ```
 
 `item_style`:
 
-- `line` (default for `document` and `sections`): one line of properties
-  under the heading: status lozenge, parent, outgoing links, inverses
-  ("verified by", "implemented by" with code locations), Jira. Compact
-  enough for a long document.
+- `list` (default for `document` and `sections`): the status lozenge on
+  its own line, then one line per relationship, its label in bold:
+  parent, outgoing links, inverses ("Verified by", "Implemented by" with
+  code locations), Jira. Each relationship reads on its own, and an item
+  with none takes one line. Lines are broken inside one paragraph
+  (Confluence and HTML `<br>`, Markdown's `\` hard break, wiki markup's
+  `\\`, a Word line break), so the block stays compact.
+- `line`: the same on a single line, joined with `·`; the most compact,
+  for long documents whose items have few links.
 - `table`: the full properties table (default for `tree`, where each item
   is a page of its own).
 - `none`: heading and body only, for documents meant to read as prose.

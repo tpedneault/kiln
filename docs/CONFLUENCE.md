@@ -33,10 +33,12 @@ date.
       1  Introduction                      (template prose)
       2  Requirements
          2.1  REQ-001 Flint is a launcher…
-              approved · verified by TEST-002 · Jira FLINT-12
+              approved
+              Verified by: TEST-002
+              Jira: FLINT-12
               <body>
-              2.1.1  REQ-002 Fast enough to be a reflex
-                     2.1.1.1  REQ-014 Flint appears within 50 ms of the hotkey
+         2.2  REQ-002 Fast enough to be a reflex     (a child: the same level)
+         2.3  REQ-014 Flint appears within 50 ms of the hotkey
       3  Design
       4  Decisions
       A  Traceability

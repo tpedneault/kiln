@@ -13,8 +13,8 @@ Requirements: implemented by 1 of 3, verified by 1 of 3.
 
 - [1 Requirements](#1-requirements)
   - [1.1 REQ-001 Flint is a launcher](#11-req-001-flint-is-a-launcher)
-    - [1.1.1 REQ-002 Fast enough to be a reflex](#111-req-002-fast-enough-to-be-a-reflex)
-    - [1.1.2 REQ-003 Themes follow Fenix](#112-req-003-themes-follow-fenix)
+  - [1.2 REQ-002 Fast enough to be a reflex](#12-req-002-fast-enough-to-be-a-reflex)
+  - [1.3 REQ-003 Themes follow Fenix](#13-req-003-themes-follow-fenix)
 - [2 Decisions](#2-decisions)
   - [2.1 ADR-002 TOML front matter](#21-adr-002-toml-front-matter)
 - [3 Tests](#3-tests)
@@ -28,7 +28,8 @@ Requirements: implemented by 1 of 3, verified by 1 of 3.
 
 ### 1.1 REQ-001 Flint is a launcher
 
-**approved** · Jira [FLINT-12](https://jira.example.com/browse/FLINT-12)
+**approved**\
+**Jira:** [FLINT-12](https://jira.example.com/browse/FLINT-12)
 
 Flint finds and opens things; see [ADR-002 TOML front matter](#21-adr-002-toml-front-matter).
 
@@ -36,9 +37,12 @@ Flint finds and opens things; see [ADR-002 TOML front matter](#21-adr-002-toml-f
 
 Windows and Linux.
 
-#### 1.1.1 REQ-002 Fast enough to be a reflex
+### 1.2 REQ-002 Fast enough to be a reflex
 
-**approved** · under [REQ-001 Flint is a launcher](#11-req-001-flint-is-a-launcher) · implemented by [src/launcher.rs:2](https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2) · verified by [TEST-001 Hotkey benchmark](#31-test-001-hotkey-benchmark)
+**approved**\
+**Parent:** [REQ-001 Flint is a launcher](#11-req-001-flint-is-a-launcher)\
+**Implemented by:** [src/launcher.rs:2](https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2)\
+**Verified by:** [TEST-001 Hotkey benchmark](#31-test-001-hotkey-benchmark)
 
 > [!NOTE]
 > Measured on the reference laptop.
@@ -50,9 +54,10 @@ flowchart TD
 
 ![flow](https://git.example.com/flint/-/raw/9f8e7d6c5b4a/design/img/flow.png)
 
-#### 1.1.2 REQ-003 Themes follow Fenix
+### 1.3 REQ-003 Themes follow Fenix
 
-**draft** · under [REQ-001 Flint is a launcher](#11-req-001-flint-is-a-launcher)
+**draft**\
+**Parent:** [REQ-001 Flint is a launcher](#11-req-001-flint-is-a-launcher)
 
 | Theme | Source |
 | --- | --- |
@@ -62,7 +67,8 @@ flowchart TD
 
 ### 2.1 ADR-002 TOML front matter
 
-**accepted** · supersedes [ADR-001 YAML front matter](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/ADR-001-yaml.md)
+**accepted**\
+**Supersedes:** [ADR-001 YAML front matter](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/ADR-001-yaml.md)
 
 Comments survive edits.
 
@@ -70,7 +76,8 @@ Comments survive edits.
 
 ### 3.1 TEST-001 Hotkey benchmark
 
-**passing** · verifies [REQ-002 Fast enough to be a reflex](#111-req-002-fast-enough-to-be-a-reflex)
+**passing**\
+**Verifies:** [REQ-002 Fast enough to be a reflex](#12-req-002-fast-enough-to-be-a-reflex)
 
 ## A Traceability
 
@@ -79,8 +86,8 @@ Comments survive edits.
 | Requirement | Title | Status | Implemented by | Verified by |
 | --- | --- | --- | --- | --- |
 | [REQ-001](#11-req-001-flint-is-a-launcher) | Flint is a launcher | **approved** | **gap** | **gap** |
-| [REQ-002](#111-req-002-fast-enough-to-be-a-reflex) | Fast enough to be a reflex | **approved** | [src/launcher.rs:2](https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2) | [TEST-001](#31-test-001-hotkey-benchmark) |
-| [REQ-003](#112-req-003-themes-follow-fenix) | Themes follow Fenix | **draft** | **gap** | **gap** |
+| [REQ-002](#12-req-002-fast-enough-to-be-a-reflex) | Fast enough to be a reflex | **approved** | [src/launcher.rs:2](https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2) | [TEST-001](#31-test-001-hotkey-benchmark) |
+| [REQ-003](#13-req-003-themes-follow-fenix) | Themes follow Fenix | **draft** | **gap** | **gap** |
 
 ## B Roadmap
 

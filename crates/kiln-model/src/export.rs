@@ -96,6 +96,8 @@ impl Layout {
 /// How an item's properties are shown under its heading.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ItemStyle {
+    /// The status, then one line per relationship, its label in bold.
+    List,
     /// One line: status, parent, links, Jira.
     Line,
     /// The full properties table.
@@ -107,6 +109,7 @@ pub enum ItemStyle {
 impl ItemStyle {
     pub fn parse(s: &str) -> Option<Self> {
         match s {
+            "list" => Some(ItemStyle::List),
             "line" => Some(ItemStyle::Line),
             "table" => Some(ItemStyle::Table),
             "none" => Some(ItemStyle::None),
@@ -189,8 +192,16 @@ impl ExportTarget {
     pub fn item_style(&self) -> ItemStyle {
         self.item_style.unwrap_or(match self.layout {
             Layout::Tree => ItemStyle::Table,
-            _ => ItemStyle::Line,
+            _ => ItemStyle::List,
         })
+    }
+
+    /// Whether `kiln:items` nests items by `parent` when it doesn't say
+    /// (`nest=`): in `tree`, where nesting is what makes the page tree;
+    /// elsewhere items are a flat list at the directive's level, so a
+    /// table of contents of a few levels lists every one of them.
+    pub fn nests_by_default(&self) -> bool {
+        self.layout == Layout::Tree
     }
 }
 

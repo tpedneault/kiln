@@ -385,7 +385,7 @@ fn target(
                 invalid(
                     w,
                     span,
-                    format!("item_style `{s}` isn't line, table or none"),
+                    format!("item_style `{s}` isn't list, line, table or none"),
                 );
                 ok = false;
                 None
@@ -685,7 +685,7 @@ flavour = "github"
         let spec = config.export("spec").unwrap();
         assert_eq!(
             (spec.format, spec.layout, spec.item_style()),
-            (ExportFormat::Confluence, Layout::Document, ItemStyle::Line)
+            (ExportFormat::Confluence, Layout::Document, ItemStyle::List)
         );
         assert_eq!(spec.link_to, ["spec-md"]);
         assert_eq!(spec.types.len(), 7);

@@ -21,6 +21,7 @@ This document describes Flint.
     - [2.1.1 REQ-002 Fast enough to be a reflex](#211-req-002-fast-enough-to-be-a-reflex)
   - [2.2 Everything else](#22-everything-else)
     - [2.2.1 REQ-001 Flint is a launcher](#221-req-001-flint-is-a-launcher)
+    - [2.2.2 REQ-003 Themes follow Fenix](#222-req-003-themes-follow-fenix)
 - [3 Decisions](#3-decisions)
 - [4 Appendix: traceability](#4-appendix-traceability)
 
@@ -30,7 +31,10 @@ This document describes Flint.
 
 #### 2.1.1 REQ-002 Fast enough to be a reflex
 
-**approved** · under [REQ-001 Flint is a launcher](#221-req-001-flint-is-a-launcher) · implemented by [src/launcher.rs:2](https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2) · verified by [TEST-001 Hotkey benchmark](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/TEST-001-bench.md)
+**approved**\
+**Parent:** [REQ-001 Flint is a launcher](#221-req-001-flint-is-a-launcher)\
+**Implemented by:** [src/launcher.rs:2](https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2)\
+**Verified by:** [TEST-001 Hotkey benchmark](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/TEST-001-bench.md)
 
 > [!NOTE]
 > Measured on the reference laptop.
@@ -46,7 +50,8 @@ flowchart TD
 
 #### 2.2.1 REQ-001 Flint is a launcher
 
-**approved** · Jira [FLINT-12](https://jira.example.com/browse/FLINT-12)
+**approved**\
+**Jira:** [FLINT-12](https://jira.example.com/browse/FLINT-12)
 
 Flint finds and opens things; see [ADR-002 TOML front matter](#3-decisions).
 
@@ -54,9 +59,10 @@ Flint finds and opens things; see [ADR-002 TOML front matter](#3-decisions).
 
 Windows and Linux.
 
-##### 2.2.1.1 REQ-003 Themes follow Fenix
+#### 2.2.2 REQ-003 Themes follow Fenix
 
-**draft** · under [REQ-001 Flint is a launcher](#221-req-001-flint-is-a-launcher)
+**draft**\
+**Parent:** [REQ-001 Flint is a launcher](#221-req-001-flint-is-a-launcher)
 
 | Theme | Source |
 | --- | --- |
@@ -77,4 +83,4 @@ Windows and Linux.
 | --- | --- | --- | --- | --- |
 | [REQ-001](#221-req-001-flint-is-a-launcher) | Flint is a launcher | **approved** | **gap** | **gap** |
 | [REQ-002](#211-req-002-fast-enough-to-be-a-reflex) | Fast enough to be a reflex | **approved** | [src/launcher.rs:2](https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2) | [TEST-001](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/TEST-001-bench.md) |
-| [REQ-003](#2211-req-003-themes-follow-fenix) | Themes follow Fenix | **draft** | **gap** | **gap** |
+| [REQ-003](#222-req-003-themes-follow-fenix) | Themes follow Fenix | **draft** | **gap** | **gap** |
