@@ -75,11 +75,29 @@ impl Confluence for DataCenter {
         Ok(all.iter().filter_map(page_from).collect())
     }
 
+    /// Every page below `id`, breadth first, one child listing per page
+    /// that has children. Not `/descendant/page`: a Data Center at work
+    /// answers it with HTTP 500 ("Please contact your admin passing
+    /// attached Log's referral number") whenever the page exists, while
+    /// `/child/page` works on the same server. The cost is a request per
+    /// page instead of one per hundred; a `document` has no pages below
+    /// its root, so it still takes one.
     fn descendants(&self, id: u64) -> Result<Vec<RemotePage>, ClientError> {
-        let all = self.http.get_all(&format!(
-            "/rest/api/content/{id}/descendant/page?expand=version,ancestors&limit=100"
-        ))?;
-        Ok(all.iter().filter_map(page_from).collect())
+        let mut out: Vec<RemotePage> = Vec::new();
+        let mut seen = std::collections::HashSet::from([id]);
+        let mut queue = std::collections::VecDeque::from([id]);
+        while let Some(parent) = queue.pop_front() {
+            for mut page in self.children(parent)? {
+                if !seen.insert(page.id) {
+                    continue;
+                }
+                // The listing's ancestors say the same, but the walk knows.
+                page.parent_id = Some(parent);
+                queue.push_back(page.id);
+                out.push(page);
+            }
+        }
+        Ok(out)
     }
 
     fn property(&self, id: u64) -> Result<Option<KilnProperty>, ClientError> {
