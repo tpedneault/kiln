@@ -34,26 +34,6 @@ pub fn existing<'p>(project: &'p Project, id: &ItemId) -> Result<&'p Item, Fail>
         .ok_or_else(|| Fail::usage(format!("{id} doesn't exist")))
 }
 
-/// The item with `id`, which must exist once: edits refuse a duplicated
-/// ID, since they couldn't say which file they changed.
-pub fn unique<'p>(project: &'p Project, id: &ItemId) -> Result<&'p Item, Fail> {
-    let item = existing(project, id)?;
-    let copies = project.indices(id);
-    if copies.len() > 1 {
-        let paths: Vec<&str> = copies
-            .iter()
-            .map(|&i| project.items[i].path.as_str())
-            .collect();
-        return Err(Fail::usage(format!(
-            "{id} is in {} files ({}); `kiln renumber {id} --to {} --file …` first",
-            paths.len(),
-            paths.join(", "),
-            project.next_id(id.prefix())
-        )));
-    }
-    Ok(item)
-}
-
 pub use kiln_index::labelled;
 
 /// Pretty JSON with a final newline.

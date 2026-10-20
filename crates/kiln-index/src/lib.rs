@@ -15,11 +15,13 @@
 //!
 //! It deliberately doesn't judge the project (`kiln-check` turns it into
 //! findings) or render it, and it decides no writes: a renumbering or a
-//! new item is a plan the caller applies. [`write_back`] is the one way
-//! callers write an edited file, so the command line and the Flint
-//! provider refuse alike when the file changed under them.
+//! new item is a plan the caller applies, or [`edit`]'s `apply_*`
+//! functions apply it. [`write_back`] is the one way callers write an
+//! edited file, so the command line, the GUI and the Flint provider
+//! refuse alike when the file changed under them.
 
 mod diff;
+mod edit;
 mod new_item;
 mod project;
 mod renumber;
@@ -27,6 +29,10 @@ mod source;
 mod write;
 
 pub use diff::{diff, ChangeKind, Detail, ItemChange};
+pub use edit::{
+    apply_link, apply_renumber, apply_set, check_link, create_item, parse_date, plan_set, unique,
+    EditError, Renumbered, SetChange, SETTABLE,
+};
 pub use new_item::{plan_new_item, toml_string, NewItem, NewItemSpec};
 pub use project::{labelled, Impact, Inbound, LoadError, Progress, Project, Source, Step};
 pub use renumber::{plan_renumber, FileEdits, RenumberPlan};

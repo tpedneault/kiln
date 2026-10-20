@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0–K8 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI, the read-only Jira mirror with K207 and `kiln auth jira`, this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
+Status: K0–K9 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the read-only Jira mirror with K207 and `kiln auth jira`, this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -209,9 +209,13 @@ leader: **Tree** (items by parent, filtered), **Trace** (coverage table,
 gaps highlighted), **Impact** (pick an item, see what depends on it),
 **Board** (work items by status), **Roadmap** (milestones with progress
 computed from `part-of` items), **Decisions** (the ADR log with
-supersession chains), **Changes** (baseline diff). `Enter` on an item opens
-it in Fenix at its title line; the GUI never edits prose. Designed in
-detail in [GUI.md](GUI.md).
+supersession chains), **Changes** (baseline diff); from K9 also **Item**
+(`kiln show`), **Check** (the findings), **Exports** (dry runs, writing,
+publishing after a confirm) and **Comments** (Confluence's unresolved
+comments). `Enter` on an item opens it in Fenix at its title line. From
+K9 the GUI edits front matter as `kiln set`, `link`, `unlink`, `new` and
+`renumber` do, through the same `kiln-index` functions; it never edits
+prose (ADR-012). Designed in detail in [GUI.md](GUI.md).
 
 ## Performance
 
@@ -282,8 +286,9 @@ changelog line.
 | K6 | `kiln diff` and baselines; `export --since` (the changes report and the in-place markers); `kiln confluence comments` | — |
 | K7 | GUI: Tree, Trace, Impact first; Board, Roadmap, Decisions, Changes after | — |
 | K8 | The `docx` format (EXPORT.md); the Jira mirror (status of linked tickets, read-only, through `fenix-jira`) | — (G6 for Jira Cloud, G9 for Jira behind a proxy) |
+| K9 | The GUI edits front matter (status, title, parent, owner, due, links, new items, renumbering) through the editing commands' shared functions, never prose (ADR-012); Item, Check, Exports (write, publish after a confirm) and Comments pages; picking another baseline | — |
 
-Everything through K8 needs nothing new from Fenix or Flint to work. INTEGRATION.md
+Everything through K9 needs nothing new from Fenix or Flint to work. INTEGRATION.md
 lists the changes (G1–G9) that make the integration better and which
 milestone notices their absence.
 

@@ -1,13 +1,15 @@
-//! The seven pages as rows (GUI.md, "Pages"): pure functions of the
-//! project, the baseline's changes and the page's options, so each is
-//! tested as text without a window.
+//! The pages as rows (GUI.md, "Pages"): pure functions of the project,
+//! what the window has gathered about it (the baseline's changes, the
+//! findings, the Jira mirror, the exports' plans, the comments) and the
+//! page's options, so each is tested as text without a window.
 
 use std::collections::{HashMap, HashSet};
 
 use kiln_index::{ChangeKind, ItemChange, Project, Source};
-use kiln_model::{Item, ItemId};
+use kiln_model::{Finding, Item, ItemId, Rule, Severity};
 
-use crate::screen::{span, Line, Role};
+use crate::host::{CommentGroup, ExportReport};
+use crate::screen::{pill, span, Line, Role};
 
 /// The pages, in `Tab` order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -19,10 +21,14 @@ pub enum Page {
     Roadmap,
     Decisions,
     Changes,
+    Item,
+    Check,
+    Exports,
+    Comments,
 }
 
 impl Page {
-    pub const ALL: [Page; 7] = [
+    pub const ALL: [Page; 11] = [
         Page::Tree,
         Page::Trace,
         Page::Impact,
@@ -30,6 +36,10 @@ impl Page {
         Page::Roadmap,
         Page::Decisions,
         Page::Changes,
+        Page::Item,
+        Page::Check,
+        Page::Exports,
+        Page::Comments,
     ];
 
     pub fn name(self) -> &'static str {
@@ -41,6 +51,10 @@ impl Page {
             Page::Roadmap => "Roadmap",
             Page::Decisions => "Decisions",
             Page::Changes => "Changes",
+            Page::Item => "Item",
+            Page::Check => "Check",
+            Page::Exports => "Exports",
+            Page::Comments => "Comments",
         }
     }
 
@@ -57,7 +71,7 @@ pub struct Open {
 }
 
 /// One row of a page.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Row {
     pub line: Line,
     /// A heading groups the rows under it; the cursor skips it.
@@ -68,6 +82,36 @@ pub struct Row {
     /// across reloads.
     pub item: Option<ItemId>,
     pub open: Option<Open>,
+    /// This copy's file, when the item's ID is in several (Check, for
+    /// renumbering the right one).
+    pub file: Option<String>,
+    /// The export target the row is about (Exports).
+    pub target: Option<String>,
+    /// What `Enter` opens in the browser (Comments).
+    pub url: Option<String>,
+}
+
+/// Something read on a thread: not asked for yet, on its way, or here.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum Remote<T> {
+    #[default]
+    NotAsked,
+    Loading,
+    Ready(T),
+    Failed(String),
+}
+
+/// What the pages show besides the project and their options.
+#[derive(Clone, Copy, Default)]
+pub struct Data<'a> {
+    pub changes: Option<&'a Changes>,
+    pub jira: Option<&'a kiln_jira::Mirror>,
+    /// `kiln check`'s findings, sorted.
+    pub findings: &'a [Finding],
+    /// A newer `kiln check` is running.
+    pub checking: bool,
+    pub exports: Option<&'a Remote<Vec<ExportReport>>>,
+    pub comments: Option<&'a Remote<Vec<CommentGroup>>>,
 }
 
 /// What a page shows besides the project.
@@ -81,6 +125,8 @@ pub struct Options {
     pub trace_type: Option<String>,
     /// Impact: the item picked with `i`.
     pub impact: Option<ItemId>,
+    /// Item: the item picked with `v`.
+    pub item: Option<ItemId>,
 }
 
 /// The baseline for the Changes page.
@@ -95,28 +141,30 @@ fn heading(text: String) -> Row {
     Row {
         line: vec![span(text, Role::Heading)],
         heading: true,
-        depth: 0,
-        item: None,
-        open: None,
+        ..Row::default()
     }
 }
 
 fn note(text: &str) -> Row {
     Row {
         line: vec![span(text, Role::Muted)],
-        heading: false,
-        depth: 0,
-        item: None,
-        open: None,
+        ..Row::default()
     }
 }
 
+/// A status's colour, from what its type says it means, so it reads the
+/// same in every project: done is green, `blocked` an error, closed
+/// muted, the initial one (a draft, a to-do) the headings' colour, and
+/// anything between (approved, doing, active) the theme's purple.
 fn status_role(p: &Project, item: &Item) -> Role {
+    let status = &item.status;
     match p.type_of(item) {
-        Some(t) if t.is_done(&item.status) => Role::Good,
-        Some(t) if t.is_closed(&item.status) || t.initial == item.status => Role::Muted,
-        // Plain, so a status doesn't share the IDs' colour.
-        _ => Role::Normal,
+        Some(t) if t.is_done(status) => Role::Done,
+        Some(_) if status == "blocked" => Role::Error,
+        Some(t) if t.is_closed(status) => Role::Muted,
+        Some(t) if t.initial == *status => Role::Heading,
+        Some(_) => Role::Active,
+        None => Role::Normal,
     }
 }
 
@@ -126,7 +174,8 @@ fn item_row(p: &Project, item: &Item, depth: u16, extra: Line) -> Row {
         span("  ".repeat(depth as usize), Role::Normal),
         span(format!("{:<9}", item.id.to_string()), Role::Accent),
         span(format!(" {}", item.title), Role::Normal),
-        span(format!("  {}", item.status), status_role(p, item)),
+        span(" ", Role::Normal),
+        pill(item.status.clone(), status_role(p, item)),
     ];
     line.extend(extra);
     Row {
@@ -138,19 +187,14 @@ fn item_row(p: &Project, item: &Item, depth: u16, extra: Line) -> Row {
             path: item.path.clone(),
             line: item.title_span.line.max(1),
         }),
+        ..Row::default()
     }
 }
 
 /// The rows of `page`.
-pub fn rows(
-    page: Page,
-    p: &Project,
-    changes: Option<&Changes>,
-    o: &Options,
-    jira: Option<&kiln_jira::Mirror>,
-) -> Vec<Row> {
-    let mut rows = page_rows(page, p, changes, o);
-    if let Some(mirror) = jira {
+pub fn rows(page: Page, p: &Project, data: &Data, o: &Options) -> Vec<Row> {
+    let mut rows = page_rows(page, p, data, o);
+    if let Some(mirror) = data.jira {
         with_tickets(&mut rows, p, mirror);
     }
     rows
@@ -176,7 +220,7 @@ fn with_tickets(rows: &mut [Row], p: &Project, mirror: &kiln_jira::Mirror) {
     }
 }
 
-fn page_rows(page: Page, p: &Project, changes: Option<&Changes>, o: &Options) -> Vec<Row> {
+fn page_rows(page: Page, p: &Project, data: &Data, o: &Options) -> Vec<Row> {
     match page {
         Page::Tree => tree(p, o),
         Page::Trace => trace(p, o),
@@ -184,7 +228,11 @@ fn page_rows(page: Page, p: &Project, changes: Option<&Changes>, o: &Options) ->
         Page::Board => board(p, o),
         Page::Roadmap => roadmap(p),
         Page::Decisions => decisions(p),
-        Page::Changes => changes_page(p, changes),
+        Page::Changes => changes_page(p, data.changes),
+        Page::Item => item_page(p, o, data.jira),
+        Page::Check => check(p, data.findings, data.checking),
+        Page::Exports => exports(data.exports),
+        Page::Comments => comments(p, data.comments),
     }
 }
 
@@ -408,6 +456,7 @@ fn impact(p: &Project, o: &Options) -> Vec<Row> {
                         path: code.path.clone(),
                         line: code.target.span.line,
                     }),
+                    ..Row::default()
                 });
             }
         }
@@ -563,7 +612,7 @@ fn decisions(p: &Project) -> Vec<Row> {
 fn changes_page(p: &Project, changes: Option<&Changes>) -> Vec<Row> {
     let Some(c) = changes else {
         return vec![note(
-            "No baseline: start with `kiln gui --since REV`, or tag a release so the latest tag is used.",
+            "No baseline: press b to pick one, start with `kiln gui --since REV`, or tag a release.",
         )];
     };
     let count = |k| c.changes.iter().filter(|x| x.kind == k).count();
@@ -606,6 +655,283 @@ fn changes_page(p: &Project, changes: Option<&Changes>) -> Vec<Row> {
                 depth: 1,
                 item: (kind != ChangeKind::Removed).then(|| x.id.clone()),
                 open,
+                ..Row::default()
+            });
+        }
+    }
+    out
+}
+
+/// Where a value `kiln show` prints leads: an item (`REQ-001 Title`) or
+/// a code location (`src/lib.rs:12`).
+fn resolve(p: &Project, value: &str) -> (Option<ItemId>, Option<Open>) {
+    let first = value.split_whitespace().next().unwrap_or_default();
+    if let Some(item) = first.parse::<ItemId>().ok().and_then(|id| p.item(&id)) {
+        return (
+            Some(item.id.clone()),
+            Some(Open {
+                path: item.path.clone(),
+                line: item.title_span.line.max(1),
+            }),
+        );
+    }
+    if let Some((path, line)) = first.trim_end_matches(',').rsplit_once(':') {
+        if let Ok(line) = line.parse::<u32>() {
+            return (
+                None,
+                Some(Open {
+                    path: path.to_owned(),
+                    line,
+                }),
+            );
+        }
+    }
+    (None, None)
+}
+
+/// `kiln show` as rows: the item, then one row per related item or
+/// location under its label, each one a row the cursor can open or view.
+fn item_page(p: &Project, o: &Options, jira: Option<&kiln_jira::Mirror>) -> Vec<Row> {
+    let Some(id) = &o.item else {
+        return vec![note("Put the cursor on an item on any page and press v.")];
+    };
+    let Some(item) = p.item(id) else {
+        return vec![note(&format!("{id} isn't in the project any more."))];
+    };
+    let mut out = vec![heading(format!("{} {}", item.id, item.title))];
+    out.push(item_row(
+        p,
+        item,
+        0,
+        vec![span(
+            format!("  {} · {}:{}", item.type_name, item.path, item.id_span.line),
+            Role::Muted,
+        )],
+    ));
+    let facts = p.facts(item);
+    let width = facts
+        .iter()
+        .map(|(k, _)| k.chars().count())
+        .max()
+        .unwrap_or(0)
+        .max(8);
+    for (key, values) in facts {
+        for (n, value) in values.iter().enumerate() {
+            let label = if n == 0 { key.as_str() } else { "" };
+            let (target, open) = if key == "jira" {
+                (None, None)
+            } else {
+                resolve(p, value)
+            };
+            let role = if target.is_some() || open.is_some() {
+                Role::Accent
+            } else {
+                Role::Normal
+            };
+            let mut line = vec![
+                span(format!("  {label:width$}  "), Role::Muted),
+                span(value.clone(), role),
+            ];
+            if key == "jira" {
+                if let Some(t) = jira.and_then(|m| m.ticket(value)) {
+                    line.push(span(
+                        format!("  {}", t.line()),
+                        if t.resolved { Role::Good } else { Role::Muted },
+                    ));
+                }
+            }
+            out.push(Row {
+                line,
+                depth: 1,
+                item: target,
+                open,
+                ..Row::default()
+            });
+        }
+    }
+    out
+}
+
+/// `kiln check`, grouped by file.
+fn check(p: &Project, findings: &[Finding], checking: bool) -> Vec<Row> {
+    let shown: Vec<&Finding> = findings
+        .iter()
+        .filter(|f| f.severity != Severity::Off)
+        .collect();
+    let errors = shown
+        .iter()
+        .filter(|f| f.severity == Severity::Error)
+        .count();
+    let warnings = shown.len() - errors;
+    let mut out = vec![heading(format!(
+        "kiln check: {errors} error{}, {warnings} warning{}{}",
+        if errors == 1 { "" } else { "s" },
+        if warnings == 1 { "" } else { "s" },
+        if checking { " (checking again…)" } else { "" }
+    ))];
+    if shown.is_empty() {
+        out.push(note(if checking {
+            "Running kiln check…"
+        } else {
+            "No findings."
+        }));
+        return out;
+    }
+    let mut file: Option<&str> = None;
+    for f in shown {
+        if file != Some(f.path.as_str()) {
+            file = Some(&f.path);
+            out.push(heading(f.path.clone()));
+        }
+        let item = p.items.iter().find(|i| i.path == f.path);
+        out.push(Row {
+            line: vec![
+                span(format!("  {:>4}:{:<3} ", f.line, f.column), Role::Muted),
+                span(format!("{} ", f.rule.code()), Role::Accent),
+                span(
+                    format!("{:<8}", f.severity.as_str()),
+                    if f.severity == Severity::Error {
+                        Role::Error
+                    } else {
+                        Role::Warn
+                    },
+                ),
+                span(format!(" {}", f.message), Role::Normal),
+            ],
+            depth: 1,
+            item: item.map(|i| i.id.clone()),
+            open: Some(Open {
+                path: f.path.clone(),
+                line: f.line.max(1),
+            }),
+            file: (f.rule == Rule::K101).then(|| f.path.clone()),
+            ..Row::default()
+        });
+    }
+    out
+}
+
+/// A page whose data is read on a thread, until it is here.
+fn waiting<T>(remote: Option<&Remote<T>>, what: &str) -> Option<Vec<Row>> {
+    match remote {
+        None | Some(Remote::NotAsked) | Some(Remote::Loading) => {
+            Some(vec![note(&format!("{what}…"))])
+        }
+        Some(Remote::Failed(e)) => Some(vec![Row {
+            line: vec![span(e.clone(), Role::Error)],
+            ..Row::default()
+        }]),
+        Some(Remote::Ready(_)) => None,
+    }
+}
+
+/// `kiln export --dry-run`, target by target, as the command line prints
+/// it: the target's line as the heading, the rest under it.
+fn exports(remote: Option<&Remote<Vec<ExportReport>>>) -> Vec<Row> {
+    if let Some(rows) = waiting(remote, "Planning the exports") {
+        return rows;
+    }
+    let Some(Remote::Ready(reports)) = remote else {
+        return Vec::new();
+    };
+    if reports.is_empty() {
+        return vec![note("kiln.toml declares no [[export]] targets.")];
+    }
+    let mut out = Vec::new();
+    for r in reports {
+        let mut lines = r.lines.iter();
+        out.push(heading(
+            lines.next().cloned().unwrap_or_else(|| r.name.clone()),
+        ));
+        let target = Some(r.name.clone());
+        let mut body: Vec<(String, Role)> = lines
+            .map(|line| {
+                let t = line.trim_start();
+                let role = if t.starts_with("refused") {
+                    Role::Error
+                } else if [
+                    "warning",
+                    "would",
+                    "drift",
+                    "leaves out",
+                    "create",
+                    "update",
+                ]
+                .iter()
+                .any(|w| t.starts_with(w))
+                {
+                    Role::Warn
+                } else if t.starts_with("unchanged") {
+                    Role::Muted
+                } else {
+                    Role::Normal
+                };
+                (line.clone(), role)
+            })
+            .collect();
+        if let Some(e) = &r.error {
+            body.push((format!("  {e}"), Role::Error));
+        }
+        if body.is_empty() {
+            body.push(("  (nothing to show)".into(), Role::Muted));
+        }
+        for (text, role) in body {
+            out.push(Row {
+                line: vec![span(text, role)],
+                depth: 1,
+                target: target.clone(),
+                ..Row::default()
+            });
+        }
+    }
+    out
+}
+
+/// `kiln confluence comments`, under each target.
+fn comments(p: &Project, remote: Option<&Remote<Vec<CommentGroup>>>) -> Vec<Row> {
+    if let Some(rows) = waiting(remote, "Reading the comments") {
+        return rows;
+    }
+    let Some(Remote::Ready(groups)) = remote else {
+        return Vec::new();
+    };
+    if groups.is_empty() {
+        return vec![note("No Confluence export target.")];
+    }
+    let mut out = Vec::new();
+    for g in groups {
+        if !g.published {
+            out.push(heading(format!(
+                "{} → space {}: not published yet",
+                g.target, g.space
+            )));
+            continue;
+        }
+        let n = g.comments.len();
+        out.push(heading(format!(
+            "{} → space {}: {n} unresolved comment{}",
+            g.target,
+            g.space,
+            if n == 1 { "" } else { "s" }
+        )));
+        for c in &g.comments {
+            let about = c.item.clone().unwrap_or_else(|| "(page)".to_owned());
+            let (item, open) = resolve(p, &about);
+            let mut line = vec![
+                span(format!("{about:<9}"), Role::Accent),
+                span(format!(" {}, {}: ", c.author, c.date), Role::Muted),
+                span(c.text.clone(), Role::Normal),
+            ];
+            if c.item.is_none() {
+                line.push(span(format!("  on \"{}\"", c.page_title), Role::Muted));
+            }
+            out.push(Row {
+                line,
+                depth: 1,
+                item,
+                open,
+                url: Some(c.url.clone()),
+                ..Row::default()
             });
         }
     }

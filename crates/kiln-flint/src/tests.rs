@@ -299,7 +299,10 @@ fn setting_a_status_writes_the_file_and_updates_the_items() {
     let err = host
         .execute("kiln:Demo:REQ-001:status:nonsense", "set-status")
         .unwrap_err();
-    assert_eq!(err, "`nonsense` isn't a status of requirement");
+    assert!(
+        err.starts_with("`nonsense` isn't a requirement status ("),
+        "{err}"
+    );
     let err = host.execute("kiln:Other:REQ-001", "clock-in").unwrap_err();
     assert!(err.contains("isn't an item of Demo"), "{err}");
 }

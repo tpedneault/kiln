@@ -1,6 +1,6 @@
-This page describes Kiln's window: how to start it, its seven pages and what each is good for, every key and mouse action, and how to change its looks. Read it when you want to look around a project (the whole tree, the coverage gaps, what a change touches, where milestones stand, what changed since a release) rather than ask one question at a time with the command line.
+This page describes Kiln's window: how to start it, its eleven pages and what each is good for, how to edit from it, every key and mouse action, and how to change its looks. Read it when you want to look around a project (the whole tree, the coverage gaps, what a change touches, where milestones stand, what changed since a release, what `kiln check` finds) and make the small changes that turns up, without typing one command at a time.
 
-The GUI is a reader. It never edits anything: you edit items in your editor, or with `kiln set` and `kiln link`, and the window follows the files within two seconds. The one thing it does outward is open an item in the Fenix editor.
+The GUI edits front matter, never prose. It does what `kiln set`, `kiln link`, `kiln unlink`, `kiln new` and `kiln renumber` do, through the same code, and it writes and publishes exports. It has no text area: an item's body is written in your editor, which `Enter` opens at the item. Whoever edits the files, the window follows them within two seconds.
 
 ## Starting it
 
@@ -27,9 +27,9 @@ kiln: gui: couldn't connect to the display: os error at …: neither WAYLAND_DIS
 
 The window is like Fenix's pages: full-window lists driven from the keyboard.
 
-- The **top line** shows the seven pages, the current one marked, and the project's name: `1 [Tree]  2 Trace  3 Impact …`.
+- The **top line** shows the pages, the current one marked, the project's name and, when `kiln check` finds errors, how many: `1 [Tree]  2 Trace  3 Impact …  Kiln  2 errors`.
 - The **body** is a list of rows. A row is one line: an item, a code location, or a heading that groups the rows under it. The cursor skips headings. Columns are aligned in a monospace font.
-- The **bottom line** shows the active filter, a message, or the keys that work on this page, for example `14 rows  Enter open · i impact · / filter · SPC pages · q quit · a show closed`.
+- The **bottom line** shows a question being asked, the active filter, a message, what is running, or the keys that work on this page, for example `14 rows  Enter open · i impact · / filter · SPC pages · q quit · a show closed`.
 
 Every page keeps its own cursor and scroll position. When the project reloads, the cursor stays on the same item (by ID), or on the row where it was if that item went away.
 
@@ -152,12 +152,113 @@ REQ-004  Small binary  status approved → implemented
 Without a baseline the page shows:
 
 ```text
-No baseline: start with `kiln gui --since REV`, or tag a release so the latest tag is used.
+No baseline: press b to pick one, start with `kiln gui --since REV`, or tag a release.
 ```
 
-The baseline's project is read from git once, at start. When you edit files, the comparison is recomputed against the new working tree. [Changes and baselines](Changes-and-baselines) explains what counts as a change.
+`b` picks another baseline: the tags are offered newest first, and you can type any revision (`main`, `HEAD~10`, a commit). The baseline's project is read from git once, when it is picked. When you edit files, the comparison is recomputed against the new working tree. [Changes and baselines](Changes-and-baselines) explains what counts as a change.
 
 Use it to prepare release notes or a review of what changed since the last baseline. It is the window's version of `kiln diff`.
+
+### Item (`SPC v`, `8`)
+
+One item, as `kiln show` prints it, for the item you pressed `v` on (on any page):
+
+```text
+REQ-002 Cold start
+REQ-002  Cold start  draft  requirement · design/REQ-002.md:2
+  parent       REQ-001 Fast start
+  verified by  TEST-001 Timing
+  coverage     implements: no
+               verifies: yes
+```
+
+Every related item and code location is a row: `Enter` opens it in Fenix, `v` views that item instead. `C-o` goes back to the item viewed before, `C-i` forward again, as in Vim's jump list.
+
+Use it to follow the links of one item without retyping IDs. It is the window's version of `kiln show`.
+
+### Check (`SPC k`, `9`)
+
+`kiln check`'s findings, grouped by file, with line, column, rule and severity:
+
+```text
+kiln check: 1 error, 0 warnings
+design/TEST-002.md
+     7:13  K102 error    REQ-099 doesn't exist
+```
+
+The findings are recomputed every time the project reloads, so fixing one in your editor makes it disappear within two seconds. `Enter` opens the file at the finding. On a duplicate ID (K101), `SPC e r` renumbers that file's copy. K207 (Jira) joins in once the Jira mirror has loaded, when `[check]` turns it on.
+
+Use it to clean up before you push, instead of reading `kiln check` in a terminal.
+
+### Exports (`SPC p`)
+
+Each export target's dry run, as `kiln export --dry-run` prints it:
+
+```text
+design-md (markdown, document) → docs/generated/DESIGN.md
+  would update docs/generated/DESIGN.md
+spec (confluence, document) → space FLINT, page 123456789 "Flint"
+  update    "Flint — design document": REQ-014 changed; REQ-031 new (42 KiB)
+  0 create, 1 update, 0 unchanged, 0 drift, 0 retire
+```
+
+The plans are made when you first open the page, on a separate thread (a Confluence target reads the space, which can take a few seconds); `R` makes them again. `w` writes the file target under the cursor, `W` every file target. `P` on a Confluence target publishes it after you answer `y`; see [Publishing from the window](#publishing-from-the-window).
+
+Use it to check what an export would change, and to publish without leaving the window.
+
+### Comments (`SPC m`)
+
+The unresolved comments on each Confluence target's pages, as `kiln confluence comments` lists them:
+
+```text
+spec → space FLINT: 1 unresolved comment
+REQ-001   Alice Martin, 2026-10-12: Is that measured cold?
+```
+
+`Enter` opens the comment in your browser; `v` shows the item it is about. Read once when the page is first opened; `R` reads them again.
+
+## Editing
+
+The keys below work on the item under the cursor, on every page (an Item row, a finding and a comment count too):
+
+| Keys | Does | Same as |
+|---|---|---|
+| `s`, `SPC e s` | sets the status: pick one of its type's statuses | `kiln set ID status=…` |
+| `H` / `L` (Board) | moves the item to the previous / next status | `kiln set ID status=…` |
+| `SPC e t` | sets the title | `kiln set ID title=…` |
+| `SPC e p` | sets the parent: pick an allowed item, or "(no parent)" | `kiln set ID parent=…` |
+| `SPC e o`, `SPC e d` | sets the owner, the due date (`2026-11-30`); empty removes it | `kiln set ID owner=… due=…` |
+| `l`, `SPC e l` | adds a link: pick the role, then the target | `kiln link ID ROLE TARGET` |
+| `U`, `SPC e u` | removes a link: pick it, then press `y` | `kiln unlink ID ROLE TARGET` |
+| `n`, `SPC e n` | creates an item: pick the type, type the title; it opens in Fenix | `kiln new TYPE --title … --open` |
+| `N`, `SPC e N` | creates a child of the item | `kiln new TYPE --parent ID --open` |
+| `SPC e r` | renumbers: type the new ID (the next free one is filled in), then press `y` | `kiln renumber ID --to …` |
+
+The question appears on the bottom line. For a pick, the choices show above it and narrow as you type: `↓` `↑` (or `Tab`, `C-n`, `C-p`) move, `Enter` answers, `C-u` clears what you typed, `Esc` cancels. Picks only offer what the configuration allows: the statuses of the item's type, the link roles its type may start, the targets those roles accept and that aren't linked yet.
+
+Before anything is written, the answer is checked exactly as the command checks it. A value that isn't allowed keeps the question open with the reason:
+
+```text
+Due date of REQ-002 (YYYY-MM-DD, empty for none): soon▏  `soon` isn't a date (2026-11-30)
+```
+
+Then the edit is made by the same code as the command: only the key or link it is about changes, comments, layout and line endings are kept, and a file that changed on disk since it was read (because your editor just saved it) is refused rather than overwritten. The bottom line shows what the command would have printed, such as `REQ-002: status draft → approved`, and the cursor follows the item.
+
+There is no undo. The files are in git: `git diff` shows what changed, and `git checkout -- <file>` takes it back.
+
+### Publishing from the window
+
+`P` on a Confluence target asks first, naming the space and the page the document goes under:
+
+```text
+Publish spec (confluence, document) → space FLINT, page 123456789 "Flint"? y/n
+```
+
+`y` publishes the plan shown, and only that plan: if someone edited the space, or you edited the files, since the plan was made, nothing is published and the bottom line asks you to look at the new plan. `n` or `Esc` publishes nothing.
+
+A plan Kiln refuses (a page edited in Confluence, an adopted page that has content) can't be published from the window. The bottom line names the command that overrides it, such as `kiln export spec --force`, so that decision is made deliberately in a terminal. Pruning retired pages (`--prune-removed`) is also left to the command line. See [Publishing to Confluence](Publishing-to-Confluence).
+
+Publishing uses the token `kiln auth confluence` stored, or `KILN_CONFLUENCE_TOKEN`. The window never asks for one: run `kiln auth confluence` in a terminal first.
 
 ## Keys
 
@@ -168,19 +269,24 @@ Normal mode, as in Fenix's pages:
 | `j` `k`, `↓` `↑` | next / previous row |
 | `C-d` `C-u`, `PgDn` `PgUp` | half a page down / up |
 | `gg` `G`, `Home` `End` | first / last row |
-| `Enter` | open the item (or code location) in Fenix at its title line |
+| `Enter` | open the item (or code location, or finding) in Fenix at its line; on a comment, open it in the browser |
 | `i` | Impact of the item under the cursor |
+| `v` | Item: the item under the cursor |
+| `C-o`, `C-i` | Item: the item viewed before / after |
 | `/` | filter (see below) |
 | `a` | Tree and Board: show closed items too, or hide them again |
 | `m` | Trace: only items with a gap, or all again |
 | `T` | Trace: the next traced type |
-| `R` | reload now |
+| `b` | Changes: pick another baseline |
+| `w`, `W`, `P` | Exports: write this file target, write every file target, publish this Confluence target |
+| `s`, `l`, `U`, `n`, `N`, `H`, `L` | the edits in [Editing](#editing) |
+| `R` | reload now; on Exports and Comments, read them again too |
 | `Tab`, `]` | next page |
 | `[` | previous page |
-| `1` to `7` | Tree, Trace, Impact, Board, Roadmap, Decisions, Changes |
+| `1` to `9` | Tree, Trace, Impact, Board, Roadmap, Decisions, Changes, Item, Check |
 | `SPC` | the leader key; see below |
 | `q`, `C-q` | quit |
-| `Esc` | clears a pending key, the leader or the filter |
+| `Esc` | clears a pending key, the leader, the filter or a question |
 
 `C-d` means Ctrl+D. Shift is not a separate modifier: `G` and `T` are the capital letters.
 
@@ -197,6 +303,11 @@ Normal mode, as in Fenix's pages:
 | `SPC r` | Roadmap |
 | `SPC d` | Decisions |
 | `SPC c` | Changes |
+| `SPC v` | Item |
+| `SPC k` | Check |
+| `SPC p` | Exports |
+| `SPC m` | Comments |
+| `SPC e` | the edits: `s` status, `t` title, `p` parent, `o` owner, `d` due date, `l` link, `u` unlink, `n` new item, `N` new child, `r` renumber |
 | `SPC R` | reload |
 | `SPC q` | quit |
 
@@ -212,7 +323,7 @@ Normal mode, as in Fenix's pages:
 
 ## Opening items
 
-`Enter` (or a double click) opens the item under the cursor in Fenix at its title line, or a code location at its line. It tries the running Fenix first, then starts Fenix, then, when Fenix isn't installed, the operating system's default editor for the file. On a heading, the footer says `Nothing to open here`. See [Editors and Flint](Editors-and-Flint#opening-items-in-fenix).
+`Enter` (or a double click) opens the item under the cursor in Fenix at its title line, a code location or a finding at its line, and a comment in the browser. It tries the running Fenix first, then starts Fenix, then, when Fenix isn't installed, the operating system's default editor for the file. On a heading, the footer says `Nothing to open here`. See [Editors and Flint](Editors-and-Flint#opening-items-in-fenix).
 
 ## Filtering
 
@@ -274,12 +385,17 @@ font_size = 15            # points, 8 to 40; default 15
 | `font` | the name of a monospace font family installed on the system |
 | `font_size` | a number from 8 to 40 |
 
+Statuses show as coloured pills: green when done, red for `blocked`, grey when closed, blue for a type's first status (such as `draft` or `todo`), and purple for anything in between (such as `approved` or `doing`). The colours come from the theme.
+
 Every key is optional. An unknown key, an unknown theme or a size out of range is reported in the footer and otherwise ignored; the window still opens. This file holds your personal looks and is not part of the project, so it is not in `kiln.toml`.
 
 ## What it doesn't do
 
-- Edit anything: use your editor, `kiln set`, `kiln link`, the language server or Flint's `k status`.
-- Show an item's body: open it in your editor with `Enter`.
+- Edit an item's body, or any text longer than one line: open it in your editor with `Enter`.
+- Show an item's body (the Item page shows its front matter and links).
+- Undo an edit: use git.
+- Override a refused Confluence plan, adopt a page, or prune retired pages: use `kiln export` with `--force`, `--adopt` or `--prune-removed`.
+- Store a token: run `kiln auth confluence` or `kiln auth jira`.
 - Refresh the Jira mirror while open.
 - Remember the last page between runs.
 
@@ -293,6 +409,8 @@ Every key is optional. An unknown key, an unknown theme or a size out of range i
 | `--since` fails | the revision doesn't exist in this clone. Fetch tags (`git fetch --tags`) |
 | `Enter` doesn't open Fenix | Fenix isn't installed or not on `PATH`; the default editor opens instead. If several Fenix instances run, set `FENIX_HOME` to choose one |
 | Footer says the theme isn't known | check the spelling against the list above |
+| An edit says the file "changed on disk since Kiln read it" | your editor saved the file at the same moment. Press the key again: the window has reloaded |
+| Exports says "no token for …" | run `kiln auth confluence` in a terminal, or set `KILN_CONFLUENCE_TOKEN`, then press `R` |
 | Jira tickets missing | no `[jira] url`, no token, Jira Cloud, or Jira unreachable; the footer says which. Try `kiln list --jira` in a terminal for the full error |
 
 See also: [Command reference](Command-reference) · [Editors and Flint](Editors-and-Flint) · [Changes and baselines](Changes-and-baselines) · [Troubleshooting](Troubleshooting)

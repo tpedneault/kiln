@@ -1,9 +1,9 @@
-//! Finding and loading the project, and writing files safely: the I/O
-//! every command shares.
+//! Finding and loading the project, and how a refused edit exits: the
+//! I/O every command shares (the writing itself is `kiln-index`'s).
 
 use std::path::{Path, PathBuf};
 
-use kiln_index::{find_root, DiskSource, LoadError, Project, Stamp};
+use kiln_index::{find_root, DiskSource, LoadError, Project};
 use kiln_model::{Date, Severity};
 
 use crate::{Fail, EXIT_FINDINGS};
@@ -102,34 +102,13 @@ pub fn today() -> Date {
     Date::from_unix_days((secs / 86_400) as i64)
 }
 
-pub use kiln_index::ReadFile;
-
-pub fn read_for_edit(path: &Path) -> Result<ReadFile, Fail> {
-    kiln_index::read_for_edit(path).map_err(|e| Fail::usage(e.to_string()))
-}
-
-/// [`kiln_index::write_back`], with a file changed on disk exiting 1
-/// (FORMAT.md, "Edits Kiln makes").
-pub fn write_back(
-    path: &Path,
-    rel: &str,
-    original: &[u8],
-    stamp: Stamp,
-    text: &str,
-    normalised: bool,
-) -> Result<(), Fail> {
-    kiln_index::write_back(path, rel, original, stamp, text, normalised).map_err(|e| match e {
-        kiln_index::WriteError::Changed(m) => Fail::new(EXIT_FINDINGS, m),
-        kiln_index::WriteError::Io(m) => Fail::usage(m),
-    })
-}
-
-/// `path` relative to `root` with `/`, for messages.
-pub fn relative(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .replace('\\', "/")
+/// An edit `kiln-index` refused: a file changed on disk exits 1
+/// (FORMAT.md, "Edits Kiln makes"), anything else is a usage error.
+pub fn edit_fail(e: kiln_index::EditError) -> Fail {
+    match e {
+        kiln_index::EditError::Changed(m) => Fail::new(EXIT_FINDINGS, m),
+        kiln_index::EditError::Invalid(m) | kiln_index::EditError::Io(m) => Fail::usage(m),
+    }
 }
 
 #[cfg(test)]
@@ -142,11 +121,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("a.md");
         std::fs::write(&path, "+++\r\nid = 1\r\n+++\r\n").unwrap();
-        let read = read_for_edit(&path).unwrap();
+        let read = kiln_index::read_for_edit(&path).unwrap();
         // An editor saves in between (a different length, so the stamp
         // differs even on file systems with coarse modification times).
         std::fs::write(&path, "+++\r\nid = 22\r\n+++\r\n").unwrap();
-        let err = write_back(
+        let err = kiln_index::write_back(
             &path,
             "a.md",
             &read.bytes,
@@ -154,6 +133,7 @@ mod tests {
             "+++\nid = 3\n+++\n",
             true,
         )
+        .map_err(|e| edit_fail(e.into()))
         .unwrap_err();
         assert_eq!(err.code, EXIT_FINDINGS);
         assert!(err.message.contains("changed on disk"), "{}", err.message);
@@ -162,8 +142,8 @@ mod tests {
             "+++\r\nid = 22\r\n+++\r\n"
         );
 
-        let read = read_for_edit(&path).unwrap();
-        write_back(
+        let read = kiln_index::read_for_edit(&path).unwrap();
+        kiln_index::write_back(
             &path,
             "a.md",
             &read.bytes,

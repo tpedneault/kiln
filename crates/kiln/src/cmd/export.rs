@@ -78,7 +78,54 @@ struct ConfluenceRun {
     applied: Option<Applied>,
 }
 
+/// How a publish is confirmed when `--yes` wasn't given.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Answer {
+    Yes,
+    No,
+    /// Nobody to ask (not on a terminal): stop after the plan.
+    CantAsk,
+}
+
+/// Asks whether to publish a target, given its name, space and the plan
+/// as printed.
+pub type Confirm<'a> = &'a mut dyn FnMut(&str, &str, &str) -> Answer;
+
+/// A line of output; a closed stdout is not worth failing an export for.
+macro_rules! say {
+    ($out:expr, $($t:tt)*) => {
+        let _ = writeln!($out, $($t)*);
+    };
+}
+
 pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
+    let mut confirm = |name: &str, space: &str, _plan: &str| {
+        let interactive = std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
+        if !interactive {
+            return Answer::CantAsk;
+        }
+        print!("Publish `{name}` to space {space}? [y/N] ");
+        let _ = std::io::stdout().flush();
+        let mut answer = String::new();
+        let _ = std::io::stdin().read_line(&mut answer);
+        if matches!(answer.trim(), "y" | "Y" | "yes") {
+            Answer::Yes
+        } else {
+            Answer::No
+        }
+    };
+    run_with(project, o, &mut std::io::stdout(), &mut confirm)
+}
+
+/// [`run`] with its output and its question elsewhere: the GUI plans and
+/// publishes one target at a time through this, so what it shows is what
+/// the command line prints.
+pub fn run_with(
+    project: Option<&Path>,
+    o: Options,
+    out: &mut dyn Write,
+    confirm: Confirm,
+) -> Result<u8, Fail> {
     let loaded = load(project)?;
     let p = &loaded.project;
     let root = loaded.source.root().to_path_buf();
@@ -274,7 +321,7 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
                     &pictures,
                     &loaded.source,
                     commit.as_deref(),
-                    false,
+                    None,
                 )?;
             }
         }
@@ -289,136 +336,27 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
     }
     let would = o.dry_run || o.check;
     let mut json_targets = Vec::new();
+    // Each target's lines as printed, which a publish is confirmed against.
+    let mut printed: Vec<String> = Vec::new();
     for (prep, outcome) in &results {
-        let t = &prep.target;
-        let left_out: Vec<String> = prep.left_out.iter().map(ToString::to_string).collect();
+        let mut buf: Vec<u8> = Vec::new();
+        print_outcome(prep, outcome, would, &o, &mut buf, &mut json_targets);
+        let _ = out.write_all(&buf);
+        printed.push(String::from_utf8_lossy(&buf).into_owned());
         match outcome {
-            Outcome::Files(plan) => {
-                changed |= plan.changes();
-                if o.format == TextOrJson::Json {
-                    json_targets.push(json!({
-                        "name": t.name, "format": t.format.as_str(), "layout": t.layout.as_str(),
-                        "write": plan.writes.iter().map(|(p, _, new)| json!({ "path": p, "new": new })).collect::<Vec<_>>(),
-                        "unchanged": plan.unchanged, "remove": plan.removes, "leftOut": left_out,
-                    }));
-                    continue;
-                }
-                println!(
-                    "{} ({}, {}) → {}",
-                    t.name,
-                    t.format.as_str(),
-                    t.layout.as_str(),
-                    t.path.as_deref().unwrap_or("")
-                );
-                let verb = |v: &str| {
-                    if would {
-                        format!("would {v}")
-                    } else {
-                        v.to_owned()
-                    }
-                };
-                for (path, _, new) in &plan.writes {
-                    println!("  {} {path}", verb(if *new { "create" } else { "update" }));
-                }
-                for path in &plan.removes {
-                    println!("  {} {path} (no longer produced)", verb("remove"));
-                }
-                if !plan.changes() {
-                    println!(
-                        "  unchanged ({} file{})",
-                        plan.unchanged.len(),
-                        if plan.unchanged.len() == 1 { "" } else { "s" }
-                    );
-                }
-                if !left_out.is_empty() {
-                    println!("  leaves out: {}", left_out.join(", "));
-                }
-            }
+            Outcome::Files(plan) => changed |= plan.changes(),
             Outcome::Confluence(run) => {
-                let ConfluenceRun {
-                    plan,
-                    space,
-                    anchor,
-                    applied,
-                    snapshot,
-                    ..
-                } = run.as_ref();
-                changed |= plan.changes();
-                refused |= !plan.refusals.is_empty();
-                if o.format == TextOrJson::Json {
-                    json_targets.push(json!({
-                        "name": t.name, "format": "confluence", "layout": t.layout.as_str(), "space": space,
-                        "parent": anchor, "parentTitle": snapshot.anchor_title, "plan": plan, "leftOut": left_out,
-                        "applied": applied.as_ref().map(applied_json),
-                    }));
-                    continue;
-                }
-                // The title lets a wrong `parent` be caught before
-                // publishing; a snapshot saved before titles were kept has
-                // none, so the ID alone is printed.
-                let named = if snapshot.anchor_title.is_empty() {
-                    String::new()
-                } else {
-                    format!(" \"{}\"", snapshot.anchor_title)
-                };
-                println!(
-                    "{} (confluence, {}) → space {space}, page {anchor}{named}",
-                    t.name,
-                    t.layout.as_str()
-                );
-                for op in &plan.ops {
-                    let kind = match op.kind {
-                        OpKind::Create => "create",
-                        OpKind::Update => "update",
-                        OpKind::Unchanged => "unchanged",
-                        OpKind::Drift => "drift",
-                        OpKind::Retire => "retire",
-                        OpKind::Prune => "prune",
-                    };
-                    let reasons = if op.reasons.is_empty() {
-                        String::new()
-                    } else {
-                        format!(": {}", op.reasons.join("; "))
-                    };
-                    let size = if op.size > 0 {
-                        format!(" ({} KiB)", op.size.div_ceil(1024))
-                    } else {
-                        String::new()
-                    };
-                    println!("  {kind:9} \"{}\"{reasons}{size}", op.title);
-                }
-                for title in &plan.foreign {
-                    println!("  foreign   \"{title}\" (not Kiln's; left alone)");
-                }
-                println!(
-                    "  {} create, {} update, {} unchanged, {} drift, {} retire{}",
-                    plan.count(OpKind::Create),
-                    plan.count(OpKind::Update),
-                    plan.count(OpKind::Unchanged),
-                    plan.count(OpKind::Drift),
-                    plan.count(OpKind::Retire),
-                    match plan.count(OpKind::Prune) {
-                        0 => String::new(),
-                        n => format!(", {n} prune"),
-                    }
-                );
-                for w in &plan.warnings {
-                    println!("  warning: {w}");
-                }
-                for r in &plan.refusals {
-                    println!("  refused: {r}");
-                }
-                if !left_out.is_empty() {
-                    println!("  leaves out: {}", left_out.join(", "));
-                }
+                changed |= run.plan.changes();
+                refused |= !run.plan.refusals.is_empty();
             }
         }
     }
     if o.format == TextOrJson::Json {
-        print!("{}", json_out(&Value::Array(json_targets)));
+        let _ = write!(out, "{}", json_out(&Value::Array(json_targets)));
     } else if publishing {
-        for (prep, outcome) in &mut results {
+        for (n, (prep, outcome)) in results.iter_mut().enumerate() {
             if let Outcome::Confluence(run) = outcome {
+                let shown = printed.get(n).map(String::as_str).unwrap_or_default();
                 stopped |= publish(
                     prep,
                     run,
@@ -426,7 +364,7 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
                     &pictures,
                     &loaded.source,
                     commit.as_deref(),
-                    true,
+                    Some((&mut *out, &mut *confirm, shown)),
                 )?;
             }
         }
@@ -442,6 +380,146 @@ pub fn run(project: Option<&Path>, o: Options) -> Result<u8, Fail> {
         return Ok(EXIT_FINDINGS);
     }
     Ok(0)
+}
+
+/// One target's outcome: lines on `out`, or an entry in `json`.
+fn print_outcome(
+    prep: &Prepared,
+    outcome: &Outcome,
+    would: bool,
+    o: &Options,
+    out: &mut dyn Write,
+    json: &mut Vec<Value>,
+) {
+    let t = &prep.target;
+    let json_targets = json;
+    let left_out: Vec<String> = prep.left_out.iter().map(ToString::to_string).collect();
+    match outcome {
+        Outcome::Files(plan) => {
+            if o.format == TextOrJson::Json {
+                json_targets.push(json!({
+                    "name": t.name, "format": t.format.as_str(), "layout": t.layout.as_str(),
+                    "write": plan.writes.iter().map(|(p, _, new)| json!({ "path": p, "new": new })).collect::<Vec<_>>(),
+                    "unchanged": plan.unchanged, "remove": plan.removes, "leftOut": left_out,
+                }));
+                return;
+            }
+            say!(
+                out,
+                "{} ({}, {}) → {}",
+                t.name,
+                t.format.as_str(),
+                t.layout.as_str(),
+                t.path.as_deref().unwrap_or("")
+            );
+            let verb = |v: &str| {
+                if would {
+                    format!("would {v}")
+                } else {
+                    v.to_owned()
+                }
+            };
+            for (path, _, new) in &plan.writes {
+                say!(
+                    out,
+                    "  {} {path}",
+                    verb(if *new { "create" } else { "update" })
+                );
+            }
+            for path in &plan.removes {
+                say!(out, "  {} {path} (no longer produced)", verb("remove"));
+            }
+            if !plan.changes() {
+                say!(
+                    out,
+                    "  unchanged ({} file{})",
+                    plan.unchanged.len(),
+                    if plan.unchanged.len() == 1 { "" } else { "s" }
+                );
+            }
+            if !left_out.is_empty() {
+                say!(out, "  leaves out: {}", left_out.join(", "));
+            }
+        }
+        Outcome::Confluence(run) => {
+            let ConfluenceRun {
+                plan,
+                space,
+                anchor,
+                applied,
+                snapshot,
+                ..
+            } = run.as_ref();
+            if o.format == TextOrJson::Json {
+                json_targets.push(json!({
+                    "name": t.name, "format": "confluence", "layout": t.layout.as_str(), "space": space,
+                    "parent": anchor, "parentTitle": snapshot.anchor_title, "plan": plan, "leftOut": left_out,
+                    "applied": applied.as_ref().map(applied_json),
+                }));
+                return;
+            }
+            // The title lets a wrong `parent` be caught before
+            // publishing; a snapshot saved before titles were kept has
+            // none, so the ID alone is printed.
+            let named = if snapshot.anchor_title.is_empty() {
+                String::new()
+            } else {
+                format!(" \"{}\"", snapshot.anchor_title)
+            };
+            say!(
+                out,
+                "{} (confluence, {}) → space {space}, page {anchor}{named}",
+                t.name,
+                t.layout.as_str()
+            );
+            for op in &plan.ops {
+                let kind = match op.kind {
+                    OpKind::Create => "create",
+                    OpKind::Update => "update",
+                    OpKind::Unchanged => "unchanged",
+                    OpKind::Drift => "drift",
+                    OpKind::Retire => "retire",
+                    OpKind::Prune => "prune",
+                };
+                let reasons = if op.reasons.is_empty() {
+                    String::new()
+                } else {
+                    format!(": {}", op.reasons.join("; "))
+                };
+                let size = if op.size > 0 {
+                    format!(" ({} KiB)", op.size.div_ceil(1024))
+                } else {
+                    String::new()
+                };
+                say!(out, "  {kind:9} \"{}\"{reasons}{size}", op.title);
+            }
+            for title in &plan.foreign {
+                say!(out, "  foreign   \"{title}\" (not Kiln's; left alone)");
+            }
+            say!(
+                out,
+                "  {} create, {} update, {} unchanged, {} drift, {} retire{}",
+                plan.count(OpKind::Create),
+                plan.count(OpKind::Update),
+                plan.count(OpKind::Unchanged),
+                plan.count(OpKind::Drift),
+                plan.count(OpKind::Retire),
+                match plan.count(OpKind::Prune) {
+                    0 => String::new(),
+                    n => format!(", {n} prune"),
+                }
+            );
+            for w in &plan.warnings {
+                say!(out, "  warning: {w}");
+            }
+            for r in &plan.refusals {
+                say!(out, "  refused: {r}");
+            }
+            if !left_out.is_empty() {
+                say!(out, "  leaves out: {}", left_out.join(", "));
+            }
+        }
+    }
 }
 
 /// What planning a Confluence target needs besides the target.
@@ -586,7 +664,8 @@ fn save_cache(path: Option<&Path>, cache: &PageCache) {
 
 /// Publishes one Confluence target's plan, asking first unless `--yes`.
 /// `Ok(true)` when it stopped after the plan (refused, declined, or
-/// non-interactive without `--yes`).
+/// non-interactive without `--yes`). `text` is where text output goes,
+/// whom to ask and the plan as shown; JSON output has none and can't ask.
 fn publish(
     prep: &Prepared,
     run: &mut ConfluenceRun,
@@ -594,7 +673,7 @@ fn publish(
     pictures: &FenixPictures,
     source: &kiln_index::DiskSource,
     commit: Option<&str>,
-    text: bool,
+    mut text: Option<(&mut dyn Write, Confirm, &str)>,
 ) -> Result<bool, Fail> {
     let t = &prep.target;
     if !run.plan.refusals.is_empty() {
@@ -608,21 +687,25 @@ fn publish(
         return Ok(false);
     };
     if !o.yes {
-        let interactive = text && std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
-        if !interactive {
-            eprintln!(
-                "kiln: `{}` not published: pass --yes to publish without asking",
-                t.name
-            );
-            return Ok(true);
-        }
-        print!("Publish `{}` to space {}? [y/N] ", t.name, run.space);
-        let _ = std::io::stdout().flush();
-        let mut answer = String::new();
-        let _ = std::io::stdin().read_line(&mut answer);
-        if !matches!(answer.trim(), "y" | "Y" | "yes") {
-            println!("  not published");
-            return Ok(true);
+        let answer = match &mut text {
+            Some((_, confirm, shown)) => confirm(&t.name, &run.space, shown),
+            None => Answer::CantAsk,
+        };
+        match answer {
+            Answer::Yes => {}
+            Answer::No => {
+                if let Some((out, _, _)) = &mut text {
+                    say!(out, "  not published");
+                }
+                return Ok(true);
+            }
+            Answer::CantAsk => {
+                eprintln!(
+                    "kiln: `{}` not published: pass --yes to publish without asking",
+                    t.name
+                );
+                return Ok(true);
+            }
         }
     }
     // The space may have moved on while the plan was read or confirmed.
@@ -685,13 +768,18 @@ fn publish(
         cache.remember(*id, *version, Some(property.clone()));
     }
     save_cache(run.cache.as_deref(), &cache);
-    if text {
-        println!(
+    if let Some((out, _, _)) = &mut text {
+        say!(
+            out,
             "{}: published {} created, {} updated, {} retired, {} pruned",
-            t.name, applied.created, applied.updated, applied.retired, applied.pruned
+            t.name,
+            applied.created,
+            applied.updated,
+            applied.retired,
+            applied.pruned
         );
         for why in &applied.skipped {
-            println!("  skipped: {why}");
+            say!(out, "  skipped: {why}");
         }
     }
     run.applied = Some(applied);

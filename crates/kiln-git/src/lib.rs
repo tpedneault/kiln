@@ -2,8 +2,8 @@
 //! tree is dirty, the last commit that changed each file (one
 //! `git log` pass, for exports' repository links), whether the clone is
 //! shallow, and whether a path is ignored; and (K6) a revision resolved
-//! to its commit, and the files at a revision, for `kiln diff` and
-//! `kiln export --since`.
+//! to its commit, the files at a revision and the tags, for `kiln diff`,
+//! `kiln export --since` and the GUI's baseline.
 //!
 //! Shells out to `git`, as `fenix-git` does, rather than linking a git
 //! library: the user's own git already honours their credentials,
@@ -201,6 +201,21 @@ pub fn latest_tag(dir: &Path) -> Option<String> {
     (output.status.success() && !tag.is_empty()).then_some(tag)
 }
 
+/// The repository's tags, the most recently created first: what the GUI
+/// offers as a baseline. No tags (or no repository) is an empty list.
+pub fn tags(dir: &Path) -> Result<Vec<String>, GitError> {
+    let output = git(dir, &["tag", "--list", "--sort=-creatordate"])?;
+    if !output.status.success() {
+        return Err(failed(&output));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(str::to_owned)
+        .collect())
+}
+
 /// The files under `dir` at `commit` that `keep` accepts, by path relative
 /// to `dir` with `/`, with their contents: one `git ls-tree` and one
 /// `git cat-file --batch` for all of them, however many there are.
@@ -376,6 +391,7 @@ mod tests {
         std::fs::write(d.join("sub/design/a.md"), "new a").unwrap();
         git(d, &["commit", "-q", "-am", "two"]);
         assert_eq!(latest_tag(d).as_deref(), Some("v1"));
+        assert_eq!(tags(d).unwrap(), ["v1"]);
         let v1 = resolve(&d.join("sub"), "v1").unwrap();
         assert_eq!(resolve(d, "HEAD~1").unwrap(), v1);
         assert!(

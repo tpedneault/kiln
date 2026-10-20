@@ -1,6 +1,6 @@
 //! Draws a [`Screen`]: the top bar, the page's rows (heading bands, the
-//! cursor's row), the footer, and the which-key popup, in the palette's
-//! colours. It knows nothing of pages; [`layout`] is pure and tested.
+//! cursor's row, status pills), the footer, and the which-key popup, in
+//! the palette's colours. It knows nothing of pages; [`layout`] is pure and tested.
 //!
 //! Text goes through glyphon as in Fenix and Flint, in the monospace
 //! family Fenix would pick unless settings name one, so columns padded
@@ -24,6 +24,11 @@ const LINE: f32 = 1.25;
 const PAD: f32 = 8.0;
 /// Columns of text the popup is wide.
 const POPUP_COLUMNS: f32 = 26.0;
+/// How opaque a pill's band is: its role's colour, faint enough that
+/// the text in the same colour reads on it.
+const PILL_ALPHA: f32 = 0.22;
+/// A pill's height, as a share of the line.
+const PILL_HEIGHT: f32 = 0.84;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rect {
@@ -201,17 +206,50 @@ impl Renderer {
         for (buffer, (line, _, _, _)) in self.buffers.iter_mut().zip(&lines) {
             buffer.set_metrics(Metrics::new(size, l.line));
             buffer.set_size(None, None);
+            // Each span's index rides on its glyphs, so a pill finds its
+            // own extent after shaping, whatever the font's advances.
             let spans: Vec<(&str, Attrs)> = line
                 .iter()
-                .map(|s| {
+                .enumerate()
+                .map(|(i, s)| {
                     (
                         s.text.as_str(),
-                        attrs.clone().color(text_color(palette.of(s.role))),
+                        attrs
+                            .clone()
+                            .color(text_color(palette.of(s.role)))
+                            .metadata(i),
                     )
                 })
                 .collect();
             buffer.set_rich_text(spans, &attrs, Shaping::Advanced, None);
             buffer.shape_until_scroll(&mut self.font_system, false);
+        }
+        // Pills: a rounded band behind each, over the row's bands.
+        for (buffer, (line, left, top, right)) in self.buffers.iter().zip(&lines) {
+            for (i, s) in line.iter().enumerate().filter(|(_, s)| s.pill) {
+                let Some((x0, x1)) = extent(buffer, i) else {
+                    continue;
+                };
+                let (x0, x1) = (left + x0, (left + x1).min(*right));
+                if x1 <= x0 {
+                    continue;
+                }
+                let h = l.line * PILL_HEIGHT;
+                let mut color = palette.of(s.role);
+                color[3] *= PILL_ALPHA;
+                self.rects.push_rounded(
+                    Rect {
+                        x: x0,
+                        y: top + (l.line - h) / 2.0,
+                        w: x1 - x0,
+                        h,
+                    },
+                    color,
+                    h / 2.0,
+                    width,
+                    height,
+                );
+            }
         }
         let areas = self
             .buffers
@@ -289,6 +327,19 @@ impl Renderer {
         self.atlas.trim();
         true
     }
+}
+
+/// Where span `i`'s glyphs start and end on the line, from the left of
+/// its text area.
+fn extent(buffer: &Buffer, i: usize) -> Option<(f32, f32)> {
+    let mut out: Option<(f32, f32)> = None;
+    for run in buffer.layout_runs() {
+        for g in run.glyphs.iter().filter(|g| g.metadata == i) {
+            let (a, b) = (g.x, g.x + g.w);
+            out = Some(out.map_or((a, b), |(x0, x1)| (x0.min(a), x1.max(b))));
+        }
+    }
+    out
 }
 
 fn installed(fs: &FontSystem, family: &str, mono: bool) -> bool {

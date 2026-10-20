@@ -1,7 +1,12 @@
 //! The window: winit's event loop, the GPU, and the glue between them and
 //! [`App`]. Keys become [`KeyPress`]es for the app; its effects open
-//! files in Fenix, reload or quit; the project is re-read when its item
-//! files or `kiln.toml` change, checked every two seconds.
+//! files in Fenix or addresses in the browser, make edits, reload or
+//! quit; the project is re-read when its item files or `kiln.toml`
+//! change, looked at every two seconds. `kiln check` runs on a thread of
+//! its own after each load, since on a large project it takes seconds the
+//! window shouldn't freeze for. The app's jobs run one at a time on a
+//! thread through the binary's [`Host`]. Threads wake the loop when they
+//! are done.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -9,16 +14,17 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use kiln_index::{DiskSource, FileSource, Project, Stamp};
-use kiln_model::ItemId;
+use kiln_model::{Date, Finding, ItemId, Rule, Severity};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, StartCause, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::keyboard::ModifiersState;
 use winit::window::{Window, WindowId};
 
 use crate::app::{App, Baseline, Effect};
 use crate::gpu::{Gpu, Surface};
+use crate::host::{Done, Host};
 use crate::render::{layout, Layout, Renderer};
 use crate::settings::Settings;
 
@@ -39,6 +45,8 @@ pub struct Options {
     pub select: Option<ItemId>,
     /// Reads the Jira mirror; run on a thread of its own.
     pub jira: Option<JiraLoad>,
+    /// Exports, Confluence and git, for the app's jobs.
+    pub host: Arc<dyn Host>,
 }
 
 /// How the window gets the Jira mirror: the binary's, which knows where
@@ -49,6 +57,7 @@ pub type JiraLoad = Box<dyn FnOnce() -> Result<kiln_jira::Mirror, String> + Send
 pub fn run(o: Options) -> Result<(), String> {
     let event_loop = event_loop()?;
     event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + POLL));
+    let proxy = event_loop.create_proxy();
     let mut app = App::new(o.root.clone(), o.project, o.baseline);
     if let Some(id) = &o.select {
         if !app.select(id) {
@@ -61,13 +70,19 @@ pub fn run(o: Options) -> Result<(), String> {
     let stamps = stamps(&o.root, app.project());
     let jira = o.jira.map(|load| {
         let (tx, rx) = std::sync::mpsc::channel();
+        let wake = proxy.clone();
         std::thread::spawn(move || {
             let _ = tx.send(load());
+            let _ = wake.send_event(());
         });
         rx
     });
     let mut win = Win {
         jira,
+        host: o.host,
+        proxy,
+        job: None,
+        check: None,
         app,
         root: o.root,
         settings: o.settings,
@@ -81,6 +96,7 @@ pub fn run(o: Options) -> Result<(), String> {
         last_click: None,
         failed: None,
     };
+    win.check();
     event_loop
         .run_app(&mut win)
         .map_err(|e| format!("the window's event loop failed: {e}"))?;
@@ -116,6 +132,14 @@ fn event_loop() -> Result<EventLoop<()>, String> {
 struct Win {
     /// The Jira mirror, until it arrives.
     jira: Option<std::sync::mpsc::Receiver<Result<kiln_jira::Mirror, String>>>,
+    host: Arc<dyn Host>,
+    /// Wakes the loop when a thread has something.
+    proxy: EventLoopProxy<()>,
+    /// The running job's answer, until it arrives.
+    job: Option<std::sync::mpsc::Receiver<Done>>,
+    /// The latest `kiln check`'s findings, until they arrive. A newer
+    /// check replaces it, so an older one's answer is dropped.
+    check: Option<std::sync::mpsc::Receiver<Vec<Finding>>>,
     app: App,
     root: PathBuf,
     settings: Settings,
@@ -129,6 +153,39 @@ struct Win {
     last_click: Option<(Instant, usize)>,
     /// Why the window couldn't start.
     failed: Option<String>,
+}
+
+/// Today in UTC, for the rules that compare dates.
+fn today() -> Date {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    Date::from_unix_days((secs / 86_400) as i64)
+}
+
+/// `kiln check` on the project as it is on disk, with K207 once the Jira
+/// mirror is here (and `[check]` turns it on). The thread reads the
+/// project itself rather than sharing the window's: a `Project` isn't
+/// shared between threads, and a file saved in between is followed by a
+/// reload, and so by another check, anyway.
+fn findings(root: &std::path::Path, jira: Option<&kiln_jira::Mirror>) -> Vec<Finding> {
+    let source = DiskSource::new(root);
+    let Ok(project) = Project::load(&source) else {
+        // The window's own load says why.
+        return Vec::new();
+    };
+    let project = &project;
+    let mut out = kiln_check::check(project, &source, today());
+    let severity = project.config.severity(Rule::K207);
+    if let Some(mirror) = jira.filter(|_| severity != Severity::Off) {
+        for mut f in kiln_jira::k207(project, mirror) {
+            f.severity = severity;
+            out.push(f);
+        }
+        out.sort_by(|a, b| a.sort_key().cmp(&b.sort_key()));
+    }
+    out
 }
 
 /// Item files and `kiln.toml` with their stamps: what a change shows in.
@@ -223,7 +280,107 @@ impl Win {
                 Ok(how) => self.app.say(how.describe(), false),
                 Err(e) => self.app.say(e, true),
             },
+            Effect::OpenUrl(url) => match kiln_fenix::open_url(&url) {
+                Ok(()) => self.app.say("Opened in the browser", false),
+                Err(e) => self.app.say(e, true),
+            },
+            Effect::Edit(edit) => match crate::edit::apply(&self.root, &edit) {
+                Ok(applied) => {
+                    self.reload(false);
+                    self.app.edited(&applied);
+                    if let Some((path, line)) = &applied.created {
+                        // The item exists whether or not this works.
+                        let how = match kiln_fenix::open(path, *line as usize) {
+                            Ok(how) => how.describe().to_owned(),
+                            Err(e) => format!("couldn't open it: {e}"),
+                        };
+                        self.app.say(format!("{}; {how}", applied.message), false);
+                    }
+                }
+                Err(e) => self.app.say(e, true),
+            },
         }
+        self.jobs();
+        self.redraw();
+    }
+
+    /// Starts the app's next job, if it has one and none is running.
+    fn jobs(&mut self) {
+        if self.job.is_some() {
+            return;
+        }
+        let Some(job) = self.app.next_job() else {
+            return;
+        };
+        let (tx, rx) = std::sync::mpsc::channel();
+        let host = self.host.clone();
+        let wake = self.proxy.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(host.run(&job));
+            let _ = wake.send_event(());
+        });
+        self.job = Some(rx);
+    }
+
+    /// Runs `kiln check` on a thread; its findings replace the app's when
+    /// they arrive.
+    fn check(&mut self) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let root = self.root.clone();
+        let jira = self.app.jira().cloned();
+        let wake = self.proxy.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(findings(&root, jira.as_ref()));
+            let _ = wake.send_event(());
+        });
+        self.check = Some(rx);
+        self.app.set_checking();
+    }
+
+    /// What the threads have sent: the Jira mirror, the findings, a job's
+    /// answer.
+    fn arrivals(&mut self) {
+        if let Some(answer) = self.jira.as_ref().and_then(|rx| rx.try_recv().ok()) {
+            self.jira = None;
+            match answer {
+                Ok(mirror) => {
+                    self.app.set_jira(mirror);
+                    // K207 needs the mirror.
+                    self.check();
+                }
+                Err(e) => self.app.say(format!("Jira: {e}"), true),
+            }
+            self.redraw();
+        }
+        match self.check.as_ref().map(|rx| rx.try_recv()) {
+            Some(Ok(found)) => {
+                self.check = None;
+                self.app.set_findings(found);
+                self.redraw();
+            }
+            Some(Err(std::sync::mpsc::TryRecvError::Disconnected)) => {
+                self.check = None;
+                self.app.set_findings(Vec::new());
+                self.app.say("kiln check stopped without an answer", true);
+                self.redraw();
+            }
+            Some(Err(std::sync::mpsc::TryRecvError::Empty)) | None => {}
+        }
+        let answer = self.job.as_ref().map(|rx| rx.try_recv());
+        match answer {
+            Some(Ok(done)) => {
+                self.job = None;
+                self.app.done(done);
+            }
+            // The thread ended without an answer.
+            Some(Err(std::sync::mpsc::TryRecvError::Disconnected)) => {
+                self.job = None;
+                self.app
+                    .job_failed("the job stopped without an answer".into());
+            }
+            Some(Err(std::sync::mpsc::TryRecvError::Empty)) | None => return,
+        }
+        self.jobs();
         self.redraw();
     }
 
@@ -233,6 +390,7 @@ impl Win {
             Ok(project) => {
                 self.stamps = stamps(&self.root, &project);
                 self.app.reload(project);
+                self.check();
                 if told {
                     self.app.say("Reloaded", false);
                 }
@@ -244,6 +402,10 @@ impl Win {
 }
 
 impl ApplicationHandler for Win {
+    fn user_event(&mut self, _: &ActiveEventLoop, (): ()) {
+        self.arrivals();
+    }
+
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_some() {
             return;
@@ -256,14 +418,7 @@ impl ApplicationHandler for Win {
 
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
         if let StartCause::ResumeTimeReached { .. } = cause {
-            if let Some(answer) = self.jira.as_ref().and_then(|rx| rx.try_recv().ok()) {
-                self.jira = None;
-                match answer {
-                    Ok(mirror) => self.app.set_jira(mirror),
-                    Err(e) => self.app.say(format!("Jira: {e}"), true),
-                }
-                self.redraw();
-            }
+            self.arrivals();
             if stamps(&self.root, self.app.project()) != self.stamps {
                 self.reload(false);
             }
