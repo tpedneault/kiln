@@ -44,6 +44,12 @@ pub struct Palette {
     pub badge_text: [f32; 4],
     /// Headings (Fenix's `syntax_function`).
     pub chip: [f32; 4],
+    /// A done status's pill (Fenix's `git_staged`; Catppuccin's green).
+    pub done: [f32; 4],
+    /// An in-progress status's pill (Fenix's `mode_picker`; Catppuccin's
+    /// mauve): apart from the IDs' colour, which is often the same as
+    /// `mode_normal`.
+    pub active: [f32; 4],
 }
 
 const fn rgba(hex: u32) -> [f32; 4] {
@@ -73,6 +79,8 @@ pub const ORBIT_DARK: Palette = Palette {
     mode_normal: rgba(0xe0af68),
     badge_text: rgba(0x1a1b26),
     chip: rgba(0x7aa2f7),
+    done: rgba(0x9ece6a),
+    active: rgba(0xbb9af7),
 };
 
 /// TempleOS: white, with VGA blue.
@@ -91,6 +99,8 @@ pub const TEMPLEOS: Palette = Palette {
     mode_normal: rgba(0x55ff55),
     badge_text: rgba(0x000000),
     chip: rgba(0xaa00aa),
+    done: rgba(0x00aa00),
+    active: rgba(0xff55ff),
 };
 
 /// Gruvbox Dark.
@@ -109,6 +119,8 @@ pub const GRUVBOX_DARK: Palette = Palette {
     mode_normal: rgba(0xfabd2f),
     badge_text: rgba(0x1d2021),
     chip: rgba(0x83a598),
+    done: rgba(0xb8bb26),
+    active: rgba(0xd3869b),
 };
 
 /// Nord.
@@ -127,6 +139,8 @@ pub const NORD: Palette = Palette {
     mode_normal: rgba(0xa3be8c),
     badge_text: rgba(0x202530),
     chip: rgba(0x88c0d0),
+    done: rgba(0xa3be8c),
+    active: rgba(0xc49ebd),
 };
 
 /// Dracula.
@@ -145,6 +159,8 @@ pub const DRACULA: Palette = Palette {
     mode_normal: rgba(0x50fa7b),
     badge_text: rgba(0x282a36),
     chip: rgba(0x50fa7b),
+    done: rgba(0x50fa7b),
+    active: rgba(0xff79c6),
 };
 
 /// Solarized Dark.
@@ -163,6 +179,8 @@ pub const SOLARIZED_DARK: Palette = Palette {
     mode_normal: rgba(0xd8ad44),
     badge_text: rgba(0x00212b),
     chip: rgba(0x55a8df),
+    done: rgba(0xa6b64c),
+    active: rgba(0xdf82b1),
 };
 
 /// One Dark.
@@ -181,6 +199,8 @@ pub const ONE_DARK: Palette = Palette {
     mode_normal: rgba(0x98c379),
     badge_text: rgba(0x21252b),
     chip: rgba(0x61afef),
+    done: rgba(0x98c379),
+    active: rgba(0x56b6c2),
 };
 
 /// Visual Studio Dark, which brings its own font.
@@ -199,6 +219,8 @@ pub const VISUAL_STUDIO_DARK: Palette = Palette {
     mode_normal: rgba(0x569cd6),
     badge_text: rgba(0x1e1e1e),
     chip: rgba(0xdcdcaa),
+    done: rgba(0x89d185),
+    active: rgba(0xc586c0),
 };
 
 /// Catppuccin Latte. Its accents darkened as Fenix's are, so they read on the light page.
@@ -217,6 +239,8 @@ pub const CATPPUCCIN_LATTE: Palette = Palette {
     mode_normal: rgba(0x1d63ee),
     badge_text: rgba(0xeff1f5),
     chip: rgba(0x1a58d3),
+    done: rgba(0x40a02b),
+    active: rgba(0x8839ef),
 };
 
 /// Catppuccin Frappé.
@@ -235,6 +259,8 @@ pub const CATPPUCCIN_FRAPPE: Palette = Palette {
     mode_normal: rgba(0x8caaee),
     badge_text: rgba(0x232634),
     chip: rgba(0x8caaee),
+    done: rgba(0xa6d189),
+    active: rgba(0xca9ee6),
 };
 
 /// Catppuccin Macchiato.
@@ -253,6 +279,8 @@ pub const CATPPUCCIN_MACCHIATO: Palette = Palette {
     mode_normal: rgba(0x8aadf4),
     badge_text: rgba(0x181926),
     chip: rgba(0x8aadf4),
+    done: rgba(0xa6da95),
+    active: rgba(0xc6a0f6),
 };
 
 /// Catppuccin Mocha.
@@ -271,6 +299,8 @@ pub const CATPPUCCIN_MOCHA: Palette = Palette {
     mode_normal: rgba(0x89b4fa),
     badge_text: rgba(0x11111b),
     chip: rgba(0x89b4fa),
+    done: rgba(0xa6e3a1),
+    active: rgba(0xcba6f7),
 };
 /// Every theme, in Fenix's `theme::ALL` order.
 pub const ALL: [&Palette; 12] = [
@@ -306,6 +336,8 @@ impl Palette {
             Role::Error => self.error,
             Role::Good => self.mode_insert,
             Role::Warn => self.mode_normal,
+            Role::Done => self.done,
+            Role::Active => self.active,
         }
     }
 }

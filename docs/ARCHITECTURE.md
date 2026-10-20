@@ -48,7 +48,7 @@ access except through a value or trait the caller passes in.
 |---|---|---|---|
 | `kiln-model` | `kiln.toml` schema (export targets and `[confluence]` too), `ItemId`, `Item`, `Ref`, `CodeRef`, `Finding`, the rules; Kiln's folders | yes | K1, K2 |
 | `kiln-parse` | front matter and `kiln.toml` with spans (`toml_edit`), references in bodies (`pulldown-cmark`) and code (`regex`), comment-preserving edits and front-matter formatting | yes | K1, K4 |
-| `kiln-index` | the loaded project: walk (`ignore`), parse in parallel (`rayon`), graph, queries (including the facts `kiln show` and hover print), renumber and new-item plans; the item diff between two projects; re-reading one file (`update_file`) | yes, given a file-source trait | K1 (incremental, K4) |
+| `kiln-index` | the loaded project: walk (`ignore`), parse in parallel (`rayon`), graph, queries (including the facts `kiln show` and hover print), renumber and new-item plans; the editing commands' checks and writes (`plan_set`, `check_link`, `apply_*`, `create_item`, shared by the CLI, the GUI and the Flint provider); the item diff between two projects; re-reading one file (`update_file`) | yes, given a file-source trait | K1 (incremental, K4) |
 | `kiln-check` | the FORMAT.md rules and their output formats | yes | K1 |
 | `kiln-render` | Markdown and templates → document tree (`pulldown-cmark`); report builders; Mermaid validation (`fenix-diagram`) | yes | K2 |
 | `kiln-export` | assembly, numbering, layouts, reference resolution, Markdown, HTML and Word (`zip`, ADR-011), the file destination, diagram pictures and their cache | yes, except writing files and the cache | K2, K8 (Word) |
@@ -60,7 +60,7 @@ access except through a value or trait the caller passes in.
 | `kiln-secrets` | tokens from the environment (K2) or the OS credential store (K3); a `Token` that never formats | no | K2, K3 |
 | `kiln` | the binary: `clap` CLI, exit codes, project discovery, reading and writing files; and `kilnw`, the GUI without a console on Windows (ADR-010) | no | K0 onward |
 | `kiln-jira` | the Jira mirror: linked keys, the cached mirror and its freshness, K207 (pure); one fetch through `fenix-jira`, and the fake Jira for tests (`fake` feature) | mirror and K207 yes; fetch no | K8 |
-| `kiln-gui` | the GUI (GUI.md): pages as rows and the application as a state machine (pure, tested as text); the window (`winit`), GPU (`wgpu`) and text (`glyphon`) that draw a `Screen` | pages and app yes; window no | K7 |
+| `kiln-gui` | the GUI (GUI.md): pages as rows, the prompt and the application as state machines (pure, tested as text); edits through `kiln-index`; the window (`winit`), GPU (`wgpu`) and text (`glyphon`) that draw a `Screen`, and the thread that runs the binary's jobs | pages, prompt and app yes; window no | K7, K9 |
 
 `kiln-gui` is the one crate that pulls in `wgpu` and `winit`, which is
 why it waited for K7. It loads display libraries at run time (`dlopen`),
@@ -84,7 +84,7 @@ needs it lands):
 | `kiln-lsp` | `kiln-model`, `kiln-parse`, `kiln-index`, `kiln-check` |
 | `kiln-flint` | `kiln-model`, `kiln-parse` (the status edit), `kiln-index`, `kiln-fenix`, `kiln-confluence` and `kiln-secrets` ("Open in Confluence") |
 | `kiln-jira` | `kiln-model`, `kiln-index` |
-| `kiln-gui` | `kiln-model`, `kiln-index`, `kiln-fenix` (opening an item), `kiln-jira` (the mirror's type; the binary hands over the function that loads it, so the GUI never sees a token); the baseline arrives as a loaded project, so it needs no `kiln-git` |
+| `kiln-gui` | `kiln-model`, `kiln-parse` (the title limit), `kiln-index` (the project, and the editing commands' `plan_set`/`apply_*`), `kiln-check` (the Check page), `kiln-fenix` (opening an item or an address), `kiln-jira` (the mirror's type and K207; the binary hands over the function that loads it, so the GUI never sees a token); exports, Confluence and git are the binary's, behind the `Host` trait, so it needs no `kiln-export`, `kiln-confluence` or `kiln-git` |
 | `kiln` | all of them |
 
 The rules:

@@ -78,7 +78,7 @@ design-md (markdown, document) → docs/DESIGN.md
 | [Jira](Jira) | Jira keys, the read-only mirror, rule K207 |
 | [Command reference](Command-reference) | every command and option, exit codes |
 | [Editors and Flint](Editors-and-Flint) | the language server in Fenix and other editors; Kiln in Flint |
-| [The GUI](The-GUI) | the window: tree, trace, impact, board, roadmap, decisions, changes |
+| [The GUI](The-GUI) | the window: tree, trace, impact, board, roadmap, decisions, changes, item, check, exports, comments; editing front matter and publishing from it |
 | [Continuous integration](Continuous-integration) | GitHub Actions and GitLab, ready to copy |
 | [Troubleshooting](Troubleshooting) | common problems, and frequently asked questions |
 

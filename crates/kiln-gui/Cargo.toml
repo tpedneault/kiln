@@ -12,7 +12,9 @@ workspace = true
 
 [dependencies]
 kiln-model.workspace = true
+kiln-parse.workspace = true
 kiln-index.workspace = true
+kiln-check.workspace = true
 kiln-fenix.workspace = true
 kiln-jira.workspace = true
 fenix-keymap.workspace = true

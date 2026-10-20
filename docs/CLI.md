@@ -1,6 +1,6 @@
 # Command line
 
-How to run `kiln`, as it stands (K8). The commands planned for later
+How to run `kiln`, as it stands (K9). The commands planned for later
 milestones are in [DESIGN.md](DESIGN.md), "Command line"; each is
 documented here when it ships. The file format is
 [FORMAT.md](FORMAT.md); `kiln.toml` is summed up in
@@ -285,11 +285,15 @@ server or network error.
 ### `kiln gui [--since REV] [--item ID]`, or `kiln` alone
 
 Opens the GUI ([GUI.md](GUI.md)): Tree, Trace, Impact, Board, Roadmap,
-Decisions and Changes, with Vim keys and the `SPC` leader; `Enter` opens
-the item under the cursor in Fenix at its title. `--since REV` is the
-baseline for the Changes page (default: the most recent tag); `--item ID`
-puts the cursor on that item. The window follows edits to the files
-within two seconds.
+Decisions, Changes, Item, Check, Exports and Comments, with Vim keys and
+the `SPC` leader; `Enter` opens the item under the cursor in Fenix at its
+title. It also does what `set`, `link`, `unlink`, `new` and `renumber` do,
+on the item under the cursor and through the same code, and what `check`,
+`show`, `export` (writing file targets, and publishing after a `y`) and
+`confluence comments` show; never an item's body. `--since REV` is the
+baseline for the Changes page (default: the most recent tag; `b` picks
+another); `--item ID` puts the cursor on that item. The window follows
+edits to the files within two seconds.
 
 On Windows, `kilnw` (next to `kiln.exe`) does the same without a console
 window, for shortcuts and Flint; a failure to open goes to `kilnw.log` in

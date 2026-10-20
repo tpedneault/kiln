@@ -1,43 +1,61 @@
 # The GUI
 
 `kiln` with no arguments (or `kiln gui`) opens a window onto the project:
-seven pages, each a full window like Fenix's pages, driven from the
-keyboard with Vim keys and the `SPC` leader. It reads; the one thing it
-does outward is open an item in Fenix. It never edits prose, and it edits
-no front matter either: that is `kiln set`, the language server, and
-Flint's `k status` (DESIGN.md, "GUI").
+eleven pages, each a full window like Fenix's pages, driven from the
+keyboard with Vim keys and the `SPC` leader. It reads the project, edits
+its front matter (statuses, titles, parents, owners, due dates, links, new
+items, IDs), shows `kiln check`'s findings, and plans, writes and publishes
+exports. It never edits prose: an item's body is written in Fenix, which
+`Enter` opens at the item (ADR-012).
 
-Designed after K6, as DESIGN.md planned; built in K7.
+Designed after K6, as DESIGN.md planned; built in K7; editing and the
+Item, Check, Exports and Comments pages in K9.
 
 ## What it is for
 
 Kiln's command line answers one question at a time (`kiln trace`, `kiln
-impact REQ-014`, `kiln diff v1.0`). The GUI is for looking around: the
+impact REQ-014`, `kiln diff v1.0`) and makes one change at a time (`kiln
+set REQ-014 status=approved`). The GUI is for looking around and for the
+small changes that looking around turns up, without retyping IDs: the
 whole tree, the gaps, what a change touches, where the milestones stand,
-what changed since a release, moving between them without retyping, and
-jumping into Fenix at the item being looked at. It is a reader's tool,
-which is why it has no editing: the files are edited in Fenix, and the
-GUI follows them within two seconds.
+what changed since a release, what `kiln check` finds, what an export
+would change; moving an item along the board, linking a test to the
+requirement it verifies, adding a child, publishing the design document.
+What it leaves to an editor is prose: the GUI has one-line inputs and no
+text area. The files are the source of truth; the GUI follows them within
+two seconds, whoever edits them.
 
 ## Pages
 
 Every page is a list of rows. A row is one line: an item, a code
-location, or a heading that groups the rows under it (headings are skipped
-by the cursor). Columns are aligned by padding, in the monospace font.
+location, a finding, an export's line, a comment, or a heading that groups
+the rows under it (headings are skipped by the cursor). Columns are
+aligned by padding, in the monospace font.
 
 | Key | Page | Rows |
 |---|---|---|
 | `SPC t` | **Tree** | every open item, nested by `parent` under a heading per type: `REQ-014  Title  approved`; children indented under their parent. Closed items are hidden until `a` |
 | `SPC x` | **Trace** | per open item of the traced type (default `requirement`, `T` cycles through types some coverage role reaches): its ID and title, then one column per coverage role: what covers it, or `gap` in the error colour. `m` keeps only items with a gap |
 | `SPC i` | **Impact** | for the item picked with `i` on any page: everything that reaches it by links or parents, transitively, nearest first, each with its path (`verifies REQ-014`, `child of REQ-002`); code locations included |
-| `SPC b` | **Board** | the work items (type `task`, else every type with `done` statuses except milestones) grouped under a heading per status, in the type's status order, with counts. Closed statuses are hidden until `a` |
+| `SPC b` | **Board** | the work items (type `task`, else every type with `done` statuses except milestones) grouped under a heading per status, in the type's status order, with counts. Closed statuses are hidden until `a`; `H` and `L` move an item to the previous or next status |
 | `SPC r` | **Roadmap** | milestones in `due` order (undated last), each with status, due date and progress (`3/5 ███░░`), and the items `part-of` it under it |
 | `SPC d` | **Decisions** | the decision log in ID order: status, then `supersedes ADR-001` / `superseded by ADR-007` |
-| `SPC c` | **Changes** | the items added, changed and removed since the baseline (`kiln gui --since REV`, else the most recent tag), grouped under Added / Changed / Removed, each with what changed (`status draft → approved; + verifies REQ-002`) |
+| `SPC c` | **Changes** | the items added, changed and removed since the baseline (`kiln gui --since REV`, else the most recent tag; `b` picks another), grouped under Added / Changed / Removed, each with what changed (`status draft → approved; + verifies REQ-002`) |
+| `SPC v` | **Item** | for the item picked with `v` on any page: what `kiln show` prints, one row per related item or code location (parent, children, links both ways, mentions, coverage, progress, Jira tickets). `v` on a row views that item; `C-o` and `C-i` go back and forward |
+| `SPC k` | **Check** | `kiln check`'s findings (K207 too, once the Jira mirror is here), grouped by file: `12:3  K102 error  REQ-099 doesn't exist`. Recomputed on a thread after every reload; the top line shows the error count on every page |
+| `SPC p` | **Exports** | `kiln export --dry-run`, target by target, as the command line prints it: the target's line as the heading, then what would change, "leaves out", and for Confluence the plan's operations. `w` writes a file target, `W` all of them, `P` publishes a Confluence target |
+| `SPC m` | **Comments** | `kiln confluence comments`: the unresolved comments under each Confluence target, by the item they are about; `Enter` opens one in the browser |
 
-`Tab` and `S-Tab` (or `1`–`7`) step through the pages in that order. The
-top line shows the pages, the current one marked, and the project's name;
-the bottom line shows the filter, a message, or the keys that work here.
+`Tab` and `]` (`[` back), or `1`–`9` for the first nine, step through
+the pages in that order. The top line shows the pages, the current one marked, the
+project's name and, when `kiln check` finds errors, how many; the bottom
+line shows the prompt, the filter, a message, what is running, or the keys
+that work here.
+
+Exports and Comments are read on a thread when their page is first opened
+(they read git, render the document, and for Confluence ask the server),
+and again with `R`; the page says what it is waiting for, and the window
+stays responsive meanwhile. One such job runs at a time.
 
 With `[jira] url` and items that link tickets, every item row ends with
 its tickets once the Jira mirror has arrived: `FLINT-12 In Review ·
@@ -50,6 +68,54 @@ Every page keeps its own cursor and scroll position. When the project
 reloads, the cursor stays on the same item (by ID), or on the row where
 it was when that item went away.
 
+## Editing
+
+The edits are those of the editing commands (CLI.md, "Editing"), on the
+item under the cursor, on any page:
+
+| Keys | Do | Same as |
+|---|---|---|
+| `s`, `SPC e s` | set the status: pick one of its type's statuses | `kiln set ID status=…` |
+| `H` / `L` (Board) | move to the previous / next status in the type's order | `kiln set ID status=…` |
+| `SPC e t` | the title | `kiln set ID title=…` |
+| `SPC e p` | the parent: pick an item of an allowed type, or none | `kiln set ID parent=…` |
+| `SPC e o` / `SPC e d` | the owner / the due date (`YYYY-MM-DD`); empty removes it | `kiln set ID owner=… due=…` |
+| `l`, `SPC e l` | link: pick a role the item's type may start, then a target the role allows that isn't linked yet | `kiln link ID ROLE TARGET` |
+| `U`, `SPC e u` | unlink: pick one of the item's links, then `y` | `kiln unlink ID ROLE TARGET` |
+| `n`, `SPC e n` | a new item: pick its type, type its title; it opens in Fenix | `kiln new TYPE --title … --open` |
+| `N`, `SPC e N` | a new child of the item: pick a type that may have it as parent | `kiln new TYPE --parent ID --open` |
+| `SPC e r` | renumber: type the new ID (the next free one is offered), then `y`. On a duplicate-ID finding on Check, it renumbers that file's copy | `kiln renumber ID --to … [--file …]` |
+
+A question is asked on the footer line, and a pick's choices show above it
+narrowing as you type: `↓` `↑` (or `C-n` `C-p`, `Tab`) move, `Enter`
+answers, `C-u` clears, `Esc` cancels. The answer is checked as the command
+would check it before anything is written; a value the configuration
+doesn't allow (`soon` as a date, a parent that would make a cycle) leaves
+the prompt open with the reason. The edit then goes through the same code
+as the command: it changes only what it is about, keeps comments, layout
+and line endings, and refuses a file that changed on disk since it was
+read (an editor's save), naming it. The footer shows what the command
+would have printed (`REQ-014: status draft → approved`), the project
+reloads at once, and the cursor follows the item.
+
+There is no undo: the files are in git, and the footer names what changed.
+
+### Exports and publishing
+
+On Exports, `w` writes the file target under the cursor (Markdown, HTML,
+Word, wiki markup) and `W` every file target, as `kiln export NAME…` does;
+the page plans again afterwards. `P` on a Confluence target asks `Publish
+spec (confluence, document) → space FLINT, page 123 "Flint"? y/n`, naming
+the space and the parent page, and on `y` publishes exactly the plan
+shown: if the space or the files moved on since it was read, nothing is
+published and the footer says to look at the new plan. A plan Kiln refuses
+(a page edited in Confluence, an adopted page with content) is not
+published from the GUI; the footer names the command that overrides it
+(`kiln export spec --force`), which stays on the command line where the
+decision is written down. Publishing needs the token `kiln auth
+confluence` stored (or `KILN_CONFLUENCE_TOKEN`); the binary reads it, the
+GUI never sees it.
+
 ## Keys
 
 Normal mode, as in Fenix's pages:
@@ -59,16 +125,21 @@ Normal mode, as in Fenix's pages:
 | `j` `k`, `↓` `↑` | next / previous row |
 | `C-d` `C-u`, `PgDn` `PgUp` | half a page down / up |
 | `gg` `G`, `Home` `End` | first / last row |
-| `Enter` | open the item (or code location) in Fenix at its title line (`kiln new --open`'s path: the running Fenix, else a new one, else the default editor) |
+| `Enter` | open the item (or code location, or finding) in Fenix at its line (`kiln new --open`'s path: the running Fenix, else a new one, else the default editor); on a comment, open it in the browser |
 | `i` | Impact of the item under the cursor |
+| `v` | Item: the item under the cursor, as `kiln show` shows it |
+| `C-o` `C-i` (Item) | the item viewed before / after |
 | `/` | filter: typing narrows the page to rows whose text contains it (case-insensitive; in Tree, ancestors of a match stay); `Enter` keeps the filter, `Esc` clears it |
 | `a` | show closed items too (Tree, Board), or hide them again |
 | `m` (Trace) | only items with a gap (missing coverage) |
 | `T` (Trace) | the next traced type |
-| `R` | reload now |
-| `SPC` | the leader: the pages above, `SPC R` reload, `SPC q` quit, with the which-key popup Fenix shows |
+| `b` (Changes) | pick another baseline: a tag, or any revision typed |
+| `w` `W` `P` (Exports) | write the file target / every file target; publish the Confluence target |
+| `s` `l` `U` `n` `N`, `H` `L` | the edits above |
+| `R` | reload now (and, on Exports and Comments, read them again) |
+| `SPC` | the leader: the pages above, `SPC e` the edits, `SPC R` reload, `SPC q` quit, with the which-key popup Fenix shows |
 | `q`, `C-q` | quit |
-| `Esc` | clears a pending key, the leader or the filter |
+| `Esc` | clears a pending key, the leader, the filter or the prompt |
 
 Mouse: the wheel scrolls, a click moves the cursor, a double click opens.
 
@@ -88,22 +159,50 @@ font_size = 15            # points, 8–40
 A theme, font or size Kiln doesn't know is ignored with a line in the
 footer, not an error.
 
+An item's status is drawn as a pill, a rounded band in its own colour,
+coloured by what its type says the status means rather than by its name,
+so it reads the same in every project: done statuses green, `blocked`
+red, closed statuses muted, the type's initial status (a draft, a to-do)
+in the headings' blue, and anything between (approved, doing, active) in
+the theme's purple. The green and purple are each theme's own (Fenix's
+staged and picker colours; Catppuccin's green and mauve), so the pills
+stay legible on light themes too.
+
 ## How it is built
 
 `kiln-gui` keeps everything that can be tested without a display in plain
-modules: each page is a function from the project (and its own state) to
-rows (`pages`); the application is a state machine from key presses to a
-`Screen` of lines of styled spans and an effect (open this file at this
-line, quit, reload) (`app`). The window, the GPU and the text (`window`,
-`gpu`, `render`) only draw a `Screen` and turn winit's events into key
-presses. Tests drive `app` with keys and compare screens as text.
+modules: each page is a function from the project (and what has been
+gathered about it, and its own state) to rows (`pages`); the prompt is a
+small state machine of its own (`prompt`); the application is a state
+machine from key presses to a `Screen` of lines of styled spans and an
+effect (open this file at this line, open this address, make this edit,
+reload, quit) (`app`). The window, the GPU and the text (`window`, `gpu`,
+`render`) only draw a `Screen` and turn winit's events into key presses.
+Tests drive `app` with keys and compare screens as text.
+
+Edits are decided in `app`, checked with `kiln-index`'s `plan_set` and
+`check_link` against the project shown, and made by `edit::apply`, which
+reads the project again and calls `kiln-index`'s `apply_set`,
+`apply_link`, `apply_renumber` or `create_item`: the functions `kiln set`,
+`link`, `unlink`, `renumber` and `new` call, and the Flint provider's
+status change too.
 
 The binary loads the project (and the baseline's project, from git, once)
-and hands them over; the window polls the item files and `kiln.toml` every
-two seconds and reloads the project when they change, recomputing the
-baseline's diff against the new project. The Jira mirror arrives the same
-way, as a function the binary hands over and the window runs once on a
-thread, so the GUI never handles a token.
+and hands them over with a `Host`: what the GUI can't do itself because it
+needs git, the export pipeline, Confluence or a token. The app queues
+`Job`s (plan the exports, write some, publish one, read the comments, list
+the tags, read the project at a revision); the window runs one at a time
+on a thread through the host, which runs the commands' own code
+(`export::run_with` with its output captured, `confluence::read`) and
+wakes the window with the answer. The window polls the item files and
+`kiln.toml` every two seconds and reloads the project when they change,
+recomputing the baseline's diff. `kiln check` then runs on a thread of
+its own, which reads the project from disk itself, since on a large
+project it takes seconds the window shouldn't freeze for; until its
+findings arrive, Check shows the previous ones and says it is checking
+again, and a newer check replaces one still running. The Jira
+mirror arrives the same way, as a function the binary hands over and the
+window runs once on a thread, so the GUI never handles a token.
 
 ## Windows: two executables
 
@@ -118,6 +217,10 @@ that are GUIs first.)
 
 ## Not built
 
-Editing anything; a detail pane with the item's body (Fenix shows it);
-refreshing the Jira mirror while the window is open (it is read once, at
-start); Kiln-specific themes; remembering the last page between runs.
+Editing an item's body, or any multi-line text (Fenix does that: `Enter`
+opens it); undo (git is the undo); overriding a refused Confluence plan,
+adopting a page or pruning retired ones (`kiln export --force`, `--adopt`,
+`--prune-removed`); `kiln auth` (the GUI never handles a token); `kiln
+init`; refreshing the Jira mirror while the window is open (it is read
+once, at start); Kiln-specific themes; remembering the last page between
+runs.

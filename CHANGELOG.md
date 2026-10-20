@@ -94,6 +94,21 @@ All notable changes to Kiln are recorded here. The format follows
   and a proxy for Jira (G9) wait on Fenix
   ([docs/EXPORT.md](docs/EXPORT.md), [docs/INTEGRATION.md](docs/INTEGRATION.md),
   [docs/CLI.md](docs/CLI.md)).
+- K9: the GUI does what the editing commands do, never prose (ADR-012):
+  set a status (`s`, or `H`/`L` on the Board), title, parent, owner or
+  due date, link and unlink, create an item or a child (opened in Fenix),
+  renumber, each picked or typed on the footer line, checked as the
+  command checks it, and written through the same `kiln-index` functions
+  as `kiln set`, `link`, `new` and `renumber` (and the Flint provider's
+  status change). New pages: Item (`kiln show`, walking from item to
+  item), Check (the findings, and an error count on every page), Exports
+  (each target's dry run; `w`/`W` write file targets, `P` publishes a
+  Confluence target after a `y`, only the plan shown) and Comments
+  (Confluence's unresolved comments, opened in the browser); `b` on
+  Changes picks another baseline; `kiln check` runs on a thread, so a
+  large project doesn't freeze the window; statuses are drawn as pills
+  coloured by what they mean (done, in progress, initial, blocked,
+  closed) ([docs/GUI.md](docs/GUI.md)).
 - Exports read more easily: the items of a `kiln:items` are a flat list
   of headings at one level, each parent followed by its children, so a
   table of contents (Confluence's stops at three levels) lists every one;

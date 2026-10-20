@@ -14,12 +14,14 @@ live), K4 (`kiln lsp`; Fenix gaps G7 and G8 worked around), K5
 (`kiln provider` for Flint), K6 (`kiln diff`, `export --since`,
 `kiln confluence comments`), K7 (the GUI, `kiln gui`, `kilnw` on
 Windows) and K8 (the `docx` format, the Jira mirror with K207 and `kiln
-auth jira`; Fenix gaps G6 and G9 worked around) are done.
+auth jira`; Fenix gaps G6 and G9 worked around) and K9 (the GUI edits
+front matter through the editing commands' shared functions, never prose,
+ADR-012; Item, Check, Exports and Comments pages) are done.
 
 ## Read first, in this order
 
 1. `docs/DESIGN.md` — goals, non-goals, architecture, crates, CLI,
-   budgets and milestones K0–K8.
+   budgets and milestones K0–K9.
 2. `docs/FORMAT.md` — the item file format and `kiln.toml`; the contract.
    `kiln-model`/`kiln-parse` implement exactly this; change both together.
 3. `docs/EXPORT.md` — export targets, the three layouts (one document is
