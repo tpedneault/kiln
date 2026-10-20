@@ -1167,3 +1167,52 @@ fn unresolved_comments_are_read_and_placed_on_both_flavours() {
         assert_eq!(placed[0].author, if cloud { "acc-alice" } else { "alice" });
     }
 }
+
+#[test]
+fn data_center_walks_child_pages_for_descendants() {
+    // A three-level tree, more children than one fake page of results.
+    let page = |title: &str, parent: u64| FakePage {
+        title: title.into(),
+        parent: Some(parent),
+        version: 1,
+        author: "alice".into(),
+        body: String::new(),
+        property: None,
+    };
+    let mut state = State::default();
+    state.pages.insert(
+        10,
+        FakePage {
+            parent: None,
+            ..page("Root", 0)
+        },
+    );
+    for (id, parent) in [(11, 10), (12, 10), (13, 10), (21, 11), (22, 11), (31, 21)] {
+        state.pages.insert(id, page(&format!("P{id}"), parent));
+    }
+    let fake = Fake::start(state, false);
+    let c = client(&fake, false);
+    let mut found: Vec<(u64, Option<u64>)> = c
+        .descendants(10)
+        .unwrap()
+        .iter()
+        .map(|p| (p.id, p.parent_id))
+        .collect();
+    found.sort();
+    assert_eq!(
+        found,
+        [
+            (11, Some(10)),
+            (12, Some(10)),
+            (13, Some(10)),
+            (21, Some(11)),
+            (22, Some(11)),
+            (31, Some(21))
+        ]
+    );
+    let log = fake.state.lock().unwrap().log.clone();
+    assert!(
+        !log.iter().any(|l| l.contains("/descendant/")),
+        "the endpoint that answers 500 on Data Center isn't asked: {log:?}"
+    );
+}

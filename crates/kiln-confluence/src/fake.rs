@@ -314,18 +314,12 @@ fn respond(
                 format!("/wiki/api/v2/pages/{id}/footer-comments?limit=2&"),
             ))
         }
-        ("GET", ["rest", "api", "content", id, "descendant", "page"]) if !cloud => {
-            let id = num(id);
-            let items = descendants(&s, id)
-                .into_iter()
-                .map(|c| dc_page(&s, c, &s.pages[&c]))
-                .collect();
-            ok(paged(
-                items,
-                start,
-                format!("/rest/api/content/{id}/descendant/page?limit=2&"),
-            ))
-        }
+        // As a Data Center at work answers it, so a use of it fails every
+        // Data Center test (Kiln walks `/child/page` instead).
+        ("GET", ["rest", "api", "content", _, "descendant", "page"]) if !cloud => status(
+            500,
+            "Please contact your admin passing attached Log's referral number: 6c1b0e2f",
+        ),
         ("GET", ["rest", "api", "content", id, "property", "kiln"]) if !cloud => {
             match s.pages.get(&num(id)).and_then(|p| p.property.clone()) {
                 Some(value) => {

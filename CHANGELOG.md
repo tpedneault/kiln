@@ -146,6 +146,12 @@ All notable changes to Kiln are recorded here. The format follows
 
 ### Changed
 
+- Confluence (Data Center): pages below the published root are found by
+  walking `child/page`, not `descendant/page`, which a live Data Center
+  answers with HTTP 500 once the page exists, so a dry run or publish of
+  an already-published document no longer fails until the page is
+  deleted ([docs/CONFLUENCE.md](docs/CONFLUENCE.md)).
+
 - Confluence: the plan names the parent page by title as well as ID
   (`→ space DEMO, page 123456789 "Demo"`, `parentTitle` in JSON), so a
   wrong `parent` is caught before publishing. It costs no extra call.
