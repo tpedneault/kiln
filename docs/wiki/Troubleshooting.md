@@ -91,6 +91,32 @@ run `kiln export --force` for that target. To publish the other pages
 and leave drifted ones alone, set `on_drift = "skip"`. See [Publishing to
 Confluence](Publishing-to-Confluence).
 
+### The publish stops: `the title "…" is held by another page in the space`
+
+Confluence wants page titles unique in a space, and a page Kiln doesn't
+own already has a title this export needs: usually its main page's,
+because another export (or a page someone made) has the same `title`.
+Nothing was published. Give the export a `title` of its own, with the
+project's name in it. If section pages collide too, set
+`qualify_titles = "always"`. See
+[Several projects in one space](Publishing-to-Confluence#several-projects-in-one-space).
+
+### `kiln preset add` refuses
+
+It changes nothing when it refuses, and says why:
+
+- **`… already exists; kiln preset add never overwrites`**: the template
+  (or an item template) is already there. Move or rename your file, or
+  keep it and add the types and export by hand from [Presets](Presets).
+- **`kiln.toml already has an export named …`**: the preset was added
+  before. To add it again, rename or remove that export first.
+- **`… uses the prefix QG, which kiln.toml gives to …`**: one of your
+  types has the prefix of a type the preset adds. Change one prefix
+  (before either has items, or with `kiln renumber`), then add the preset.
+- **`… would fail kiln check …`**: the result would have an export or
+  template error, named in the message; usually a type of yours with the
+  preset's name but missing something the template uses.
+
 ### `K207 not checked: …`
 
 Rule K207 compares items with their Jira tickets, and Jira couldn't be
@@ -131,6 +157,13 @@ Kiln project. A Markdown file elsewhere gets empty answers.
 - Files over 2 MiB and binary files are skipped.
 
 ## Frequently asked questions
+
+### Can I write arc42 documentation with Kiln?
+
+Yes: `kiln preset add arc42` adds an arc42 template, its types (quality
+goals and scenarios, constraints, building blocks, glossary terms) and an
+export with a page per section. [Presets](Presets) shows what it adds and
+the links worth adding on top.
 
 ### Do I need Fenix, Flint, Confluence or Jira?
 

@@ -380,7 +380,10 @@ job. [Checking](Checking) lists every rule and how to fix it. Put
 
 A **template** gives the document its shape: your own headings and prose,
 with **directives** (HTML comments) where Kiln places items and reports.
-Create `design/templates/design-document.md`:
+(`kiln preset add design-doc` writes a ready-made one and its export for
+you; arc42 and a requirements specification are [presets](Presets) too.
+Here you write one, to see how it works.) Create
+`design/templates/design-document.md`:
 
 ```markdown
 # Introduction

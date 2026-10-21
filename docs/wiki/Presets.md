@@ -378,6 +378,14 @@ task, test) cost nothing: a type without items never shows in the
 document. Remove them if you want `kiln new` to offer fewer, along with
 the links that mention them. Keep `test` if you verify scenarios.
 
+#### Renaming a type a template uses
+
+The template names its types in its directives
+(`<!-- kiln:items type="block" -->`). Rename a type in `kiln.toml` and
+change those too; `kiln check` (K112) names any directive still using the
+old name, with its line. Items keep their `type = "…"` line, so rename
+it there as well (a search and replace over `design/`).
+
 #### Statuses and prefixes
 
 The statuses above are a starting point; the template uses none by
@@ -479,6 +487,16 @@ path = "docs/DESIGN-DOCUMENT.md"
 
 `kiln export --check` in CI keeps a committed copy current
 ([Continuous integration](Continuous-integration)).
+
+## Removing a preset
+
+Nothing in Kiln remembers that a preset was added, so removing one is
+removing what it wrote: the template (`design/templates/arc42.md`), its
+item templates, the export and its commented Confluence version at the
+end of `kiln.toml`, and the types and roles nothing else uses. Remove a
+type only once no item has it (`kiln list --type quality-goal`), or
+`kiln check` reports those items (K104). Types another preset uses too
+(`constraint`, `term` for arc42 and srs) stay.
 
 ## Publishing a preset to Confluence
 

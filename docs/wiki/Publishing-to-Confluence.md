@@ -68,6 +68,11 @@ nothing the second time.
     └── B Open findings
 ```
 
+The main page lists its child pages with Confluence's Children macro, in
+the order Confluence keeps them; `children = "list"` has Kiln write the
+list in document order instead (see
+[Several projects in one space](#several-projects-in-one-space)).
+
 ### `tree`
 
 ```text
