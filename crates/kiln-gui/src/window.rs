@@ -20,7 +20,7 @@ use winit::dpi::LogicalSize;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::keyboard::ModifiersState;
-use winit::window::{Window, WindowId};
+use winit::window::{Icon, Window, WindowId};
 
 use crate::app::{App, Baseline, Effect};
 use crate::gpu::{Gpu, Surface};
@@ -205,11 +205,23 @@ fn stamps(root: &std::path::Path, project: &Project) -> BTreeMap<String, Stamp> 
     out
 }
 
+/// The window's icon (title bar, Alt-Tab, the X11 taskbar), drawn from
+/// `kiln-brand`: the geometry the `kiln` crate's build script embeds in
+/// the Windows executables, which Explorer and a taskbar pin read before
+/// the process runs, so the two can't disagree. Wayland ignores it; the
+/// desktop file's icon is used there. A window without its icon is still
+/// a window, so a failure here is no error.
+fn kiln_icon() -> Option<Icon> {
+    let icon = kiln_brand::app_icon(256);
+    Icon::from_rgba(icon.rgba, icon.width, icon.height).ok()
+}
+
 impl Win {
     fn start(&mut self, event_loop: &ActiveEventLoop) -> Result<(), String> {
         let attributes = Window::default_attributes()
             .with_title(format!("Kiln — {}", self.app.project().config.name))
-            .with_inner_size(LogicalSize::new(1100.0, 760.0));
+            .with_inner_size(LogicalSize::new(1100.0, 760.0))
+            .with_window_icon(kiln_icon());
         let window = Arc::new(
             event_loop
                 .create_window(attributes)

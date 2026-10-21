@@ -216,6 +216,23 @@ there is one `kiln`. (ADR-010 records the tradeoff; DESIGN.md's earlier
 "`--console` on Windows" was Fenix's and Flint's answer, for programs
 that are GUIs first.)
 
+## Icon
+
+Kiln's mark is a fired block in clay, its three faces standing a little
+apart, with Fenix's Flame burning in its mouth: drawn the way Fenix's
+Forged F is (a 48-unit grid, every slanted edge rising 1 : 2, flat
+colour, the same graphite tile and Martian Mono wordmark), so the two
+read as one suite. `kiln-brand` draws it from one vector definition: the
+window's icon, and the `.ico` that `crates/kiln/build.rs` embeds in
+`kiln.exe` and `kilnw.exe` on every Windows build, which Explorer, a
+taskbar pin and the Start menu show. `kiln.ico` and the logos in
+`docs/brand/` are copies for use outside a build, rewritten by `cargo run
+-p kiln-brand --example write-icon` and checked against the geometry by a
+test. On Linux the window icon shows under X11; Wayland takes a desktop
+file's icon, and Kiln installs no desktop file.
+
+![Kiln](brand/kiln-icon-256.png)
+
 ## Not built
 
 Editing an item's body, or any multi-line text (Fenix does that: `Enter`

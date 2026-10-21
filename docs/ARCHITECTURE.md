@@ -25,7 +25,11 @@ clippy.toml           test-only lint relaxations
 kiln.toml, design/    Kiln's own Kiln project, checked in CI (K1 dogfooding)
 docs/generated/       its design document, exported and checked in CI (K2)
 crates/kiln-*/        library crates, one role each
-crates/kiln/          the binary: src/cmd/ has one module per command
+crates/kiln/          the binary: src/cmd/ has one module per command;
+                      build.rs embeds the icon in the Windows executables
+crates/kiln-brand/tools/outline.py  the wordmark's outlines, from the font
+kiln.ico, docs/brand/ the icon and logos, drawn by kiln-brand's
+                      write-icon example and checked by its tests
 crates/kiln-check/examples/bench.rs   the benchmark gate (check and export)
 crates/*/golden/      golden files (KILN_BLESS=1 rewrites them)
 scripts/ci.ps1        the gates, locally and in CI (CI.md)
@@ -61,6 +65,7 @@ access except through a value or trait the caller passes in.
 | `kiln-secrets` | tokens from the environment (K2) or the OS credential store (K3); a `Token` that never formats | no | K2, K3 |
 | `kiln` | the binary: `clap` CLI, exit codes, project discovery, reading and writing files; and `kilnw`, the GUI without a console on Windows (ADR-010) | no | K0 onward |
 | `kiln-jira` | the Jira mirror: linked keys, the cached mirror and its freshness, K207 (pure); one fetch through `fenix-jira`, and the fake Jira for tests (`fake` feature) | mirror and K207 yes; fetch no | K8 |
+| `kiln-brand` | the mark, wordmark and app icon (GUI.md, "Icon") drawn from one vector definition by a small rasteriser; the `.ico` with its `ico` feature (`image`) | yes | after K10 |
 | `kiln-gui` | the GUI (GUI.md): pages as rows, the prompt and the application as state machines (pure, tested as text); edits through `kiln-index`; the window (`winit`), GPU (`wgpu`) and text (`glyphon`) that draw a `Screen`, and the thread that runs the binary's jobs | pages, prompt and app yes; window no | K7, K9 |
 
 `kiln-gui` is the one crate that pulls in `wgpu` and `winit`, which is
@@ -85,8 +90,9 @@ needs it lands):
 | `kiln-lsp` | `kiln-model`, `kiln-parse`, `kiln-index`, `kiln-check` |
 | `kiln-flint` | `kiln-model`, `kiln-parse` (the status edit), `kiln-index`, `kiln-fenix`, `kiln-confluence` and `kiln-secrets` ("Open in Confluence") |
 | `kiln-jira` | `kiln-model`, `kiln-index` |
-| `kiln-gui` | `kiln-model`, `kiln-parse` (the title limit), `kiln-index` (the project, and the editing commands' `plan_set`/`apply_*`), `kiln-check` (the Check page), `kiln-fenix` (opening an item or an address), `kiln-jira` (the mirror's type and K207; the binary hands over the function that loads it, so the GUI never sees a token); exports, Confluence and git are the binary's, behind the `Host` trait, so it needs no `kiln-export`, `kiln-confluence` or `kiln-git` |
-| `kiln` | all of them |
+| `kiln-brand` | no Kiln crate |
+| `kiln-gui` | `kiln-model`, `kiln-parse` (the title limit), `kiln-index` (the project, and the editing commands' `plan_set`/`apply_*`), `kiln-check` (the Check page), `kiln-fenix` (opening an item or an address), `kiln-brand` (the window icon), `kiln-jira` (the mirror's type and K207; the binary hands over the function that loads it, so the GUI never sees a token); exports, Confluence and git are the binary's, behind the `Host` trait, so it needs no `kiln-export`, `kiln-confluence` or `kiln-git` |
+| `kiln` | all of them; `kiln-brand` with `ico` in its build script too |
 
 The rules:
 

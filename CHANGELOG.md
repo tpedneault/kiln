@@ -141,6 +141,12 @@ All notable changes to Kiln are recorded here. The format follows
 - Catppuccin themes in the GUI: `theme` takes `Catppuccin Latte`,
   `Catppuccin Frappé`, `Catppuccin Macchiato` and `Catppuccin Mocha`,
   Fenix's colours for them.
+- Kiln's mark and icon: a fired block in clay holding Fenix's flame, drawn
+  as Fenix's Forged F is, so the suite reads as one. `kiln-brand` draws
+  it from one definition: the GUI window's icon, and the icon embedded in
+  `kiln.exe` and `kilnw.exe` on every Windows build; `kiln.ico` and the
+  logos in `docs/brand/` are checked against it by a test
+  ([docs/GUI.md](docs/GUI.md), "Icon").
 
 - Code files in the editor: run beside a language's own server (Fenix's
   additional servers, which close INTEGRATION.md's G3), `kiln lsp`

@@ -134,6 +134,7 @@ docs/CONFIGURATION.md kiln.toml and environment, the overview
 docs/wiki/            the user guide, published to the GitHub wiki (CI.md)
 kiln.toml, design/    Kiln's own Kiln project (dogfooding), checked in CI
 docs/generated/       its exported design document, `kiln export --check` in CI
+docs/brand/, kiln.ico the logo and icon, drawn by crates/kiln-brand (GUI.md, "Icon")
 crates/               the workspace (kiln-* libraries, kiln binary)
 scripts/ci.ps1        the one entry point for the gates
 scripts/release.ps1   a release's steps; .github/workflows/release.yml runs them on a tag
