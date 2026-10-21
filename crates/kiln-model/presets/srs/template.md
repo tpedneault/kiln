@@ -7,8 +7,14 @@ freely: it is this project's file now.
 Comments like this one are notes for whoever edits the template: they
 don't appear in the export. Replace the placeholder sentences with this
 product's own text and delete what doesn't apply. Requirements are
-sorted into section 3 by tag; `kiln new requirement --title "…"` adds
-one. `kiln check` validates this file; `kiln export srs` writes it.
+sorted into section 3 by tag (function, performance, usability,
+interface, data, attribute); the others land in "Other requirements".
+
+The sections that list items need these types in kiln.toml:
+requirement, term, constraint and test, and an [[export]] whose
+`template` is this file. The wiki's "Presets" page has that
+configuration and its options. `kiln check` validates this file once an
+export uses it.
 -->
 
 <!-- kiln:summary -->

@@ -18,8 +18,8 @@ auth jira`; Fenix gaps G6 and G9 worked around) and K9 (the GUI edits
 front matter through the editing commands' shared functions, never prose,
 ADR-012; Item, Check, Exports and Comments pages) and K10 (`kiln jira
 sync` and `pull`: a sub-task per task kept in step, ADR-014) and K11
-(presets: `kiln preset add arc42|srs|design-doc`, copied not referenced,
-ADR-015; `qualify_titles` for spaces several projects share) are done.
+(presets: `kiln preset add arc42|srs|design-doc` copies a template only,
+configuration on the wiki, ADR-015; `qualify_titles` for spaces several projects share) are done.
 
 ## Read first, in this order
 

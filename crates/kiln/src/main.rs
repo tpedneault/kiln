@@ -98,11 +98,11 @@ enum Command {
         /// Also register `kiln lsp` for Markdown in .fenix/tools.json (merged, never replaced).
         #[arg(long)]
         fenix: bool,
-        /// Also add a preset (`kiln preset list`): arc42, srs, design-doc.
+        /// Also add a preset's template (`kiln preset list`): arc42, srs, design-doc.
         #[arg(long, value_name = "NAME")]
         preset: Option<String>,
     },
-    /// Document templates Kiln ships, with their types and export: list them, or add one.
+    /// Document templates Kiln ships (arc42, srs, design-doc): list them, or add one.
     Preset {
         #[command(subcommand)]
         what: PresetCommand,
@@ -275,7 +275,7 @@ enum Command {
 enum PresetCommand {
     /// The presets and what each is for.
     List,
-    /// Copy a preset into this project: its template, its types and an export; never overwrites.
+    /// Copy a preset's template into this project's templates/ folder; never overwrites.
     Add {
         name: String,
         /// Print what would change; write nothing.

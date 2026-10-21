@@ -8,7 +8,7 @@ All examples on this page come from one small scratch project, made with `kiln i
 |---|---|
 | [`kiln init`](#kiln-init) | starts a project: writes `kiln.toml` and a `design/` folder |
 | [`kiln preset list`](#kiln-preset-list) | the document templates Kiln ships (arc42, srs, design-doc) |
-| [`kiln preset add`](#kiln-preset-add) | copies one into the project, with its types and an export |
+| [`kiln preset add`](#kiln-preset-add) | copies one's template into the project |
 | [`kiln new`](#kiln-new) | creates an item with the next free ID |
 | [`kiln list`](#kiln-list) | lists items, filtered |
 | [`kiln show`](#kiln-show) | one item with its links in both directions, coverage and progress |
@@ -68,7 +68,7 @@ Writes `kiln.toml` with the seven default types (requirement, design, decision, 
 |---|---|
 | `--name NAME` | the project's name in reports and exports. Default: the folder's name |
 | `--fenix` | also registers `kiln lsp` in `.fenix/tools.json` as an additional language server for the Fenix editor, beside each language's own, for Markdown and the languages of the code `[code] paths` scans. It merges into an existing file. In a folder that already has a `kiln.toml`, `kiln init --fenix` does only this; run it again after adding `[code] paths` |
-| `--preset NAME` | also adds a preset, exactly as [`kiln preset add NAME`](#kiln-preset-add) does. An unknown name stops before anything is written |
+| `--preset NAME` | also adds a preset's template, exactly as [`kiln preset add NAME`](#kiln-preset-add) does. An unknown name stops before anything is written |
 | `--project DIR` | writes the project in `DIR` instead of the current folder |
 
 ```console
@@ -97,14 +97,12 @@ Notes:
 kiln preset list
 ```
 
-The presets: document templates Kiln ships, each with the item types it
-places and an export target. See
-[Templates and exports](Templates-and-exports#presets-arc42-and-others).
+The presets: document templates Kiln ships. See [Presets](Presets).
 
 ```console
 $ kiln preset list
 arc42       arc42 architecture documentation: twelve sections, one page each
-srs         a software requirements specification after ISO/IEC/IEEE 29148, one document
+srs         a software requirements specification after ISO/IEC/IEEE 29148
 design-doc  a design document: requirements, design, decisions, milestones, risks
 ```
 
@@ -114,40 +112,29 @@ design-doc  a design document: requirements, design, decisions, milestones, risk
 kiln preset add NAME [--dry-run] [--project DIR]
 ```
 
-Copies a preset into the project: its template to
-`design/templates/NAME.md`, the types and link roles it needs that
-`kiln.toml` doesn't have yet (with item templates for the types it adds),
-and an `[[export]]` target named `NAME` at the end of `kiln.toml`, with a
-Confluence version of it commented out. The rest of `kiln.toml`, comments
-included, is left as it was. From then on the template is your file:
-edit it, and `kiln export NAME` writes the document.
+Copies the preset's template to `design/templates/NAME.md` (the
+`templates/` folder of your first `paths` entry), and nothing else:
+`kiln.toml` is left alone. On stderr it names what the template needs
+that `kiln.toml` doesn't declare yet; [Presets](Presets) has the types,
+links and export to add for each preset, and the options.
 
 | Option | Does |
 |---|---|
-| `--dry-run` | prints what would change; writes nothing |
+| `--dry-run` | names the file it would write; writes nothing |
 
 ```console
 $ kiln preset add arc42
-kiln.toml
 design/templates/arc42.md
-design/templates/quality-scenario.md
-design/templates/building-block.md
-kiln: added the arc42 preset (types quality-goal, quality-scenario, constraint, block, term; kept kiln.toml's own decision, risk; roles addresses; mitigates gains from decision, block; export `arc42`); `kiln export arc42` writes it
+kiln: added the arc42 template; before an export can use it, kiln.toml needs what it places: `quality-goal` isn't a type; `constraint` isn't a type; `block` isn't a type; `quality-scenario` isn't a type; `term` isn't a type (the wiki's "Presets" page has the configuration and its options)
 $ kiln preset add arc42
-kiln: kiln.toml already has an export named `arc42`; the arc42 preset is added already, or rename that export first
+kiln: design/templates/arc42.md already exists; kiln preset add never overwrites (move it away, or rename it, and add the preset again)
 ```
 
 Notes:
 
-- A type you already have is kept as you defined it; the preset's
-  template doesn't depend on status names. A link role you already have
-  gains the types the preset links from or to.
-- It never overwrites, and when it refuses it changes nothing (exit 2): a
-  file it would write already exists, the export name is taken, one of
-  its types uses a prefix another type has, or `kiln check` would find an
-  export or template error in the result.
-- Two presets can sit side by side (`arc42` and `srs` share the
-  `constraint` and `term` types).
+- The template is yours from then on; a newer Kiln never changes it.
+- Once an `[[export]]` uses it, `kiln check` checks it (K112), naming
+  anything it refers to that `kiln.toml` lacks, with the line.
 
 ### kiln new
 

@@ -50,7 +50,7 @@ The full design, with the reasoning behind it, is in `docs/DESIGN.md` and the do
   - [3.12 ADR-012 The GUI edits front matter, never prose](#312-adr-012-the-gui-edits-front-matter-never-prose)
   - [3.13 ADR-013 Items are a flat list, with one line per relationship](#313-adr-013-items-are-a-flat-list-with-one-line-per-relationship)
   - [3.14 ADR-014 Kiln pushes the tasks it manages to Jira](#314-adr-014-kiln-pushes-the-tasks-it-manages-to-jira)
-  - [3.15 ADR-015 Presets are copied into the project, not referenced](#315-adr-015-presets-are-copied-into-the-project-not-referenced)
+  - [3.15 ADR-015 A preset is a template copied in; its configuration is documented](#315-adr-015-a-preset-is-a-template-copied-in-its-configuration-is-documented)
 - [4 Milestones](#4-milestones)
 - [5 Risks](#5-risks)
 - [6 Appendix: traceability](#6-appendix-traceability)
@@ -308,15 +308,17 @@ From K10, with `[jira] project` set, `kiln jira sync` keeps Jira in step with th
 
 What stays Jira's: assignees, sprints, comments, worklogs, and every ticket that isn't a sub-task of the project issue, which Kiln never writes even when an item links it. Kiln deletes nothing: a sub-task no item links any more is reported. A ticket moved in Jira is flagged by K207; `kiln jira pull` takes its status back into the item as a reviewable edit, or the next sync moves it back. The repository stays the source of truth ([REQ-001 The repository is the source of truth](#21-req-001-the-repository-is-the-source-of-truth)), and Kiln still holds no assignments or sprints ([RISK-004 The model becomes a second Jira](#5-risks)).
 
-### 3.15 ADR-015 Presets are copied into the project, not referenced
+### 3.15 ADR-015 A preset is a template copied in; its configuration is documented
 
 **accepted**
 
-People asked for ready-made documents (arc42 first) that they could add with one command and then adapt. Kiln could ship such a template and have a target name it (`template = "preset:arc42"`), or copy it into the repository.
+People asked for ready-made documents (arc42 first) that they could add with one command and then adapt. Two questions: whether a preset is referenced or copied, and whether adding one also configures the project.
 
-It copies. `kiln preset add` writes the template into `design/templates/`, adds the types and link roles it places to `kiln.toml`, and appends an export target; from then on all of it is the project's own, changed in its merge requests like any other file, and a newer Kiln never touches it. A referenced template would change under its authors with an upgrade, in the published document of all places, and every team that adapts arc42 to itself (the normal case) would have to copy it anyway. The cost is that improvements to a preset reach only projects that add it afterwards; `kiln init --preset NAME` in an empty folder writes the current one to compare with.
+**Copied.** `kiln preset add` writes the template into the project's `templates/` folder, and from then on it is the project's file, changed in its merge requests; a newer Kiln never touches it. A referenced template (`template = "preset:arc42"`) would change under its authors with an upgrade, in the published document of all places, and every team that adapts arc42 to itself (the normal case) would copy it anyway. The cost is that improvements to a template reach only projects that add it afterwards; `kiln init --preset NAME` in an empty folder writes the current one to compare with.
 
-Adding never replaces: a type the project has is kept, a role it has gains only what the preset links, and a prefix clash, a taken export name or a file already there stops it before anything is written ([REQ-013 Edits keep the author's formatting and never fight an editor](#22-req-013-edits-keep-the-authors-formatting-and-never-fight-an-editor)). The presets follow the structure of arc42 and ISO/IEC/IEEE 29148 with wording of Kiln's own, since arc42's help text is CC BY-SA and Kiln is MIT OR Apache-2.0.
+**Only the template.** A first version also merged the template's types, link roles and an export target into `kiln.toml`. But those are design choices with real options: whether tests verify quality scenarios, whether code implements building blocks, whether concepts are items or prose, where the document is published. Editing `kiln.toml` would make them for the project, or need a flag for each, and would touch the one file every other command reads. So `kiln preset add` writes the template and names on stderr what it needs that `kiln.toml` lacks; the wiki's "Presets" page has the configuration for each preset and its options, every block of it tested against the template in CI, and `kiln check` (K112) names anything still missing once an export uses the template.
+
+The templates follow the structure of arc42 and ISO/IEC/IEEE 29148 with wording of Kiln's own, since arc42's help text is CC BY-SA and Kiln is MIT OR Apache-2.0.
 
 ## 4 Milestones
 

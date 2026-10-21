@@ -992,8 +992,52 @@ fn jira_sync_creates_sub_tasks_records_their_keys_and_pull_takes_status_back() {
     assert!(t2.contains("status = \"done\""), "{t2}");
 }
 
+/// The `toml` blocks of the wiki's Presets page marked
+/// `<!-- tested: NAME -->`, in order: the configuration the page tells
+/// people to paste, so a test can paste it too.
+fn wiki_config(name: &str) -> Vec<String> {
+    let page = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/wiki/Presets.md"),
+    )
+    .expect("the wiki's Presets page is there");
+    let marker = format!("<!-- tested: {name} -->");
+    let mut out = Vec::new();
+    let mut rest = page.as_str();
+    while let Some(at) = rest.find(&marker) {
+        rest = &rest[at + marker.len()..];
+        let body = rest
+            .trim_start()
+            .strip_prefix("```toml\n")
+            .expect("a marker is followed by a toml block");
+        let end = body.find("\n```").expect("the toml block ends");
+        out.push(body[..=end].to_owned());
+    }
+    assert!(!out.is_empty(), "no `{marker}` blocks");
+    out
+}
+
+/// Pastes `snippet` into `config` as the wiki says: a `[types.*]` or
+/// `[links.*]` table the file already has is replaced (the default
+/// file's tables end at a blank line).
+fn paste(config: &str, snippet: &str) -> String {
+    let mut config = config.to_owned();
+    for header in snippet
+        .lines()
+        .filter(|l| l.starts_with("[types.") || l.starts_with("[links."))
+    {
+        let needle = format!("\n{header}\n");
+        if let Some(at) = config.find(&needle) {
+            let end = config[at + 1..]
+                .find("\n\n")
+                .map_or(config.len(), |e| at + 1 + e);
+            config.replace_range(at..end, "");
+        }
+    }
+    format!("{}\n\n{snippet}", config.trim_end())
+}
+
 #[test]
-fn presets_are_listed_added_once_and_export_clean() {
+fn presets_add_only_their_template_and_the_wiki_configuration_works() {
     let out = kiln(&["preset", "list"]);
     assert!(out.status.success());
     let names: Vec<String> = stdout(&out)
@@ -1014,69 +1058,99 @@ fn presets_are_listed_added_once_and_export_clean() {
     );
     assert!(!d.join("kiln.toml").exists());
 
-    let written = ok(d, &["init", "--name", "Shop", "--preset", "arc42"]);
-    assert!(written.contains("design/templates/arc42.md"), "{written}");
-    ok(d, &["new", "quality-goal", "--title", "Fast pages"]);
-    ok(
-        d,
-        &[
-            "new",
-            "quality-scenario",
-            "--title",
-            "Search under load",
-            "--parent",
-            "QG-001",
-        ],
-    );
-    ok(d, &["new", "term", "--title", "Basket"]);
-    ok(d, &["check"]);
-    ok(d, &["export", "arc42"]);
-    let index = std::fs::read_to_string(d.join("docs/arc42/index.md")).unwrap();
-    assert!(index.starts_with("# Shop — architecture\n"), "{index}");
-    assert!(index.contains("- [12 Glossary](glossary.md)"), "{index}");
-    let goals = std::fs::read_to_string(d.join("docs/arc42/introduction-and-goals.md")).unwrap();
-    assert!(goals.contains("| QG-001 | Fast pages |"), "{goals}");
-    assert!(
-        !goals.contains("<!--"),
-        "the template's notes stay out of the export: {goals}"
-    );
-    let scenario = std::fs::read_dir(d.join("design/quality-scenarios"))
-        .unwrap()
-        .next()
-        .unwrap()
-        .unwrap()
-        .path();
-    assert!(std::fs::read_to_string(scenario)
-        .unwrap()
-        .contains("**Stimulus:**"));
+    for name in ["arc42", "srs", "design-doc"] {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        ok(d, &["init", "--name", "Shop"]);
+        let before = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+        let plan = ok(d, &["preset", "add", name, "--dry-run"]);
+        assert_eq!(plan, format!("design/templates/{name}.md: new\n"));
+        assert_eq!(
+            ok(d, &["preset", "add", name]),
+            format!("design/templates/{name}.md\n")
+        );
+        assert_eq!(
+            std::fs::read_to_string(d.join("kiln.toml")).unwrap(),
+            before,
+            "{name}: kiln.toml is left alone"
+        );
+        // Twice: refused.
+        let out = kiln_in(d, &["preset", "add", name]);
+        assert_eq!(out.status.code(), Some(2));
+        assert!(stderr(&out).contains("already exists"), "{}", stderr(&out));
 
-    // Twice: refused, nothing changes.
-    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
-    let out = kiln_in(d, &["preset", "add", "arc42"]);
-    assert_eq!(out.status.code(), Some(2));
-    assert_eq!(
-        std::fs::read_to_string(d.join("kiln.toml")).unwrap(),
-        config
-    );
-
-    // A file in the way: refused before anything is written.
-    std::fs::write(d.join("design/templates/srs.md"), "mine\n").unwrap();
-    let out = kiln_in(d, &["preset", "add", "srs"]);
-    assert_eq!(out.status.code(), Some(2));
-    assert!(stderr(&out).contains("design/templates/srs.md already exists"));
-    assert_eq!(
-        std::fs::read_to_string(d.join("kiln.toml")).unwrap(),
-        config
-    );
-    std::fs::remove_file(d.join("design/templates/srs.md")).unwrap();
-
-    // A dry run writes nothing; then the second preset sits beside the first.
-    let plan = ok(d, &["preset", "add", "srs", "--dry-run"]);
-    assert!(plan.contains("design/templates/srs.md: new"), "{plan}");
-    assert!(!d.join("design/templates/srs.md").exists());
-    ok(d, &["preset", "add", "srs"]);
-    ok(d, &["check"]);
-    ok(d, &["export", "srs"]);
-    let srs = std::fs::read_to_string(d.join("docs/SRS.md")).unwrap();
-    assert!(srs.contains("**TERM-001 Basket**"), "{srs}");
+        // The wiki's configuration, every option included, checks and
+        // exports clean.
+        let mut config = before.clone();
+        for snippet in wiki_config(name) {
+            config = paste(&config, &snippet);
+        }
+        std::fs::write(d.join("kiln.toml"), &config).unwrap();
+        std::fs::write(
+            d.join("design/templates/quality-scenario.md"),
+            "**Stimulus:** what happens.\n",
+        )
+        .unwrap();
+        if name == "arc42" {
+            ok(d, &["new", "quality-goal", "--title", "Fast pages"]);
+            ok(
+                d,
+                &[
+                    "new",
+                    "quality-scenario",
+                    "--title",
+                    "Search under load",
+                    "--parent",
+                    "QG-001",
+                ],
+            );
+            ok(d, &["new", "constraint", "--title", "Runs on Kubernetes"]);
+            ok(d, &["new", "block", "--title", "Front end"]);
+            ok(
+                d,
+                &["new", "block", "--title", "Basket", "--parent", "BB-001"],
+            );
+            ok(d, &["new", "decision", "--title", "Server-side rendering"]);
+            ok(d, &["new", "term", "--title", "Basket"]);
+            ok(d, &["new", "concept", "--title", "Error handling"]);
+            ok(d, &["new", "runtime", "--title", "Checkout"]);
+            ok(d, &["new", "test", "--title", "Load test"]);
+            for (id, role, target) in [
+                ("ADR-001", "addresses", "QG-001"),
+                ("ADR-001", "affects", "BB-001"),
+                ("ADR-001", "respects", "CON-001"),
+                ("BB-002", "uses", "BB-001"),
+                ("BB-002", "applies", "CPT-001"),
+                ("RT-001", "involves", "BB-002"),
+                ("TEST-001", "verifies", "QS-001"),
+            ] {
+                ok(d, &["link", id, role, target]);
+            }
+            std::fs::create_dir_all(d.join("src")).unwrap();
+            std::fs::write(
+                d.join("src/basket.rs"),
+                format!("// {}: BB-002\n", "implements"),
+            )
+            .unwrap();
+            let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+            std::fs::write(
+                d.join("kiln.toml"),
+                config.replace("# [code]\n# paths = [\"src\"]", "[code]\npaths = [\"src\"]"),
+            )
+            .unwrap();
+        }
+        ok(d, &["check"]);
+        ok(d, &["export", name]);
+        if name == "arc42" {
+            let read = |f: &str| std::fs::read_to_string(d.join("docs/arc42").join(f)).unwrap();
+            assert!(read("glossary.md").contains("**TERM-001 Basket**"));
+            let blocks = read("building-block-view.md");
+            assert!(
+                blocks.contains("src/basket.rs"),
+                "code implements a block: {blocks}"
+            );
+            assert!(blocks.contains("**Used by:**"), "{blocks}");
+            assert!(read("quality-requirements.md").contains("**Verified by:**"));
+        }
+    }
 }

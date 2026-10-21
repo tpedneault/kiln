@@ -90,9 +90,8 @@ decisions are shaped here before the work is fired. It sits beside Fenix
 - **Finding**: a problem `kiln check` reports: an error fails the check, a
   warning doesn't.
 - **Preset**: a document template Kiln ships (arc42, a requirements
-  specification, a design document) with the types it places and an
-  export target, copied into a project by `kiln preset add` and the
-  project's own from then on.
+  specification, a design document), copied into a project by `kiln
+  preset add` and the project's own from then on.
 
 FORMAT.md defines all of these precisely.
 
@@ -123,8 +122,8 @@ own unit tests; I/O only where the crate's role is I/O.
 
 | Crate | Role | Pure? |
 |---|---|---|
-| `kiln-model` | `kiln.toml` schema (types, statuses, links, paths, code-reference patterns), `ItemId`, `Item`, `Link`, `Finding`; the presets, as data. | yes |
-| `kiln-parse` | Splits front matter from body, parses front matter with `toml_edit` (keeping spans for diagnostics and comment-preserving edits), finds references in bodies and in source comments. Every value keeps its byte span. Adding a preset to `kiln.toml`, spliced so comments survive. | yes |
+| `kiln-model` | `kiln.toml` schema (types, statuses, links, paths, code-reference patterns), `ItemId`, `Item`, `Link`, `Finding`; the presets' templates, embedded. | yes |
+| `kiln-parse` | Splits front matter from body, parses front matter with `toml_edit` (keeping spans for diagnostics and comment-preserving edits), finds references in bodies and in source comments. Every value keeps its byte span. | yes |
 | `kiln-index` | Loads a project: walks configured paths (`ignore` crate, so `.gitignore` is honoured), parses in parallel, builds the graph (forward and inverse links, parent tree), answers queries (children, ancestors, transitive impact, coverage). Incremental update of one file for the LSP. | yes, given a file source trait |
 | `kiln-check` | The rules in FORMAT.md, each with a code, a severity (overridable in `kiln.toml`) and a span. Output as text, JSON, GitLab Code Quality and GitHub annotations. | yes |
 | `kiln-render` | Markdown body → a small intermediate document tree (`pulldown-cmark`), with item references, callouts, tables, code blocks and Mermaid diagrams as distinct nodes. Report builders (traceability, findings, roadmap, risks, changes) produce the same tree. | yes |
@@ -186,8 +185,8 @@ nearest `kiln.toml` (`--project <dir>` overrides).
 
 | Command | Does | Milestone |
 |---|---|---|
-| `kiln init [--preset NAME]` | writes a `kiln.toml` with the default types and a `design/` folder; never overwrites; `--preset` adds a preset too | K1, K11 |
-| `kiln preset list` / `preset add NAME [--dry-run]` | the presets; copies one into the project: its template, the types and roles it lacks, an export target; never overwrites (see "Presets") | K11 |
+| `kiln init [--preset NAME]` | writes a `kiln.toml` with the default types and a `design/` folder; never overwrites; `--preset` adds a preset's template too | K1, K11 |
+| `kiln preset list` / `preset add NAME [--dry-run]` | the presets; copies one's template into the project's `templates/` folder, naming what it needs from `kiln.toml`; never overwrites (see "Presets") | K11 |
 | `kiln new <type> [--parent ID] [--title T]` | allocates the next ID, writes the file from the type's template, prints its path; `--open` opens it in Fenix at the title | K1 |
 | `kiln list [--type T] [--status S] [--tag X] [--jira] [--format text\|json]` | items, filtered; `--jira` adds each linked ticket's status from the Jira mirror | K1, K8 |
 | `kiln show <ID>` | one item with its computed links | K1 |
@@ -211,44 +210,41 @@ plan, 2 usage or configuration error, 3 network or server error.
 
 ## Presets
 
-A preset is a document template Kiln ships, with what it needs to work:
-the item types and link roles it places, item body templates for those
-types, and an export target. `kiln preset add arc42` copies one into the
-project; `kiln init --preset arc42` starts a project with one.
+A preset is a document template Kiln ships. `kiln preset add arc42`
+copies it into the project's `templates/` folder (`kiln init --preset
+arc42` starts a project with it), and that is all it writes.
 
-| Preset | Document | Layout | Types it brings |
-|---|---|---|---|
-| `arc42` | arc42 architecture documentation, its twelve sections | `sections`: a main page and a page per section | quality goal (QG), quality scenario (QS), constraint (CON), building block (BB), decision (ADR), risk (RISK), term (TERM); the role `addresses` |
-| `srs` | a software requirements specification after the outline of ISO/IEC/IEEE 29148 | `document` | requirement, constraint, test, term; `verifies` |
-| `design-doc` | a design document: goals, requirements, design, decisions, milestones, risks, traceability | `document` | the default types |
+| Preset | Document | Types it places |
+|---|---|---|
+| `arc42` | arc42 architecture documentation, its twelve sections | quality-goal, constraint, block, decision, quality-scenario, risk, term |
+| `srs` | a software requirements specification after the outline of ISO/IEC/IEEE 29148 | requirement (by tag), term, constraint, test |
+| `design-doc` | a design document: goals, requirements, design, decisions, milestones, risks, traceability | the default types |
 
-How adding works, and why:
+Why only the template (ADR-015):
 
-- **Copied, not referenced** (ADR-015). The template, the types and the
-  target become the project's files, changed like any other and reviewed
-  in its merge requests. A newer Kiln never rewrites them: a document
-  whose shape changed under its authors after an upgrade would be a
-  surprise in the one place surprises cost most, and a team adapting
-  arc42 to itself is the normal case, not the exception.
-- **Added to, never replaced.** A type the project already declares is
-  kept as it is; the preset's templates use no status names, so they work
-  with the project's own. A link role the project has gains the preset's
-  `from` and `to` types it lacks. A prefix another type already uses, an
-  export of the same name or a file already there stops it before
-  anything is written; so does a result `kiln check` would fail.
+- **Configuration is the project's.** Which types a project has, what
+  links its building blocks may carry and where its document is
+  published are design choices with real options (tests verifying
+  quality scenarios, code implementing blocks, concepts as items or as
+  prose). A command that edits `kiln.toml` would make those choices for
+  the project, or need a flag for each. The wiki's "Presets" page lays
+  out the configuration and the options instead, every block of it
+  tested against the template, and `kiln preset add` names on stderr
+  what the template needs that `kiln.toml` lacks.
+- **Copied, not referenced.** The template is the project's file,
+  changed in its merge requests; a newer Kiln never rewrites it, since a
+  document whose shape changed under its authors after an upgrade would
+  be a surprise in the one place surprises cost most, and a team adapting
+  arc42 to itself is the normal case.
 - **The template guides in comments.** Guidance for the author is in HTML
   comments, which GitLab and GitHub hide and exports leave out, so the
   file reads as an outline and the export shows only what the project
   wrote (EXPORT.md, "Templates").
 - **The structure is the standard's, the words are Kiln's.** arc42's own
   help text is CC BY-SA, which would bring its share-alike terms into a
-  binary licensed MIT OR Apache-2.0; the presets follow arc42's (and ISO/IEC/IEEE
-  29148's) section structure, link to the source and are written fresh.
-- **Ready for a shared space.** Each target's title carries the project's
-  name (`Shop — architecture`), and the commented-out Confluence target
-  sets `qualify_titles = "always"` (CONFLUENCE.md, "Pages and their
-  identity"), so two projects with the same preset can publish to one
-  Confluence space without their section pages fighting for a title.
+  binary licensed MIT OR Apache-2.0; the templates follow arc42's (and
+  ISO/IEC/IEEE 29148's) section structure, link to the source and are
+  written fresh.
 
 ## GUI (K7)
 
@@ -336,7 +332,7 @@ changelog line.
 | K8 | The `docx` format (EXPORT.md); the Jira mirror (status of linked tickets, read-only, through `fenix-jira`) | — (G6 for Jira Cloud, G9 for Jira behind a proxy) |
 | K9 | The GUI edits front matter (status, title, parent, owner, due, links, new items, renumbering) through the editing commands' shared functions, never prose (ADR-012); Item, Check, Exports (write, publish after a confirm) and Comments pages; picking another baseline | — |
 | K10 | `kiln jira sync`: a project issue and a sub-task per task, created and kept in step (summary, due date, status by transition), keys written back into the files; `kiln jira pull`; the Jira target in the GUI (ADR-014) | — (G6 for Jira Cloud, G9 for Jira behind a proxy) |
-| K11 | Presets: `kiln preset list`/`add`, `kiln init --preset`, with `arc42`, `srs` and `design-doc` (ADR-015); `style="compact"` items; a template's own HTML comments left out of exports; Confluence titles that don't depend on who published first (`qualify_titles`), a refused plan instead of a failed create when a title is taken, and `children = "list"` | — |
+| K11 | Presets: `kiln preset list`/`add`, `kiln init --preset`, the `arc42`, `srs` and `design-doc` templates, their configuration and options on the wiki (ADR-015); `style="compact"` items; a template's own HTML comments left out of exports; Confluence titles that don't depend on who published first (`qualify_titles`), a refused plan instead of a failed create when a title is taken, and `children = "list"` | — |
 
 Everything through K11 needs nothing new from Fenix or Flint to work. INTEGRATION.md
 lists the changes (G1–G9) that make the integration better and which

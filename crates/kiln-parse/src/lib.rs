@@ -2,8 +2,7 @@
 //! parses the front matter and `kiln.toml` with `toml_edit`, finds
 //! `[[ID]]` and bare-ID references in bodies (outside code, through
 //! `pulldown-cmark`), and matches code-reference patterns in source text
-//! (docs/FORMAT.md). Also the comment-preserving front-matter edits, and
-//! adding a preset to `kiln.toml` the same way.
+//! (docs/FORMAT.md). Also the comment-preserving front-matter edits.
 //!
 //! Every value keeps its byte span. That costs memory and some ceremony,
 //! and buys the two things Kiln is for at the point of an error: a
@@ -24,7 +23,6 @@ mod config;
 mod edit;
 mod exports;
 mod item;
-mod preset;
 mod text;
 mod toml_walk;
 
@@ -35,5 +33,4 @@ pub use edit::{
     FieldValue,
 };
 pub use item::{parse_item, relative_destination, sections, ItemOptions, Sections, MAX_TITLE};
-pub use preset::{add_preset, PresetPlan};
 pub use text::{denormalize, normalize, uses_crlf, LineIndex};

@@ -2,7 +2,11 @@
 A design document, as a Kiln export template, added by `kiln preset add
 design-doc`: the shape of Kiln's own. Edit it freely: it is this
 project's file now. Comments like this one don't appear in the export.
-`kiln check` validates this file; `kiln export design-doc` writes it.
+
+It places Kiln's default types (requirement, design, decision,
+milestone, risk), so with the kiln.toml `kiln init` writes it needs only
+an [[export]] whose `template` is this file: the wiki's "Presets" page
+has it.
 -->
 
 # Introduction

@@ -307,54 +307,12 @@ all of them.
 
 ### Presets: arc42 and others
 
-Kiln ships a few templates ready to use, as **presets**. `kiln preset
-list` names them; `kiln preset add NAME` copies one into your project
-(or `kiln init --preset NAME` starts a project with one):
-
-| Preset | What you get | Layout |
-|---|---|---|
-| `arc42` | arc42 architecture documentation (arc42.org): its twelve sections | `sections`: a main page listing one page per section |
-| `srs` | a software requirements specification after the outline of ISO/IEC/IEEE 29148, requirements sorted into its sections by tag | `document` |
-| `design-doc` | a design document: goals, requirements, design, decisions, milestones, risks, traceability | `document` |
-
-A preset brings three things, and then they are yours:
-
-1. **The template**, `design/templates/NAME.md`, with guidance for each
-   section in HTML comments (left out of the export) and placeholder
-   sentences to replace. Delete the sections you don't need, add your
-   own, move them around.
-2. **The types it places**, added to `kiln.toml` if you don't have them
-   yet, each with a comment saying what it is for. For arc42:
-
-   | arc42 section | Kiln |
-   |---|---|
-   | 1.2 Quality goals | `quality-goal` items (QG), as a table |
-   | 2 Constraints | `constraint` items (CON), as a table |
-   | 3, 4, 6, 7, 8 Context, strategy, runtime, deployment, concepts | prose and Mermaid diagrams in the template |
-   | 5 Building block view | `block` items (BB), nested by `parent`: levels 1, 2, 3 |
-   | 9 Architecture decisions | `decision` items (ADR) |
-   | 10 Quality requirements | `quality-scenario` items (QS), each with its goal as `parent` |
-   | 11 Risks and technical debt | `risk` items and the risks report |
-   | 12 Glossary | `term` items, `style="compact"`: the body is the definition |
-
-   Decisions and blocks can link to the goals they serve
-   (`addresses`) and the risks they reduce (`mitigates`).
-3. **An export target** named after the preset, writing Markdown, and the
-   same target for Confluence commented out below it. For a shared
-   Confluence space it sets `qualify_titles = "always"`, so two projects
-   using the same preset don't fight over "1 Introduction and Goals" (see
-   [Publishing to Confluence](Publishing-to-Confluence#several-projects-in-one-space)).
-
-```console
-$ kiln init --name Shop --preset arc42
-$ kiln new quality-goal --title "Pages answer within a second"
-$ kiln new quality-scenario --title "Search under load" --parent QG-001
-$ kiln export arc42
-```
-
-A newer Kiln never changes a preset you have added: it was copied, not
-linked. The presets follow arc42's and the standard's structure; their
-wording is Kiln's own.
+Kiln ships a few templates ready to use: `arc42`, `srs` (a requirements
+specification after ISO/IEC/IEEE 29148) and `design-doc`. `kiln preset
+add arc42` copies one into `design/templates/`; the types it places and
+the export that uses it are yours to add to `kiln.toml`.
+[Presets](Presets) has that configuration for each, ready to paste, and
+the options.
 
 ### Template errors (K112)
 

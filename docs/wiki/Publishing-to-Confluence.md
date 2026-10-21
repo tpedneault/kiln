@@ -331,7 +331,7 @@ qualify_titles = "always"   # every section page carries this target's title, fr
 Every section and item page then carries the target's title, so its title
 depends only on its own project. The root page is the target's `title`
 itself, so give each project's document a title with its name in it (the
-presets do: `Shop — architecture`).
+configurations on [Presets](Presets) do: `Shop — architecture`).
 
 When a title can't be made unique, because the root's title is taken or
 two targets share the same `title`, the plan stops before anything is

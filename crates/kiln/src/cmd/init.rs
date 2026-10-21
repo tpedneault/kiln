@@ -1,7 +1,6 @@
 //! `kiln init`: a `kiln.toml` with FORMAT.md's default types and a
 //! `design/` folder. Never overwrites anything. `--preset` then adds a
-//! preset, as `kiln preset add` would: the defaults stay, since a preset
-//! adds only the types it lacks.
+//! preset's template, as `kiln preset add` would.
 //!
 //! `--fenix` also registers `kiln lsp` as an additional language server in
 //! the project's `.fenix/tools.json` (INTEGRATION.md, "Editing items"), for

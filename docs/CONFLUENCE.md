@@ -184,12 +184,12 @@ parentheses, `1 Introduction and Goals (Shop — architecture)`:
   and links to the old title by URL break;
 - with `qualify_titles = "always"`, from the first publish, whatever else
   is in the space. Titles then depend only on the project, which is what
-  a space several projects publish to wants; the presets' Confluence
-  targets set it.
+  a space several projects publish to wants; the Confluence targets the
+  wiki's "Presets" page suggests set it.
 
 The root page is never qualified: it is the target's own `title`, so a
-project names its document, and the presets put the project's name in
-it. A title Kiln can't make unique (the root's, or a qualified title
+project names its document, and the wiki's preset configurations put
+the project's name in it. A title Kiln can't make unique (the root's, or a qualified title
 another page also holds, as when two targets share a `title`) stops the
 plan before anything is written, naming the title; creating the page
 would fail half-way through a publish. Titles are capped at 255

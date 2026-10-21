@@ -130,8 +130,10 @@ text, FORMAT.md, "Body").
 
 Kiln ships ready-made templates as **presets** (DESIGN.md, "Presets"):
 `kiln preset add arc42` (or `srs`, `design-doc`) copies one into
-`design/templates/`, with the types it places and a target for it, and
-from then on it is the project's own file, guidance in its comments:
+`design/templates/`, and from then on it is the project's own file, with
+guidance in its comments. The types it places and a target for it go in
+`kiln.toml` as the wiki's "Presets" page describes. A template of one's
+own:
 
 ~~~markdown
 # Introduction
