@@ -341,6 +341,11 @@ impl App {
                 // What was written or published changes the plan.
                 self.exports = Remote::NotAsked;
             }
+            Done::Pulled(Ok(lines)) => {
+                let last = lines.last().cloned().unwrap_or_else(|| "Done".into());
+                self.say(last, false);
+            }
+            Done::Pulled(Err(e)) => self.say(e, true),
             Done::Comments(Ok(groups)) => self.comments = Remote::Ready(groups),
             Done::Comments(Err(e)) => self.comments = Remote::Failed(e),
             Done::Tags(tags) => {
@@ -587,6 +592,10 @@ impl App {
             KeyCode::Char('w') if self.page == Page::Exports => self.write_export(false),
             KeyCode::Char('W') if self.page == Page::Exports => self.write_export(true),
             KeyCode::Char('P') if self.page == Page::Exports => self.ask_publish(),
+            KeyCode::Char('J') => match self.current().and_then(|r| r.item.clone()) {
+                Some(id) => self.queue(Job::JiraPull(id.to_string())),
+                None => self.say("No item under the cursor", true),
+            },
             KeyCode::Char('s') => self.start_edit(EditKey::Status),
             KeyCode::Char('l') => self.start_edit(EditKey::Link),
             KeyCode::Char('U') => self.start_edit(EditKey::Unlink),
@@ -1154,7 +1163,7 @@ impl App {
             match &self.exports {
                 Remote::Ready(reports) => reports
                     .iter()
-                    .filter(|r| !r.confluence)
+                    .filter(|r| !r.confluence && !r.jira)
                     .map(|r| r.name.clone())
                     .collect(),
                 _ => Vec::new(),
@@ -1163,9 +1172,9 @@ impl App {
             let Some(r) = self.report() else {
                 return;
             };
-            if r.confluence {
+            if r.confluence || r.jira {
                 self.say(
-                    format!("`{}` is a Confluence target: P publishes it", r.name),
+                    format!("`{}` isn't a file target: P publishes it", r.name),
                     true,
                 );
                 return;
@@ -1184,7 +1193,7 @@ impl App {
         let Some(r) = self.report() else {
             return;
         };
-        if !r.confluence {
+        if !r.confluence && !r.jira {
             self.say(format!("`{}` is a file target: w writes it", r.name), true);
             return;
         }
@@ -1392,7 +1401,7 @@ impl App {
             } else {
                 " · m gaps only · T type"
             }),
-            Page::Item => hints.push_str(" · C-o back"),
+            Page::Item => hints.push_str(" · C-o back · J status from Jira"),
             Page::Changes => hints.push_str(" · b baseline"),
             Page::Exports => hints.push_str(" · w write · W write all · P publish · R plan again"),
             Page::Comments => hints.push_str(" · R read again"),

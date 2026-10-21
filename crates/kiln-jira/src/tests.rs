@@ -138,3 +138,246 @@ fn k207_done_and_resolved_disagree() {
         ]
     );
 }
+
+// The sync (ADR-014): planning against the fake, applying, and planning
+// again to nothing.
+
+use crate::sync::{plan, Op, Plan};
+
+fn task(id: &str, status: &str, rest: &str) -> String {
+    format!("+++\nid = \"{id}\"\ntype = \"task\"\ntitle = \"{id} title\"\nstatus = \"{status}\"\n{rest}+++\n")
+}
+
+/// A project syncing tasks to DEMO; `jira` is `[jira]`'s extra lines,
+/// `tasks` (path, text).
+fn synced(url: &str, jira: &str, tasks: &[(&str, String)]) -> Project {
+    let mut source = MemorySource::new().with(
+        "kiln.toml",
+        format!(
+            "{}\n[jira]\nurl = \"{url}\"\nproject = \"DEMO\"\n{jira}",
+            kiln_model::default_config("Demo")
+        ),
+    );
+    for (path, text) in tasks {
+        source.insert(path, text.as_bytes());
+    }
+    let project = Project::load(&source).unwrap();
+    assert!(project.findings.is_empty(), "{:?}", project.findings);
+    project
+}
+
+fn sync_plan(fake: &Fake, project: &Project) -> (crate::sync::Remote, Plan) {
+    let sync = project.config.jira_sync.clone().unwrap();
+    let remote = push::read(&fake.url, TOKEN, project, &sync).unwrap();
+    let p = plan(project, &sync, &remote, &|i| format!("from {}", i.path));
+    (remote, p)
+}
+
+#[test]
+fn a_first_sync_creates_the_project_issue_and_a_sub_task_per_open_task() {
+    let fake = Fake::start(State::default());
+    let tasks = [
+        (
+            "design/TASK-001.md",
+            task("TASK-001", "todo", "due = 2026-11-30\n"),
+        ),
+        ("design/TASK-002.md", task("TASK-002", "doing", "")),
+        ("design/TASK-003.md", task("TASK-003", "dropped", "")),
+    ];
+    let project = synced(&fake.url, "", &tasks);
+    let (remote, p) = sync_plan(&fake, &project);
+    assert!(matches!(p.ops[0], Op::CreateParent { ref summary } if summary == "Kiln: Demo"));
+    let creates: Vec<String> = p
+        .ops
+        .iter()
+        .filter_map(|o| match o {
+            Op::Create { item, .. } => Some(item.to_string()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        creates,
+        ["TASK-001", "TASK-002"],
+        "a dropped task gets no ticket"
+    );
+    assert!(
+        fake.state.lock().unwrap().writes().is_empty(),
+        "planning writes nothing"
+    );
+
+    let sync = project.config.jira_sync.clone().unwrap();
+    let done = push::apply(&fake.url, TOKEN, &sync, &remote, &p);
+    assert_eq!(done.error, None);
+    assert_eq!(done.parent.as_deref(), Some("DEMO-101"));
+    assert_eq!(
+        done.created,
+        [
+            ("TASK-001".parse().unwrap(), "DEMO-102".to_owned()),
+            ("TASK-002".parse().unwrap(), "DEMO-103".to_owned())
+        ]
+    );
+    {
+        let s = fake.state.lock().unwrap();
+        let t1 = &s.issues["DEMO-102"];
+        assert_eq!(t1.summary, "TASK-001 TASK-001 title");
+        assert_eq!(t1.parent.as_deref(), Some("DEMO-101"));
+        assert_eq!(t1.due.as_deref(), Some("2026-11-30"));
+        assert_eq!(t1.status, "To Do");
+        assert_eq!(
+            s.issues["DEMO-103"].status, "In Progress",
+            "doing: moved on"
+        );
+    }
+
+    // With the keys written back, the next plan is empty.
+    let tasks = [
+        (
+            "design/TASK-001.md",
+            task(
+                "TASK-001",
+                "todo",
+                "jira = \"DEMO-102\"\ndue = 2026-11-30\n",
+            ),
+        ),
+        (
+            "design/TASK-002.md",
+            task("TASK-002", "doing", "jira = \"DEMO-103\"\n"),
+        ),
+        ("design/TASK-003.md", task("TASK-003", "dropped", "")),
+    ];
+    let project = synced(&fake.url, "parent = \"DEMO-101\"\n", &tasks);
+    let (_, again) = sync_plan(&fake, &project);
+    assert!(!again.changes(), "{:?}", again.ops);
+    assert_eq!(again.unchanged, 2);
+}
+
+#[test]
+fn changes_in_kiln_become_updates_and_transitions_or_refusals() {
+    let state = State::default()
+        .issue("DEMO-100", "To Do", "new", None)
+        .subtask("DEMO-101", "DEMO-100", "TASK-001 old title", "To Do")
+        .subtask(
+            "DEMO-102",
+            "DEMO-100",
+            "TASK-002 TASK-002 title",
+            "In Progress",
+        )
+        .subtask("DEMO-103", "DEMO-100", "TASK-003 TASK-003 title", "Done")
+        .subtask("DEMO-104", "DEMO-100", "TASK-009 gone", "To Do")
+        .issue("OTHER-1", "To Do", "new", None);
+    let fake = Fake::start(state);
+    let tasks = [
+        (
+            "design/TASK-001.md",
+            task("TASK-001", "done", "jira = \"DEMO-101\"\n"),
+        ),
+        (
+            "design/TASK-002.md",
+            task("TASK-002", "blocked", "jira = \"DEMO-102\"\n"),
+        ),
+        (
+            "design/TASK-003.md",
+            task("TASK-003", "todo", "jira = \"DEMO-103\"\n"),
+        ),
+        (
+            "design/TASK-004.md",
+            task("TASK-004", "doing", "jira = \"OTHER-1\"\n"),
+        ),
+    ];
+    let project = synced(
+        &fake.url,
+        "parent = \"DEMO-100\"\n\n[jira.status]\nblocked = \"Blocked\"\n",
+        &tasks,
+    );
+    let (remote, p) = sync_plan(&fake, &project);
+    let show: Vec<String> = p.ops.iter().map(|o| format!("{o:?}")).collect();
+    assert!(
+        p.ops
+            .iter()
+            .any(|o| matches!(o, Op::Update { key, summary: Some(_), .. } if key == "DEMO-101")),
+        "{show:#?}"
+    );
+    assert!(
+        p.ops.iter().any(
+            |o| matches!(o, Op::Transition { key, to, .. } if key == "DEMO-101" && to == "Done")
+        ),
+        "{show:#?}"
+    );
+    assert!(
+        p.ops.iter().any(
+            |o| matches!(o, Op::Transition { key, to, .. } if key == "DEMO-102" && to == "Blocked")
+        ),
+        "[jira.status] names Blocked: {show:#?}"
+    );
+    let refused = p.ops.iter().find_map(|o| match o {
+        Op::Refused { key, why, .. } if key == "DEMO-103" => Some(why.clone()),
+        _ => None,
+    });
+    assert_eq!(
+        refused.as_deref(),
+        Some(
+            "no transition from Done to a to-do status (the workflow offers: Reopen → In Progress)"
+        )
+    );
+    assert!(p
+        .ops
+        .iter()
+        .any(|o| matches!(o, Op::Orphan { key, .. } if key == "DEMO-104")));
+    assert!(
+        p.ops
+            .iter()
+            .any(|o| matches!(o, Op::LeftAlone { keys, .. } if keys == &["OTHER-1"])),
+        "a ticket outside the project issue is never written: {show:#?}"
+    );
+    assert!(p.refused());
+
+    let sync = project.config.jira_sync.clone().unwrap();
+    let done = push::apply(&fake.url, TOKEN, &sync, &remote, &p);
+    assert_eq!(done.error, None);
+    assert_eq!((done.updated, done.moved), (1, 2));
+    let s = fake.state.lock().unwrap();
+    assert_eq!(s.issues["DEMO-101"].status, "Done");
+    assert_eq!(s.issues["DEMO-101"].summary, "TASK-001 TASK-001 title");
+    assert_eq!(s.issues["DEMO-102"].status, "Blocked");
+    assert_eq!(s.issues["DEMO-103"].status, "Done", "refused: left alone");
+    assert_eq!(s.issues["OTHER-1"].status, "To Do");
+    assert!(
+        s.issues.contains_key("DEMO-104"),
+        "an orphan is never deleted"
+    );
+}
+
+#[test]
+fn required_fields_kiln_doesnt_set_refuse_creating() {
+    let mut state = State::default().issue("DEMO-100", "To Do", "new", None);
+    state
+        .required
+        .insert("Sub-task".into(), vec!["components".into()]);
+    let fake = Fake::start(state);
+    let tasks = [("design/TASK-001.md", task("TASK-001", "todo", ""))];
+    let project = synced(&fake.url, "parent = \"DEMO-100\"\n", &tasks);
+    let (_, p) = sync_plan(&fake, &project);
+    assert_eq!(
+        p.refusals,
+        ["Sub-task needs fields Kiln doesn't set (components): give them defaults in Jira, or create the tickets by hand"]
+    );
+}
+
+#[test]
+fn statuses_map_back_for_pull() {
+    let fake = Fake::start(State::default());
+    let tasks = [("design/TASK-001.md", task("TASK-001", "todo", ""))];
+    let project = synced(
+        &fake.url,
+        "\n[jira.status]\nblocked = \"Blocked\"\n",
+        &tasks,
+    );
+    let sync = project.config.jira_sync.clone().unwrap();
+    let item = &project.items[0];
+    let back =
+        |status: &str, category: &str| sync::status_back(&project, &sync, item, status, category);
+    assert_eq!(back("Blocked", "indeterminate").as_deref(), Some("blocked"));
+    assert_eq!(back("In Review", "indeterminate").as_deref(), Some("doing"));
+    assert_eq!(back("Done", "done").as_deref(), Some("done"));
+    assert_eq!(back("Open", "new").as_deref(), Some("todo"));
+}

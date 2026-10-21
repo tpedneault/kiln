@@ -236,6 +236,11 @@ enum Command {
         #[command(subcommand)]
         what: ConfluenceCommand,
     },
+    /// Jira: push the tasks Kiln manages as sub-tasks of the project issue.
+    Jira {
+        #[command(subcommand)]
+        what: JiraCommand,
+    },
     /// Store a token in the OS credential store, prompting without echo.
     Auth {
         #[command(subcommand)]
@@ -267,6 +272,21 @@ enum ConfluenceCommand {
         #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
         format: TextOrJson,
     },
+}
+
+#[derive(Subcommand)]
+enum JiraCommand {
+    /// Create, update and move the project's tickets to match the items.
+    Sync {
+        /// Print the plan; change nothing.
+        #[arg(long)]
+        dry_run: bool,
+        /// Sync without asking (needed when not interactive).
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Take the status of items' tickets into the items (all synced items without IDs).
+    Pull { ids: Vec<String> },
 }
 
 #[derive(Subcommand)]
@@ -375,6 +395,12 @@ fn main() -> ExitCode {
         Command::Confluence {
             what: ConfluenceCommand::Comments { names, format },
         } => cmd::confluence::comments(project, names, format),
+        Command::Jira {
+            what: JiraCommand::Sync { dry_run, yes },
+        } => cmd::jira::sync(project, dry_run, yes),
+        Command::Jira {
+            what: JiraCommand::Pull { ids },
+        } => cmd::jira::pull(project, &ids),
         Command::Auth {
             service: AuthService::Confluence { forget },
         } => cmd::auth::confluence(project, forget),

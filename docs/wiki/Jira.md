@@ -1,7 +1,8 @@
 This page explains how Kiln works with Jira: linking items to tickets,
-how those links appear in exported documents and Confluence, the
-read-only mirror that shows each ticket's status, the `kiln check` rule
-that compares items with their tickets, and tokens. Read it if your team
+how those links appear in exported documents and Confluence, the mirror
+that shows each ticket's status, keeping tickets in step with your tasks
+(`kiln jira sync`), the `kiln check` rule that compares items with their
+tickets, and tokens. Read it if your team
 tracks work in Jira and designs with Kiln.
 
 Kiln works without Jira. Everything on this page is optional, and when
@@ -11,16 +12,20 @@ Jira can't be reached, Kiln says why and carries on.
 
 Kiln holds the design: requirements, decisions, milestones, and the work
 items that implement them. Jira holds the day-to-day work: who does what,
-in which sprint, with which workflow. Kiln links the two and reads Jira,
-and that is all:
+in which sprint, with which workflow. Kiln links the two and reads Jira:
 
-- It **never creates, edits or transitions** a ticket.
+- With `[jira] project` set, it **keeps its own tickets in step** with
+  your tasks: one Jira issue for the project, a sub-task per task, with
+  their summary, due date and status (see
+  [Keeping Jira in step](#keeping-jira-in-step-kiln-jira-sync)). It
+  never writes any other ticket, and never deletes one.
 - It has **no assignment and no sprints**. An item's `owner` is
   informational only.
 - It shows a ticket's status and assignee next to the item, so you can
   see where the work stands without leaving the design.
 
-Change tickets in Jira, or in Fenix's Jira page if you use Fenix.
+Assign, plan and comment in Jira, or in Fenix's Jira page if you use
+Fenix.
 
 ## Linking an item to tickets
 
@@ -182,6 +187,112 @@ read, it fails with one line and exit code 3:
 $ kiln list --jira
 kiln: Jira at https://jira.example.com: request failed: … Dns Failed: resolve dns name 'jira.example.com:443': failed to lookup address information: Name or service not known
 ```
+
+## Keeping Jira in step: `kiln jira sync`
+
+With `[jira] project` set, Kiln keeps Jira in step with your tasks, one
+way: you change a task in Kiln (in the file, with `kiln set`, or on the
+GUI's Board) and `kiln jira sync` brings its ticket along. One Jira issue
+stands for the Kiln project, and each task is a sub-task of it:
+
+```text
+DEMO-100  Kiln: Demo                    (Task, the project issue)
+  DEMO-101  TASK-001 Measure it         (Sub-task)  In Progress
+  DEMO-102  TASK-002 Waiting on Fenix   (Sub-task)  Blocked
+  DEMO-103  TASK-003 Ship it            (Sub-task)  Done
+```
+
+Set it up in `kiln.toml`:
+
+```toml
+[jira]
+url = "https://jira.example.com"
+project = "DEMO"          # the Jira project tickets are created in
+
+[jira.status]             # optional: Kiln status → Jira status name
+blocked = "Blocked"
+```
+
+| Key | Means | Default |
+|---|---|---|
+| `project` | the Jira project's key; without it, Kiln only links and reads | none |
+| `parent` | the project issue; the first sync creates it and writes this key | written by `kiln jira sync` |
+| `parent_type` | the project issue's type when the sync creates it | `Task` |
+| `subtask_type` | the sub-tasks' issue type | the project's sub-task type |
+| `types` | the Kiln types synced | `["task"]` |
+| `[jira.status]` | a Kiln status → a Jira status name | by status category |
+
+Without a `[jira.status]` entry, a status maps to a Jira status category,
+which every workflow has: the type's first status (`todo`) to a to-do
+status, a done or closed status (`done`, `dropped`) to a done status, and
+anything between (`doing`, `blocked`) to an in-progress status. Map a
+status by name when your workflow tells two in-progress statuses apart,
+as `blocked = "Blocked"` above does.
+
+Then, from the repository:
+
+```console
+$ kiln jira sync --dry-run
+jira (DEMO) → a new project issue (Task)
+  create     "Kiln: Demo" (Task), the project issue
+  create     TASK-001 Measure it (Sub-task), then to an in-progress status
+  create     TASK-002 Waiting on Fenix (Sub-task), then to Blocked
+  3 create, 0 update, 0 move, 0 unchanged
+$ kiln jira sync
+…
+Sync jira (DEMO) → a new project issue (Task)? [y/N] y
+jira: 3 created, 0 updated, 2 moved; 3 files gained ticket keys (commit them)
+```
+
+The sync writes the keys it created into the files: `parent =
+"DEMO-100"` under `[jira]` in `kiln.toml`, and `jira = "DEMO-101"` in each
+item, keeping their comments and layout. **Commit them**: that is what
+makes the next sync update those tickets instead of creating new ones.
+
+On later runs it changes what differs:
+
+```console
+$ kiln set TASK-001 status=done
+$ kiln jira sync --yes
+jira (DEMO) → DEMO-100 "Kiln: Demo"
+  move       DEMO-101 TASK-001: In Progress → Done
+  0 create, 0 update, 1 move, 2 unchanged
+jira: 0 created, 0 updated, 1 moved
+```
+
+| Plan line | Means |
+|---|---|
+| `create` | a sub-task for a task that has no ticket (a closed task gets none) |
+| `update` | the summary (`TASK-001 Measure it`) or the due date changed |
+| `move` | the transition that reaches the mapped status |
+| `refused` | no transition reaches it from where the ticket is (the workflow forbids it); that ticket is left alone, the rest is synced, and the exit code is 1 |
+| `orphan` | a sub-task of the project issue that no task links any more; reported, never deleted |
+| `left alone` | a task linked to a ticket outside the project issue: Kiln never writes it (K207 still compares it) |
+
+Kiln writes only the summary, due date and status of the project issue's
+sub-tasks. Assignees, sprints, comments and every other ticket stay
+Jira's, and Kiln never deletes a ticket.
+
+### When someone moves a ticket in Jira
+
+`kiln check` flags it with K207 (turn the rule on in `[check]`). Then
+either take Jira's status into the task:
+
+```console
+$ kiln jira pull TASK-002
+TASK-002: status doing → done (from DEMO-102 Done)
+```
+
+or run `kiln jira sync`, which moves the ticket back to the task's
+status. `kiln jira pull` with no IDs does it for every synced task. It
+maps a Jira status back the same way, through `[jira.status]` or the
+status category, and says so when a status maps to nothing.
+
+### In the GUI
+
+The Exports page (`SPC p`) shows the sync's plan as one more target,
+`jira`. `P` on it asks, then syncs exactly the plan shown. `J` on any
+item takes its ticket's status from Jira, as `kiln jira pull` does.
 
 ## Rule K207: items and tickets that disagree
 

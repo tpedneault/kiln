@@ -22,7 +22,7 @@ mod folders;
 mod id;
 mod item;
 
-pub use config::{default_config, slug, CodeConfig, Config, LinkRole, TypeDef, CODE};
+pub use config::{default_config, slug, CodeConfig, Config, JiraSync, LinkRole, TypeDef, CODE};
 pub use export::{
     ConfluenceConfig, ConfluenceFlavour, ConfluenceTarget, Diagrams, DocxOptions, ExportFormat,
     ExportTarget, Flavour, HtmlOptions, ItemStyle, Layout, MarkdownOptions, OnDrift, REPORTS,

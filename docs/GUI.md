@@ -43,7 +43,7 @@ aligned by padding, in the monospace font.
 | `SPC c` | **Changes** | the items added, changed and removed since the baseline (`kiln gui --since REV`, else the most recent tag; `b` picks another), grouped under Added / Changed / Removed, each with what changed (`status draft → approved; + verifies REQ-002`) |
 | `SPC v` | **Item** | for the item picked with `v` on any page: what `kiln show` prints, one row per related item or code location (parent, children, links both ways, mentions, coverage, progress, Jira tickets). `v` on a row views that item; `C-o` and `C-i` go back and forward |
 | `SPC k` | **Check** | `kiln check`'s findings (K207 too, once the Jira mirror is here), grouped by file: `12:3  K102 error  REQ-099 doesn't exist`. Recomputed on a thread after every reload; the top line shows the error count on every page |
-| `SPC p` | **Exports** | `kiln export --dry-run`, target by target, as the command line prints it: the target's line as the heading, then what would change, "leaves out", and for Confluence the plan's operations. `w` writes a file target, `W` all of them, `P` publishes a Confluence target |
+| `SPC p` | **Exports** | `kiln export --dry-run`, target by target, as the command line prints it: the target's line as the heading, then what would change, "leaves out", and for Confluence the plan's operations; with `[jira] project`, `kiln jira sync --dry-run` as one more target, `jira`. `w` writes a file target, `W` all of them, `P` publishes a Confluence target or syncs Jira |
 | `SPC m` | **Comments** | `kiln confluence comments`: the unresolved comments under each Confluence target, by the item they are about; `Enter` opens one in the browser |
 
 `Tab` and `]` (`[` back), or `1`–`9` for the first nine, step through
@@ -134,7 +134,8 @@ Normal mode, as in Fenix's pages:
 | `m` (Trace) | only items with a gap (missing coverage) |
 | `T` (Trace) | the next traced type |
 | `b` (Changes) | pick another baseline: a tag, or any revision typed |
-| `w` `W` `P` (Exports) | write the file target / every file target; publish the Confluence target |
+| `w` `W` `P` (Exports) | write the file target / every file target; publish the Confluence target, or sync Jira |
+| `J` | take the item's status from its Jira ticket (`kiln jira pull ID`) |
 | `s` `l` `U` `n` `N`, `H` `L` | the edits above |
 | `R` | reload now (and, on Exports and Comments, read them again) |
 | `SPC` | the leader: the pages above, `SPC e` the edits, `SPC R` reload, `SPC q` quit, with the which-key popup Fenix shows |

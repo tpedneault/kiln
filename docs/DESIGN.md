@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0–K9 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the read-only Jira mirror with K207 and `kiln auth jira`, this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
+Status: K0–K10 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the Jira mirror with K207 and `kiln auth jira`, `kiln jira sync` and `pull` keeping a sub-task per task in step (K10), this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -59,7 +59,9 @@ decisions are shaped here before the work is fired. It sits beside Fenix
 
 - **A ticket tracker.** No assignees, sprints, estimates or boards of
   other people's work. Work items exist for projects without Jira and for
-  linking; with Jira, they point at tickets.
+  linking; with Jira, they point at tickets, and (K10) Kiln keeps the
+  sub-tasks of its own project issue in step with them, one way
+  (ADR-014).
 - **Editing in Confluence.** Confluence is a published view. Edits made
   there are detected and reported, never merged back (CONFLUENCE.md,
   "Drift").
@@ -287,8 +289,9 @@ changelog line.
 | K7 | GUI: Tree, Trace, Impact first; Board, Roadmap, Decisions, Changes after | — |
 | K8 | The `docx` format (EXPORT.md); the Jira mirror (status of linked tickets, read-only, through `fenix-jira`) | — (G6 for Jira Cloud, G9 for Jira behind a proxy) |
 | K9 | The GUI edits front matter (status, title, parent, owner, due, links, new items, renumbering) through the editing commands' shared functions, never prose (ADR-012); Item, Check, Exports (write, publish after a confirm) and Comments pages; picking another baseline | — |
+| K10 | `kiln jira sync`: a project issue and a sub-task per task, created and kept in step (summary, due date, status by transition), keys written back into the files; `kiln jira pull`; the Jira target in the GUI (ADR-014) | — (G6 for Jira Cloud, G9 for Jira behind a proxy) |
 
-Everything through K9 needs nothing new from Fenix or Flint to work. INTEGRATION.md
+Everything through K10 needs nothing new from Fenix or Flint to work. INTEGRATION.md
 lists the changes (G1–G9) that make the integration better and which
 milestone notices their absence.
 

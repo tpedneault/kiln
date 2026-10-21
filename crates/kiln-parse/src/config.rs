@@ -8,7 +8,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use kiln_model::{
-    is_prefix, CodeConfig, Config, Finding, LinkRole, Rule, Severity, Span, TypeDef, CODE,
+    is_prefix, CodeConfig, Config, Finding, JiraSync, LinkRole, Rule, Severity, Span, TypeDef, CODE,
 };
 use toml_edit::{ImDocument, Item, TableLike};
 
@@ -175,14 +175,29 @@ pub fn parse_config(text: &str) -> (Option<Config>, Vec<Finding>) {
     }
 
     let mut jira_url = None;
+    let mut jira_sync = None;
     if let Some(table) = root
         .get("jira")
         .and_then(|i| w.table(i, Rule::K002, "`[jira]`"))
     {
-        w.unknown_keys(table, &["url"], Rule::K003, "in [jira]");
+        w.unknown_keys(
+            table,
+            &[
+                "url",
+                "project",
+                "parent",
+                "parent_type",
+                "subtask_type",
+                "types",
+                "status",
+            ],
+            Rule::K003,
+            "in [jira]",
+        );
         if let Some(item) = table.get("url") {
             jira_url = w.string(item, Rule::K002, "`jira.url`").map(|(s, _)| s);
         }
+        jira_sync = jira_sync_config(&mut w, table, &types);
     }
 
     let severities = match root
@@ -203,6 +218,7 @@ pub fn parse_config(text: &str) -> (Option<Config>, Vec<Finding>) {
     );
 
     let config = Config {
+        jira_sync,
         format,
         name,
         paths,
@@ -635,6 +651,76 @@ fn coverage(w: &mut Walk, item: Option<&Item>, links: &[LinkRole]) -> Vec<String
     out
 }
 
+/// `[jira] project` and the keys that go with it; `None` without
+/// `project`, which leaves Jira to links and the mirror. A type or status
+/// the configuration doesn't declare is a K002 and left out.
+fn jira_sync_config(w: &mut Walk, table: &dyn TableLike, types: &[TypeDef]) -> Option<JiraSync> {
+    let text = |w: &mut Walk, key: &str| {
+        table
+            .get(key)
+            .and_then(|i| w.string(i, Rule::K002, &format!("`jira.{key}`")))
+    };
+    let project = text(w, "project");
+    let parent = text(w, "parent");
+    let parent_type = text(w, "parent_type");
+    let subtask_type = text(w, "subtask_type");
+    let mut sync = JiraSync::default();
+    if let Some(item) = table.get("types") {
+        sync.types.clear();
+        for (name, span) in w
+            .strings(item, Rule::K002, "`jira.types`")
+            .unwrap_or_default()
+        {
+            if types.iter().any(|t| t.name == name) {
+                sync.types.push(name);
+            } else {
+                w.report(
+                    Rule::K002,
+                    span,
+                    format!("[jira] types: `{name}` isn't a type"),
+                );
+            }
+        }
+    }
+    if let Some(status) = table
+        .get("status")
+        .and_then(|i| w.table(i, Rule::K002, "`[jira.status]`"))
+    {
+        for (key, item) in status.iter() {
+            let key_span = w.span_of_key(status, key);
+            let Some((value, _)) = w.string(item, Rule::K002, &format!("`jira.status.{key}`"))
+            else {
+                continue;
+            };
+            let known = types
+                .iter()
+                .filter(|t| sync.types.contains(&t.name))
+                .any(|t| t.statuses.iter().any(|s| s == key));
+            if known {
+                sync.status.insert(key.to_owned(), value);
+            } else {
+                w.report(
+                    Rule::K002,
+                    key_span,
+                    format!("[jira.status]: `{key}` isn't a status of a synced type"),
+                );
+            }
+        }
+    }
+    let (project, span) = project?;
+    if project.trim().is_empty() {
+        w.report(Rule::K002, span, "[jira] project: give a Jira project key");
+        return None;
+    }
+    sync.project = project;
+    sync.parent = parent.map(|(s, _)| s).filter(|s| !s.trim().is_empty());
+    if let Some((t, _)) = parent_type {
+        sync.parent_type = t;
+    }
+    sync.subtask_type = subtask_type.map(|(s, _)| s);
+    Some(sync)
+}
+
 fn severities(w: &mut Walk, table: &dyn TableLike) -> BTreeMap<Rule, Severity> {
     let mut out = BTreeMap::new();
     for (code, item) in table.iter() {
@@ -693,6 +779,64 @@ mod tests {
         );
         assert_eq!(req.folder(), "requirements");
         assert_eq!(config.type_named("design").unwrap().initial, "draft");
+    }
+
+    #[test]
+    fn jira_sync_keys_are_read_and_checked() {
+        let base = kiln_model::default_config("Demo");
+        let (config, findings) = parse_config(&format!(
+            "{base}
+[jira]
+url = \"https://jira.example.com\"
+project = \"DEMO\"
+parent = \"DEMO-100\"
+
+[jira.status]
+blocked = \"Blocked\"
+"
+        ));
+        assert_eq!(findings, vec![]);
+        let sync = config.unwrap().jira_sync.unwrap();
+        assert_eq!(sync.project, "DEMO");
+        assert_eq!(sync.parent.as_deref(), Some("DEMO-100"));
+        assert_eq!(
+            (sync.parent_type.as_str(), sync.types.clone()),
+            ("Task", vec!["task".to_owned()])
+        );
+        assert_eq!(
+            sync.status.get("blocked").map(String::as_str),
+            Some("Blocked")
+        );
+
+        let (config, findings) = parse_config(&format!(
+            "{base}
+[jira]
+url = \"https://jira.example.com\"
+project = \"DEMO\"
+types = [\"task\", \"epic\"]
+
+[jira.status]
+wip = \"In Progress\"
+"
+        ));
+        let messages: Vec<&str> = findings.iter().map(|f| f.message.as_str()).collect();
+        assert_eq!(
+            messages,
+            [
+                "[jira] types: `epic` isn't a type",
+                "[jira.status]: `wip` isn't a status of a synced type"
+            ]
+        );
+        assert_eq!(config.unwrap().jira_sync.unwrap().types, ["task"]);
+
+        // Without `project`, Jira is links and the mirror only.
+        let (config, _) = parse_config(&format!(
+            "{base}
+[jira]
+url = \"https://jira.example.com\"
+"
+        ));
+        assert_eq!(config.unwrap().jira_sync, None);
     }
 
     #[test]

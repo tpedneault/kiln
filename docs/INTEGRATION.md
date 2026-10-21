@@ -357,8 +357,23 @@ None blocking. Five small ones worth raising in Flint's own repository
   default): an item done whose ticket isn't resolved, or the reverse
   (FORMAT.md); when Jira can't be read, the rest is checked and stderr
   says why K207 wasn't.
-- **Never**: creating, editing or transitioning tickets. That is Fenix's
-  Jira page and Jira's own job.
+- **Sync (K10, ADR-014)**: with `[jira] project`, `kiln jira sync` keeps
+  one project issue (`[jira] parent`, created by the first sync) and a
+  sub-task per synced item (`[jira] types`, tasks by default) in step:
+  it creates the sub-tasks and keeps their summary (`TASK-001 Title`),
+  due date and status, by the transition that reaches the mapped status
+  (`[jira.status]`, else the status category). Keys it creates are
+  written into the items and `kiln.toml`, for the person who ran it to
+  commit. Managed tickets are the project issue's sub-tasks (`parent =
+  KEY`); every other ticket is never written. Nothing is deleted: a
+  sub-task no item links is reported. `kiln jira pull` takes a ticket's
+  status back into its item. Everything it uses is in `fenix-jira` at the
+  pinned rev: `issue_types`, `create_fields`, `create` (a sub-task by its
+  `parent` field), `update_summary`, `update_due`, `list_transitions`,
+  `apply_transition`, `search_issues`.
+- **Never**: assignees, sprints, comments, worklogs, deleting a ticket,
+  or writing a ticket that isn't a sub-task of the project issue. That
+  is Fenix's Jira page and Jira's own job.
 - **Token**: `KILN_JIRA_TOKEN`, else the credential store under the suite's
   name `jira:<url>` (service `fenix-suite`), which Flint's M8 already
   uses, so a token stored once serves Flint and Kiln.

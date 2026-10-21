@@ -865,3 +865,129 @@ fn list_jira_and_k207_read_the_mirror_once_per_ten_minutes() {
     assert_eq!(stderr(&out).lines().count(), 1, "{}", stderr(&out));
     assert!(!stderr(&out).contains("wrong-secret"));
 }
+
+#[test]
+// verifies: REQ-001
+fn jira_sync_creates_sub_tasks_records_their_keys_and_pull_takes_status_back() {
+    use kiln_jira::fake::{Fake, State, TOKEN};
+    let fake = Fake::start(State::default());
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    std::fs::write(
+        d.join("kiln.toml"),
+        format!(
+            "{config}\n[jira]\nurl = \"{}\"   # the team's Jira\nproject = \"DEMO\"\n",
+            fake.url
+        ),
+    )
+    .unwrap();
+    std::fs::create_dir_all(d.join("design/tasks")).unwrap();
+    let task = |id: &str, status: &str| {
+        format!("+++\nid = \"{id}\"  # keep\ntype = \"task\"\ntitle = \"{id} title\"\nstatus = \"{status}\"\n+++\n\nThe body.\n")
+    };
+    std::fs::write(d.join("design/tasks/TASK-001.md"), task("TASK-001", "todo")).unwrap();
+    std::fs::write(
+        d.join("design/tasks/TASK-002.md"),
+        task("TASK-002", "doing"),
+    )
+    .unwrap();
+
+    // A dry run plans and writes nothing, in Jira or in the files.
+    let out = kiln_jira(d, TOKEN, &["jira", "sync", "--dry-run"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let plan = stdout(&out);
+    assert!(
+        plan.starts_with("jira (DEMO) → a new project issue (Task)\n"),
+        "{plan}"
+    );
+    assert!(
+        plan.contains("  create     \"Kiln: Demo\" (Task), the project issue"),
+        "{plan}"
+    );
+    assert!(
+        plan.contains(
+            "  create     TASK-002 TASK-002 title (Sub-task), then to an in-progress status"
+        ),
+        "{plan}"
+    );
+    assert!(
+        plan.contains("  3 create, 0 update, 0 move, 0 unchanged"),
+        "{plan}"
+    );
+    assert!(fake.state.lock().unwrap().writes().is_empty());
+
+    // Not on a terminal and without --yes: nothing happens.
+    let out = kiln_jira(d, TOKEN, &["jira", "sync"]);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert!(fake.state.lock().unwrap().writes().is_empty());
+
+    let out = kiln_jira(d, TOKEN, &["jira", "sync", "--yes"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(
+        stdout(&out).contains(
+            "jira: 3 created, 0 updated, 1 moved; 3 files gained ticket keys (commit them)"
+        ),
+        "{}",
+        stdout(&out)
+    );
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    assert!(config.contains("parent = \"DEMO-101\""), "{config}");
+    assert!(
+        config.contains("# the team's Jira"),
+        "comments kept: {config}"
+    );
+    let t1 = std::fs::read_to_string(d.join("design/tasks/TASK-001.md")).unwrap();
+    assert!(t1.contains("jira = \"DEMO-102\""), "{t1}");
+    assert!(
+        t1.contains("id = \"TASK-001\"  # keep") && t1.ends_with("The body.\n"),
+        "{t1}"
+    );
+
+    // Synced: the next plan changes nothing.
+    let out = kiln_jira(d, TOKEN, &["jira", "sync", "--dry-run"]);
+    let plan = stdout(&out);
+    assert!(
+        plan.starts_with("jira (DEMO) → DEMO-101 \"Kiln: Demo\"\n"),
+        "{plan}"
+    );
+    assert!(
+        plan.contains("0 create, 0 update, 0 move, 2 unchanged"),
+        "{plan}"
+    );
+
+    // A change in Kiln becomes a move; a move in Jira comes back by pull.
+    ok(d, &["set", "TASK-001", "status=done"]);
+    let out = kiln_jira(d, TOKEN, &["jira", "sync", "--yes"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(
+        stdout(&out).contains("  move       DEMO-102 TASK-001: To Do → Done"),
+        "{}",
+        stdout(&out)
+    );
+    assert_eq!(fake.state.lock().unwrap().issues["DEMO-102"].status, "Done");
+
+    fake.state
+        .lock()
+        .unwrap()
+        .issues
+        .get_mut("DEMO-103")
+        .unwrap()
+        .status = "Done".into();
+    fake.state
+        .lock()
+        .unwrap()
+        .issues
+        .get_mut("DEMO-103")
+        .unwrap()
+        .category = "done".into();
+    let out = kiln_jira(d, TOKEN, &["jira", "pull"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert_eq!(
+        stdout(&out),
+        "TASK-002: status doing → done (from DEMO-103 Done)\n"
+    );
+    let t2 = std::fs::read_to_string(d.join("design/tasks/TASK-002.md")).unwrap();
+    assert!(t2.contains("status = \"done\""), "{t2}");
+}

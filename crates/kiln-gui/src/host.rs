@@ -16,8 +16,11 @@ pub enum Job {
     PlanExports,
     /// `kiln export NAME…` for these file targets.
     WriteExports(Vec<String>),
-    /// Publishes a Confluence target, if its plan is still `shown`.
+    /// Publishes a Confluence target (or syncs Jira, target `jira`), if
+    /// its plan is still `shown`.
     Publish { target: String, shown: String },
+    /// `kiln jira pull ID`.
+    JiraPull(String),
     /// `kiln confluence comments`.
     Comments,
     /// The tags, newest first, for picking a baseline.
@@ -32,7 +35,9 @@ impl Job {
         match self {
             Job::PlanExports => "Planning the exports…".into(),
             Job::WriteExports(names) => format!("Writing {}…", names.join(", ")),
+            Job::Publish { target, .. } if target == "jira" => "Syncing Jira…".into(),
             Job::Publish { target, .. } => format!("Publishing {target}…"),
+            Job::JiraPull(id) => format!("Taking {id}'s status from Jira…"),
             Job::Comments => "Reading Confluence comments…".into(),
             Job::Tags => "Reading tags…".into(),
             Job::Baseline(rev) => format!("Reading the project at {rev}…"),
@@ -46,6 +51,8 @@ pub enum Done {
     /// The lines `kiln export` printed, or why it failed.
     Wrote(Result<Vec<String>, String>),
     Published(Result<Vec<String>, String>),
+    /// What `kiln jira pull` printed.
+    Pulled(Result<Vec<String>, String>),
     Comments(Result<Vec<CommentGroup>, String>),
     Tags(Result<Vec<String>, String>),
     Baseline(Result<Box<Baseline>, String>),
@@ -56,6 +63,8 @@ pub enum Done {
 pub struct ExportReport {
     pub name: String,
     pub confluence: bool,
+    /// The Jira sync (`kiln jira sync`), shown as one more target.
+    pub jira: bool,
     /// As `kiln export --dry-run` prints them: the target's line first.
     pub lines: Vec<String>,
     /// Why it couldn't be planned (no token, a server error…).

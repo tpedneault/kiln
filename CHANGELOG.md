@@ -116,6 +116,18 @@ All notable changes to Kiln are recorded here. The format follows
   `tree`. Properties default to the new `item_style = "list"`: the status,
   then one line per relationship with its label in bold, instead of one
   long line (`line` is still there); ADR-013 ([docs/EXPORT.md](docs/EXPORT.md)).
+- K10: Kiln keeps Jira in step with its tasks (ADR-014). With `[jira]
+  project`, `kiln jira sync` creates one project issue and a sub-task per
+  task, and keeps their summary, due date and status, by the workflow
+  transition that reaches the mapped status (`[jira.status]`, else the
+  status category); it prints the plan first, asks (or `--yes`), and
+  writes the keys it created into `kiln.toml` and the items, to commit.
+  Only the project issue's sub-tasks are ever written, nothing is
+  deleted, and a move the workflow forbids is reported and skipped.
+  `kiln jira pull` takes a ticket's status back into its item; K207 names
+  both. In the GUI, the Exports page shows the sync as a `jira` target
+  (`P` syncs after a `y`), and `J` pulls an item's status
+  ([docs/INTEGRATION.md](docs/INTEGRATION.md), [docs/CLI.md](docs/CLI.md)).
 - The wiki: a user guide for designing a project with Kiln, from
   installing and a tutorial to the design method and references for item
   files, configuration, checks, exports, Confluence, Jira, the command

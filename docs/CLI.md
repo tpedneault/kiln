@@ -1,6 +1,6 @@
 # Command line
 
-How to run `kiln`, as it stands (K9). The commands planned for later
+How to run `kiln`, as it stands (K10). The commands planned for later
 milestones are in [DESIGN.md](DESIGN.md), "Command line"; each is
 documented here when it ships. The file format is
 [FORMAT.md](FORMAT.md); `kiln.toml` is summed up in
@@ -342,6 +342,48 @@ stored token; CI sets that rather than running `kiln auth`.
 $ kiln auth confluence
 Token for https://confluence.example.com:
 stored the token for https://confluence.example.com (signed in as Thomas) in the credential store as fenix-suite/confluence:https://confluence.example.com
+```
+
+### `kiln jira sync [--dry-run] [--yes]`
+
+With `[jira] project`, keeps Jira in step with the synced items
+(`[jira] types`, tasks by default; INTEGRATION.md, "Jira"): one project
+issue (`[jira] parent`, created and written into `kiln.toml` by the
+first sync) and a sub-task per item, whose summary (`TASK-001 Title`),
+due date and status it keeps. It prints the plan, then asks (or
+`--yes`):
+
+```
+$ kiln jira sync
+jira (DEMO) → DEMO-100 "Kiln: Demo"
+  create     TASK-004 Later (Sub-task)
+  move       DEMO-101 TASK-001: In Progress → Done
+  refused    DEMO-103 TASK-003: no transition from Done to a to-do status (the workflow offers: Reopen → In Progress)
+  1 create, 0 update, 1 move, 1 unchanged, 1 refused
+Sync jira (DEMO) → DEMO-100 "Kiln: Demo"? [y/N] y
+jira: 1 created, 0 updated, 1 moved; 1 file gained ticket keys (commit them)
+```
+
+A status maps through `[jira.status]` by name, else by Jira's status
+category (the type's initial status: to do; done or closed: done;
+others: in progress). A ticket the workflow can't move there is
+`refused` and left alone (exit 1); the rest is synced. Tickets outside
+the project issue are never written (`left alone`); a sub-task no item
+links is reported (`orphan`), never deleted. Keys it creates are written
+into the items (`jira =`) and `kiln.toml`, even when Jira fails part way
+(exit 3): commit them, so no ticket is created twice. `--dry-run` prints
+the plan only. Needs a token as the mirror does.
+
+### `kiln jira pull [ID…]`
+
+Takes the status of each item's ticket (a sub-task of the project issue)
+into the item, mapped back through `[jira.status]` or the category, as a
+`kiln set` would write it: for a ticket someone moved in Jira, which K207
+reports. Without IDs, every synced item.
+
+```
+$ kiln jira pull TASK-002
+TASK-002: status doing → done (from DEMO-102 Done)
 ```
 
 ### `kiln auth jira [--forget]`

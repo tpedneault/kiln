@@ -111,9 +111,18 @@ roles = ["implements", "verifies"]
 [render]
 link_bare_ids = true             # REQ-014 in prose is a reference, not only [[REQ-014]]
 
-# Where `jira` keys point. Read-only; the token never goes here.
+# Where `jira` keys point; the token never goes here. With `project`,
+# `kiln jira sync` keeps a sub-task per task in step (INTEGRATION.md).
 [jira]
 url = "https://jira.example.com"
+project = "FLINT"                # optional: the Jira project Kiln's tickets go in
+parent = "FLINT-100"             # written by the first sync: the project issue
+# parent_type = "Task"           # the project issue's type when created
+# subtask_type = "Sub-task"      # default: the project's sub-task type
+# types = ["task"]               # the Kiln types synced
+
+[jira.status]                    # optional: Kiln status → Jira status name
+blocked = "Blocked"              # unmapped statuses go by status category
 
 # Severity overrides for check rules (see "Check rules").
 [check]

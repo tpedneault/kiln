@@ -84,7 +84,11 @@ impl kiln_gui::Host for GuiHost {
                 exporting(root, names.clone(), false, &mut |_, _, _| Answer::CantAsk)
                     .map(|(lines, _)| lines),
             ),
+            Job::Publish { target, shown } if target == "jira" => {
+                Done::Published(jira_sync(root, shown))
+            }
             Job::Publish { target, shown } => Done::Published(publish(root, target, shown)),
+            Job::JiraPull(id) => Done::Pulled(jira_pull(root, id)),
             Job::Comments => Done::Comments(comments(root)),
             Job::Tags => Done::Tags(kiln_git::tags(root).map_err(|e| e.to_string())),
             Job::Baseline(rev) => {
@@ -128,18 +132,22 @@ fn exporting(
 /// Every target's dry run, one at a time, so a Confluence target without
 /// a token doesn't hide the file targets' plans.
 fn plan_exports(root: &Path) -> Vec<ExportReport> {
-    let targets = match load(Some(root)) {
-        Ok(l) => l.project.config.exports.clone(),
+    let (targets, jira) = match load(Some(root)) {
+        Ok(l) => (
+            l.project.config.exports.clone(),
+            l.project.config.jira_sync.is_some(),
+        ),
         Err(f) => {
             return vec![ExportReport {
                 name: "kiln.toml".into(),
                 confluence: false,
+                jira: false,
                 lines: Vec::new(),
                 error: Some(f.message),
             }]
         }
     };
-    targets
+    let mut reports: Vec<ExportReport> = targets
         .into_iter()
         .map(|t| {
             let confluence = t.format == ExportFormat::Confluence;
@@ -149,6 +157,7 @@ fn plan_exports(root: &Path) -> Vec<ExportReport> {
                 Ok((lines, _)) => ExportReport {
                     name: t.name,
                     confluence,
+                    jira: false,
                     lines,
                     error: None,
                 },
@@ -161,11 +170,83 @@ fn plan_exports(root: &Path) -> Vec<ExportReport> {
                     )],
                     name: t.name,
                     confluence,
+                    jira: false,
                     error: Some(e),
                 },
             }
         })
-        .collect()
+        .collect();
+    if jira {
+        reports.push(jira_plan(root));
+    }
+    reports
+}
+
+/// `kiln jira sync --dry-run`, as one more target on the Exports page.
+fn jira_plan(root: &Path) -> ExportReport {
+    let mut out: Vec<u8> = Vec::new();
+    let result = super::jira::sync_with(Some(root), true, false, &mut out, &mut |_, _| {
+        Answer::CantAsk
+    });
+    let mut lines: Vec<String> = String::from_utf8_lossy(&out)
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    if lines.is_empty() {
+        lines.push("jira (kiln jira sync)".into());
+    }
+    ExportReport {
+        name: "jira".into(),
+        confluence: false,
+        jira: true,
+        lines,
+        error: result.err().map(|f| f.message),
+    }
+}
+
+/// Syncs Jira, but only the plan that was shown.
+fn jira_sync(root: &Path, shown: &str) -> Result<Vec<String>, String> {
+    let mut moved = false;
+    let mut out: Vec<u8> = Vec::new();
+    super::jira::sync_with(Some(root), false, false, &mut out, &mut |_, plan| {
+        if plan == shown {
+            Answer::Yes
+        } else {
+            moved = true;
+            Answer::No
+        }
+    })
+    .map_err(|f| f.message)?;
+    if moved {
+        return Err(
+            "Jira not synced: its plan changed since it was shown; look at the new plan and press P again"
+                .into(),
+        );
+    }
+    Ok(String::from_utf8_lossy(&out)
+        .lines()
+        .map(str::to_owned)
+        .collect())
+}
+
+/// `kiln jira pull ID`: its lines, or its first warning as the error.
+fn jira_pull(root: &Path, id: &str) -> Result<Vec<String>, String> {
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    let code = super::jira::pull_with(Some(root), &[id.to_owned()], &mut out, &mut err)
+        .map_err(|f| f.message)?;
+    let err = String::from_utf8_lossy(&err).trim().to_owned();
+    if code != 0 && !err.is_empty() {
+        return Err(err
+            .lines()
+            .next()
+            .unwrap_or("")
+            .trim_start_matches("kiln: ")
+            .to_owned());
+    }
+    Ok(String::from_utf8_lossy(&out)
+        .lines()
+        .map(str::to_owned)
+        .collect())
 }
 
 /// Publishes `target`, but only the plan that was shown: when the space
