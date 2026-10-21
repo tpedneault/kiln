@@ -1,7 +1,9 @@
 //! The GUI (docs/GUI.md): eleven pages onto the project (Tree, Trace,
 //! Impact, Board, Roadmap, Decisions, Changes, Item, Check, Exports,
 //! Comments), driven from the keyboard, opening items in Fenix, editing
-//! front matter and running exports.
+//! front matter and running exports; and [`home`], the projects
+//! dashboard it starts on outside a project, which adds, removes and
+//! switches between the projects in [`projects`].
 //!
 //! Everything that can be tested without a display is in plain modules:
 //! [`pages`] (each page as rows), [`app`] (keys in, a [`Screen`] and an
@@ -21,9 +23,12 @@
 pub mod app;
 pub mod edit;
 mod gpu;
+pub mod home;
 pub mod host;
+mod image;
 pub mod keys;
 pub mod pages;
+pub mod projects;
 pub mod prompt;
 mod rect;
 mod render;
@@ -36,7 +41,7 @@ pub use app::{App, Baseline, Effect};
 pub use host::{Comment, CommentGroup, Done, ExportReport, Host, Job};
 pub use screen::Screen;
 pub use settings::{parse as parse_settings, Settings};
-pub use window::{run, JiraLoad, Options};
+pub use window::{run, JiraLoad, Opened, Opener, Options};
 
 #[cfg(test)]
 mod tests;

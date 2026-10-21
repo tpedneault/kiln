@@ -346,6 +346,14 @@ baseline for the Changes page (default: the most recent tag; `b` picks
 another); `--item ID` puts the cursor on that item. The window follows
 edits to the files within two seconds.
 
+Outside a project (no `kiln.toml` in the current folder or above it, and
+no `--project`), it opens on **Home**, the projects dashboard: the
+projects opened before, most recent first, with a preview of each;
+`Enter` opens one, `a` adds a folder, `d` takes one off the list, and
+`SPC h` on any page comes back to it. `--since` and `--item` are about a
+project, so outside one they fail as before. Every project the window
+opens joins Home's list (`state/projects.toml`, CONFIGURATION.md).
+
 On Windows, `kilnw` (next to `kiln.exe`) does the same without a console
 window, for shortcuts and Flint; a failure to open goes to `kilnw.log` in
 the temporary folder. Without a display, `kiln gui` fails with one line

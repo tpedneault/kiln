@@ -50,16 +50,25 @@ fn version_prints_name_and_version_and_exits_0() {
 }
 
 #[test]
-fn no_arguments_outside_a_project_is_one_line_and_exits_2() {
-    // `kiln` alone opens the GUI; outside a project it stops before any
-    // window. (No test opens a window: CI may have a desktop to open it on.)
-    let out = kiln(&[]);
+fn the_gui_asked_about_a_project_outside_one_is_one_line_and_exits_2() {
+    // `kiln` alone outside a project opens Home (GUI.md, "Home"), so no
+    // test runs it bare: CI may have a desktop to open it on. What is
+    // about a project still stops before any window when there is none.
+    let empty = tempfile::tempdir().unwrap();
+    for args in [
+        vec!["gui", "--item", "REQ-7"],
+        vec!["gui", "--since", "v1.0"],
+    ] {
+        let out = kiln_in(empty.path(), &args);
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        let err = stderr(&out);
+        assert!(err.starts_with("kiln: no kiln.toml"), "{err}");
+        assert_eq!(err.lines().count(), 1);
+    }
+    let elsewhere = empty.path().to_str().unwrap();
+    let out = kiln_in(empty.path(), &["--project", elsewhere]);
     assert_eq!(out.status.code(), Some(2));
-    let err = stderr(&out);
-    assert!(err.starts_with("kiln: no kiln.toml"), "{err}");
-    assert_eq!(err.lines().count(), 1);
-    let gui = kiln(&["gui", "--item", "REQ-7"]);
-    assert_eq!(gui.status.code(), Some(2));
+    assert!(stderr(&out).starts_with("kiln: no kiln.toml"));
 }
 
 #[test]

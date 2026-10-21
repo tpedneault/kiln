@@ -596,6 +596,7 @@ The state folder holds caches, all safe to delete at any time:
 | `state/confluence/<space>-<project>-<export>.json` | One page cache per Confluence target (page id, version), which saves an API call per unchanged page and lets the Flint provider open an item's page offline. |
 | `state/flint-project` | The project the Flint provider last followed Fenix to. |
 | `state/jira/<host>.json` | The Jira mirror: each linked ticket's status and assignee, reused for ten minutes. |
+| `state/projects.toml` | The projects the GUI's Home lists, with when each was last opened. Deleting it empties Home; opening a project adds it back. |
 
 ## The GUI's settings
 

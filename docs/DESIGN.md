@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0–K11 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the Jira mirror with K207 and `kiln auth jira`, `kiln jira sync` and `pull` keeping a sub-task per task in step (K10), presets such as arc42 with `kiln preset add` (K11), this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
+Status: K0–K12 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the Jira mirror with K207 and `kiln auth jira`, `kiln jira sync` and `pull` keeping a sub-task per task in step (K10), presets such as arc42 with `kiln preset add` (K11), Home, the GUI's projects dashboard, to open, add, remove and switch projects (K12), this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -171,7 +171,8 @@ The same four kinds as Fenix and Flint, under `kiln`: settings in
 `%AppData%\kiln` / `~/.config/kiln` (a user `settings.toml` for things that
 aren't the project's: theme, GUI keys), state in
 `%LocalAppData%\kiln\state` / `~/.local/state/kiln/state` (the Confluence
-page cache, the Flint provider's last project), logs beside the state.
+page cache, the Flint provider's last project, the GUI's list of projects),
+logs beside the state.
 `KILN_HOME` puts all of it in one folder. `fenix_storage::paths` hard-codes
 `fenix` (Flint's F14), so mirror its rules in `kiln-model` as Flint does
 in `flint-config`.
@@ -204,7 +205,7 @@ nearest `kiln.toml` (`--project <dir>` overrides).
 | `kiln lsp` | language server on stdio | K4 |
 | `kiln provider` | Flint provider on stdio | K5 |
 | `kiln diff <REV>[..<REV>]` | item-level changes between revisions, or a revision and the working tree (FORMAT.md, "Baselines") | K6 |
-| `kiln` (no arguments), `kiln gui [--since REV] [--item ID]` | the GUI (GUI.md) | K7 |
+| `kiln` (no arguments), `kiln gui [--since REV] [--item ID]` | the GUI (GUI.md); in a project its pages, elsewhere Home, the projects dashboard | K7, K12 |
 
 Errors are one line on stderr naming what failed and why, with the file
 and line when there is one. Exit codes: 0 fine, 1 findings or a refused
@@ -276,7 +277,10 @@ publishing after a confirm) and **Comments** (Confluence's unresolved
 comments). `Enter` on an item opens it in Fenix at its title line. From
 K9 the GUI edits front matter as `kiln set`, `link`, `unlink`, `new` and
 `renumber` do, through the same `kiln-index` functions; it never edits
-prose (ADR-012). Designed in detail in [GUI.md](GUI.md).
+prose (ADR-012). From K12 it starts anywhere: outside a project it opens
+on **Home**, a projects dashboard after Fenix's (the projects opened
+before, a preview of each, adding, removing and switching), and `SPC h`
+goes back there from any page. Designed in detail in [GUI.md](GUI.md).
 
 ## Performance
 
@@ -350,8 +354,9 @@ changelog line.
 | K9 | The GUI edits front matter (status, title, parent, owner, due, links, new items, renumbering) through the editing commands' shared functions, never prose (ADR-012); Item, Check, Exports (write, publish after a confirm) and Comments pages; picking another baseline | — |
 | K10 | `kiln jira sync`: a project issue and a sub-task per task, created and kept in step (summary, due date, status by transition), keys written back into the files; `kiln jira pull`; the Jira target in the GUI (ADR-014) | — (G6 for Jira Cloud, G9 for Jira behind a proxy) |
 | K11 | Presets: `kiln preset list`/`add`, `kiln init --preset`, with `arc42`, `srs` and `design-doc`, each adding its types, roles and export to `kiln.toml` without duplicates, options on the wiki (ADR-015); `style="compact"` items; a template's own HTML comments left out of exports; Confluence titles that don't depend on who published first (`qualify_titles`), a refused plan instead of a failed create when a title is taken, and `children = "list"` | — |
+| K12 | Home, the projects dashboard (REQ-017): `kiln` outside a project opens on the projects opened before, with a preview of each (items, types, next milestone, `kiln check`'s findings), adding a folder, removing one from the list, switching with `SPC h`; the list in the state folder | — |
 
-Everything through K11 needs nothing new from Fenix or Flint to work. INTEGRATION.md
+Everything through K12 needs nothing new from Fenix or Flint to work. INTEGRATION.md
 lists the changes (G1–G9) that make the integration better and which
 milestone notices their absence.
 

@@ -1,6 +1,8 @@
 //! Draws a [`Screen`]: the top bar, the page's rows (heading bands, the
 //! cursor's row, status pills), the footer, and the which-key popup, in
-//! the palette's colours. It knows nothing of pages; [`layout`] is pure and tested.
+//! the palette's colours; on Home, its bands, rules and lockup, placed in
+//! cells as wide as the font's. It knows nothing of pages; [`layout`] is
+//! pure and tested.
 //!
 //! Text goes through glyphon as in Fenix and Flint, in the monospace
 //! family Fenix would pick unless settings name one, so columns padded
@@ -14,8 +16,9 @@ use glyphon::{
 };
 
 use crate::gpu::{Gpu, Surface};
+use crate::image::Picture;
 use crate::rect::Rects;
-use crate::screen::{Line, Screen};
+use crate::screen::{Fill, Line, Screen};
 use crate::theme::{text_color, Palette};
 
 /// Line height as a multiple of the font size, Fenix's ratio.
@@ -93,6 +96,18 @@ impl Layout {
         }
     }
 
+    /// How many cells of `cell` pixels fit across the rows.
+    pub fn columns(&self, cell: f32) -> usize {
+        ((self.width - 2.0 * self.pad) / cell.max(1.0))
+            .floor()
+            .max(1.0) as usize
+    }
+
+    /// The cell at `x`, for cells `cell` pixels wide.
+    pub fn column_at(&self, x: f32, cell: f32) -> usize {
+        ((x - self.pad) / cell.max(1.0)).floor().max(0.0) as usize
+    }
+
     /// The row at height `y`, if any.
     pub fn row_at(&self, y: f32) -> Option<usize> {
         let i = ((y - self.body_top) / self.line).floor();
@@ -109,6 +124,10 @@ pub struct Renderer {
     text: TextRenderer,
     family: String,
     buffers: Vec<Buffer>,
+    /// Home's lockup.
+    picture: Picture,
+    /// The font's advance at a size: (size, advance).
+    cell: Option<(f32, f32)>,
 }
 
 impl Renderer {
@@ -130,6 +149,8 @@ impl Renderer {
             None,
         );
         Renderer {
+            picture: Picture::new(gpu, format),
+            cell: None,
             rects: Rects::new(&gpu.device, format),
             font_system,
             swash: SwashCache::new(),
@@ -139,6 +160,29 @@ impl Renderer {
             family,
             buffers: Vec::new(),
         }
+    }
+
+    /// How wide a cell is at `l`'s size: the monospace font's advance,
+    /// measured once a size, so Home's bands sit exactly under its text.
+    pub fn cell_width(&mut self, l: &Layout) -> f32 {
+        let size = l.line / LINE;
+        if let Some((at, w)) = self.cell {
+            if at == size {
+                return w;
+            }
+        }
+        const N: usize = 20;
+        let mut b = Buffer::new(&mut self.font_system, Metrics::new(size, l.line));
+        b.set_wrap(Wrap::None);
+        b.set_size(None, None);
+        let attrs = Attrs::new().family(Family::Name(&self.family));
+        b.set_text(&"0".repeat(N), &attrs, Shaping::Advanced, None);
+        b.shape_until_scroll(&mut self.font_system, false);
+        let w = b.layout_runs().map(|r| r.line_w).fold(0.0_f32, f32::max) / N as f32;
+        // A font that shapes nothing: monospace fonts' usual ratio.
+        let w = if w > 0.0 { w } else { size * 0.6 };
+        self.cell = Some((size, w));
+        w
     }
 
     /// Draws `screen` and presents it; `false` when the surface wasn't
@@ -155,6 +199,26 @@ impl Renderer {
             return false;
         };
         let (width, height) = (surface.config.width as f32, surface.config.height as f32);
+        let cell = self.cell_width(l);
+        // Home's lockup: three rows tall, drawn at the height it shows at.
+        let logo = screen.logo.map(|(row, col)| {
+            let h = (3.0 * l.line * 0.8).round() as u32;
+            let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+            let fg = palette.foreground;
+            let (w, h) = self
+                .picture
+                .lockup(gpu, h, [byte(fg[0]), byte(fg[1]), byte(fg[2])]);
+            let (w, h) = (w as f32, h as f32);
+            Rect {
+                x: (l.pad + col as f32 * cell).round(),
+                y: (l.row(row).y + (3.0 * l.line - h) / 2.0).round(),
+                w,
+                h,
+            }
+        });
+        if let Some(r) = logo {
+            self.picture.place(gpu, r, width, height);
+        }
         self.rects.clear();
         let mut push = |r: Rect, c: [f32; 4]| self.rects.push(r, c, width, height);
         push(l.top, palette.surface);
@@ -164,6 +228,38 @@ impl Renderer {
         }
         if let Some(c) = screen.cursor {
             push(l.row(c), palette.selection);
+        }
+        // Home's bands, in cells; the cursor's with Fenix's focus rail.
+        let rail = (l.pad / 4.0).max(2.0).round();
+        for b in &screen.bands {
+            let r = Rect {
+                x: l.pad + b.cols.start as f32 * cell,
+                y: l.row(b.row).y,
+                w: b.cols.len() as f32 * cell,
+                h: b.rows as f32 * l.line,
+            };
+            match b.fill {
+                Fill::Panel => push(r, palette.surface),
+                Fill::Key => push(r, palette.border),
+                Fill::Cursor => {
+                    push(r, palette.selection);
+                    push(Rect { w: rail, ..r }, palette.accent);
+                }
+            }
+        }
+        let hairline = (l.pad / 8.0).max(1.0).round();
+        for (row, cols) in &screen.rules {
+            let mut color = palette.muted;
+            color[3] *= 0.35;
+            push(
+                Rect {
+                    x: l.pad + cols.start as f32 * cell,
+                    y: (l.row(*row).y + (l.line - hairline) / 2.0).round(),
+                    w: cols.len() as f32 * cell,
+                    h: hairline,
+                },
+                color,
+            );
         }
         // The which-key popup: bottom right, above the footer.
         let popup_w = POPUP_COLUMNS * l.line * 0.6 + 2.0 * l.pad;
@@ -320,6 +416,9 @@ impl Renderer {
                 multiview_mask: None,
             });
             self.rects.draw(&mut pass);
+            if logo.is_some() {
+                self.picture.draw(&mut pass);
+            }
             let _ = self.text.render(&self.atlas, &self.viewport, &mut pass);
         }
         gpu.queue.submit(Some(encoder.finish()));

@@ -1,11 +1,14 @@
-//! `kiln gui` (and `kiln` alone): the window (docs/GUI.md). Loads the
-//! project, the baseline for the Changes page (`--since REV`, else the
-//! most recent tag) and the user's `settings.toml`, then hands over, with
-//! a [`kiln_gui::Host`] for what the window can't do itself: exports,
-//! Confluence and git. The host runs the commands' own code
-//! (`export::run_with`, `confluence::read`), so the window shows what the
-//! terminal would print and asks Confluence nothing the command line
-//! wouldn't.
+//! `kiln gui` (and `kiln` alone): the window (docs/GUI.md). In a project
+//! (`--project`, or the current folder or one above it with a
+//! `kiln.toml`) it opens that project's pages; anywhere else it opens
+//! Home, the projects dashboard. Opening a project loads it, the baseline
+//! for the Changes page (`--since REV`, else the most recent tag) and the
+//! user's `settings.toml`, then hands over, with a [`kiln_gui::Host`] for
+//! what the window can't do itself: exports, Confluence and git. The host
+//! runs the commands' own code (`export::run_with`, `confluence::read`),
+//! so the window shows what the terminal would print and asks Confluence
+//! nothing the command line wouldn't. Home opens projects through the
+//! same function, on the window's thread.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -14,7 +17,7 @@ use kiln_gui::{Comment, CommentGroup, Done, ExportReport, Job};
 use kiln_model::ExportFormat;
 
 use super::export::{self, Answer};
-use crate::project::{at_revision, folders, load};
+use crate::project::{at_revision, folders, load, root};
 use crate::{Fail, TextOrJson, EXIT_USAGE};
 
 pub fn run(
@@ -22,18 +25,60 @@ pub fn run(
     since: Option<String>,
     item: Option<String>,
 ) -> Result<u8, Fail> {
-    let loaded = load(project)?;
-    let root = loaded.source.root().to_path_buf();
+    // `--project`, `--since` and `--item` are about a project: without
+    // one they fail as every other command does. Alone, outside a
+    // project, Kiln starts on Home.
+    let found = match project {
+        Some(_) => Some(root(project)?),
+        None => std::env::current_dir()
+            .ok()
+            .and_then(|d| kiln_index::find_root(&d)),
+    };
+    let found = match found {
+        Some(r) => Some(r),
+        None if since.is_some() || item.is_some() => Some(root(None)?),
+        None => None,
+    };
     let select = item.as_deref().map(super::parse_id).transpose()?;
-    let baseline = since
-        .or_else(|| kiln_git::latest_tag(&root))
-        .map(|rev| baseline(&root, &rev))
-        .transpose()?;
+    let start = found.map(|r| open(&r, since)).transpose()?;
     let (settings, notes) = folders()
         .map(|f| f.settings.join("settings.toml"))
         .and_then(|p| std::fs::read_to_string(p).ok())
         .map(|text| kiln_gui::parse_settings(&text))
         .unwrap_or_default();
+    kiln_gui::run(kiln_gui::Options {
+        start,
+        settings,
+        notes,
+        select,
+        // Home opens the folder on its list, not a project above it that
+        // a removed `kiln.toml` would leave `load` to find.
+        open: Arc::new(|root: &Path| {
+            if !root.join(kiln_parse::CONFIG_FILE).is_file() {
+                return Err(format!(
+                    "no kiln.toml in {} any more; d takes it off the list",
+                    root.display()
+                ));
+            }
+            open(root, None).map_err(|f| f.message)
+        }),
+        projects: folders().map(|f| f.state.join(kiln_gui::projects::FILE)),
+        home_dir: dirs::home_dir(),
+    })
+    .map(|()| 0)
+    .map_err(|e| Fail::new(EXIT_USAGE, format!("gui: {e}")))
+}
+
+/// The project at `root`, read for the window: its baseline (`since`,
+/// else the most recent tag), its Jira mirror to load beside the window,
+/// and the host its jobs run through.
+fn open(root: &Path, since: Option<String>) -> Result<kiln_gui::Opened, Fail> {
+    let loaded = load(Some(root))?;
+    let root = loaded.source.root().to_path_buf();
+    let baseline = since
+        .or_else(|| kiln_git::latest_tag(&root))
+        .map(|rev| baseline(&root, &rev))
+        .transpose()?;
     // The Jira mirror loads beside the window, so a slow Jira never holds
     // it up; a project without `[jira] url` or keys asks for nothing.
     let keys = kiln_jira::keys(&loaded.project);
@@ -43,18 +88,13 @@ pub fn run(
         }
         _ => None,
     };
-    kiln_gui::run(kiln_gui::Options {
+    Ok(kiln_gui::Opened {
         host: Arc::new(GuiHost { root: root.clone() }),
         root,
         jira,
         project: loaded.project,
         baseline,
-        settings,
-        notes,
-        select,
     })
-    .map(|()| 0)
-    .map_err(|e| Fail::new(EXIT_USAGE, format!("gui: {e}")))
 }
 
 /// The project at `rev`, labelled `v1.0 (1a2b3c4)`.

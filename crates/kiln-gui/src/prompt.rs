@@ -56,6 +56,12 @@ pub enum Then {
         shown: String,
     },
     Baseline,
+    /// Home: a project's folder, typed.
+    AddProject,
+    /// Home: taking this project off the list, confirmed.
+    RemoveProject {
+        root: std::path::PathBuf,
+    },
 }
 
 /// One entry of a pick.

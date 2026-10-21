@@ -1,7 +1,10 @@
 //! What a frame shows, as data: lines of styled spans for the top bar,
-//! the page and the footer, and the which-key popup. The application
-//! builds it; the renderer draws it and knows nothing about pages. Tests
-//! compare screens as text.
+//! the page and the footer, and the which-key popup; Home adds bands,
+//! rules and the logo, placed in cells. The application builds it; the
+//! renderer draws it and knows nothing about pages. Tests compare screens
+//! as text.
+
+use std::ops::Range;
 
 /// What a span means, which the theme turns into a colour.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,6 +64,27 @@ pub fn plain(line: &[Span]) -> String {
     line.iter().map(|s| s.text.as_str()).collect()
 }
 
+/// What a band is filled with.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Fill {
+    /// Home's find field: the bars' colour.
+    Panel,
+    /// A keycap.
+    Key,
+    /// The entry under the cursor, when it is narrower than the row or
+    /// taller than one line.
+    Cursor,
+}
+
+/// A flat band behind cells: `rows` rows from `row`, columns `cols`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Band {
+    pub row: usize,
+    pub rows: usize,
+    pub cols: Range<usize>,
+    pub fill: Fill,
+}
+
 /// A whole frame.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Screen {
@@ -78,15 +102,28 @@ pub struct Screen {
     pub footer_error: bool,
     /// The which-key popup: one line per key.
     pub popup: Vec<Line>,
+    /// Bands behind the rows, in cells (Home).
+    pub bands: Vec<Band>,
+    /// Hairlines through the middle of a row, across these cells (Home).
+    pub rules: Vec<(usize, Range<usize>)>,
+    /// Kiln's lockup, three rows tall from this row and cell (Home).
+    pub logo: Option<(usize, usize)>,
 }
 
 impl Screen {
-    /// The whole screen as text, one line per line, the cursor's row
-    /// marked with `>`: what tests compare.
+    /// The whole screen as text, one line per line, the cursor's row (or
+    /// rows) marked with `>`: what tests compare.
     pub fn dump(&self) -> String {
         let mut out = format!("{}\n", plain(&self.top));
+        let under_cursor = |i: usize| {
+            self.cursor == Some(i)
+                || self
+                    .bands
+                    .iter()
+                    .any(|b| b.fill == Fill::Cursor && (b.row..b.row + b.rows).contains(&i))
+        };
         for (i, row) in self.rows.iter().enumerate() {
-            let mark = if self.cursor == Some(i) { '>' } else { ' ' };
+            let mark = if under_cursor(i) { '>' } else { ' ' };
             out.push_str(&format!("{mark}{}\n", plain(row).trim_end()));
         }
         out.push_str(&format!("-- {}\n", plain(&self.footer)));

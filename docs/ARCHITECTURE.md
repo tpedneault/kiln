@@ -66,7 +66,7 @@ access except through a value or trait the caller passes in.
 | `kiln` | the binary: `clap` CLI, exit codes, project discovery, reading and writing files; and `kilnw`, the GUI without a console on Windows (ADR-010) | no | K0 onward |
 | `kiln-jira` | the Jira mirror: linked keys, the cached mirror and its freshness, K207 (pure); one fetch through `fenix-jira`, and the fake Jira for tests (`fake` feature) | mirror and K207 yes; fetch no | K8 |
 | `kiln-brand` | the mark, wordmark and app icon (GUI.md, "Icon") drawn from one vector definition by a small rasteriser; the `.ico` with its `ico` feature (`image`) | yes | after K10 |
-| `kiln-gui` | the GUI (GUI.md): pages as rows, the prompt and the application as state machines (pure, tested as text); edits through `kiln-index`; the window (`winit`), GPU (`wgpu`) and text (`glyphon`) that draw a `Screen`, and the thread that runs the binary's jobs | pages, prompt and app yes; window no | K7, K9 |
+| `kiln-gui` | the GUI (GUI.md): pages as rows, the prompt, the application and Home (the projects dashboard) as state machines (pure, tested as text); edits through `kiln-index`; the list of projects in the state folder; the window (`winit`), GPU (`wgpu`) and text (`glyphon`) that draw a `Screen`, the logo drawn as one textured quad, and the threads that run the binary's jobs, open projects and summarise them for Home | pages, prompt, app and home yes; window no | K7, K9, K12 |
 
 `kiln-gui` is the one crate that pulls in `wgpu` and `winit`, which is
 why it waited for K7. It loads display libraries at run time (`dlopen`),
@@ -91,7 +91,7 @@ needs it lands):
 | `kiln-flint` | `kiln-model`, `kiln-parse` (the status edit), `kiln-index`, `kiln-fenix`, `kiln-confluence` and `kiln-secrets` ("Open in Confluence") |
 | `kiln-jira` | `kiln-model`, `kiln-index` |
 | `kiln-brand` | no Kiln crate |
-| `kiln-gui` | `kiln-model`, `kiln-parse` (the title limit), `kiln-index` (the project, and the editing commands' `plan_set`/`apply_*`), `kiln-check` (the Check page), `kiln-fenix` (opening an item or an address), `kiln-brand` (the window icon), `kiln-jira` (the mirror's type and K207; the binary hands over the function that loads it, so the GUI never sees a token); exports, Confluence and git are the binary's, behind the `Host` trait, so it needs no `kiln-export`, `kiln-confluence` or `kiln-git` |
+| `kiln-gui` | `kiln-model`, `kiln-parse` (the title limit), `kiln-index` (the project, and the editing commands' `plan_set`/`apply_*`), `kiln-check` (the Check page), `kiln-fenix` (opening an item or an address), `kiln-brand` (the window icon and Home's lockup), `kiln-jira` (the mirror's type and K207; the binary hands over the function that loads it, so the GUI never sees a token); exports, Confluence and git are the binary's, behind the `Host` trait, and opening a project from Home (its baseline from git) behind a function the binary hands over, so it needs no `kiln-export`, `kiln-confluence` or `kiln-git` |
 | `kiln` | all of them; `kiln-brand` with `ico` in its build script too |
 
 The rules:

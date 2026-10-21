@@ -188,6 +188,14 @@ All notable changes to Kiln are recorded here. The format follows
   space without the titles depending on who published first; `children =
   "list"` lists child pages as links in document order instead of the
   `children` macro ([docs/CONFLUENCE.md](docs/CONFLUENCE.md)).
+- K12: Home, the projects dashboard (REQ-017). `kiln` outside a project
+  opens on the projects opened before, after Fenix's Home: the logo and
+  the date, a find field, each project with when it was last opened and a
+  dot for its `kiln check`, and a preview (items, types, next milestone,
+  findings). `Enter` or `1`–`9` opens one, `a` adds a folder (with `Tab`
+  completion), `d` takes one off the list, and `SPC h` or `gh` on any page
+  goes back to switch; the list is `projects.toml` in the state folder
+  ([docs/GUI.md](docs/GUI.md), "Home").
 
 ### Changed
 

@@ -6,10 +6,77 @@ keyboard with Vim keys and the `SPC` leader. It reads the project, edits
 its front matter (statuses, titles, parents, owners, due dates, links, new
 items, IDs), shows `kiln check`'s findings, and plans, writes and publishes
 exports. It never edits prose: an item's body is written in Fenix, which
-`Enter` opens at the item (ADR-012).
+`Enter` opens at the item (ADR-012). Started outside a project, it opens
+on Home, a projects dashboard after Fenix's, which adds, removes and
+switches between projects.
 
 Designed after K6, as DESIGN.md planned; built in K7; editing and the
-Item, Check, Exports and Comments pages in K9.
+Item, Check, Exports and Comments pages in K9; Home in K12 (REQ-017).
+
+## Home
+
+Which project the window opens:
+
+| Started | Opens |
+|---|---|
+| `kiln`, `kiln gui` in a project (its folder or one below) | that project's pages, as before |
+| `--project PATH` | that project's pages; no `kiln.toml` there or above is an error, as for every command |
+| anywhere else (a shortcut, the Start menu, a terminal in `~`) | Home |
+
+Home is Fenix's Home cut to what Kiln has: the lockup and the date, a
+find field, then two columns, the projects and a preview of the one under
+the cursor, stacked into one when the window is narrower than 76 cells:
+
+```text
+[Home]  2 projects
+
+ ▣ kiln                                         Wednesday 21 October 2026
+
+  ›  Find a project                                                    /
+
+projects 2 ─────────────────── a add   Kiln ─────────────────── Enter open
+ 1  Kiln                       2 h ●   ~/src/kiln
+    ~/src/kiln
+ 2  Flint                      3 d ○   items     42 · 30 open
+    ~/src/flint                        types     requirement 12 · decision 14
+ +  add a project                  a   next      MS-003 Beta · due 2026-11-30 · 3/5
+                                       check     2 errors · 1 warning
+                                       opened    2 h ago
+```
+
+Each project shows its name (`kiln.toml`'s, its folder's until read),
+its path (the home folder as `~`), how long since it was last opened,
+and a dot for how `kiln check` finds it: green clean, the warning colour
+with warnings, red with errors or when it can't be read (no `kiln.toml`
+there any more), hollow while it is being read. The preview shows its
+items (how many, how many open, by type), its next open milestone with
+its due date and progress, and the findings. Projects and their findings
+are read on a thread when Home opens, so a slow disk never holds it up.
+
+| Keys | Do |
+|---|---|
+| `j` `k`, `↓` `↑`, `C-n` `C-p` | next / previous project (the last entry is *add a project*) |
+| `gg` `G`, `Home` `End` | first / last |
+| `Enter`, a double click | open the project (on *add a project*: add one) |
+| `1`–`9` | open the first nine directly |
+| `/` | the find field: typing narrows the list by name or path; `↓` `↑` move, `Enter` opens, `Esc` clears |
+| `a` | add a project: type its folder (`Tab` completes folder names, `~` is the home folder); a folder inside a project adds the project. A folder without a `kiln.toml` in it or above is refused with the reason, the prompt staying open |
+| `d` | take the project under the cursor off the list, after a `y`; its folder is untouched |
+| `R` | read the projects again |
+| `q`, `C-q` | quit |
+
+From any page, `SPC h` or `gh` goes back to Home, with the project just
+left first and under the cursor. Not while a job runs (planning,
+writing or publishing exports, reading comments): its answer would have
+no page to land on, so the footer says to wait.
+
+The list is `projects.toml` in Kiln's state folder (CONFIGURATION.md),
+most recently opened first. Every project the window opens joins it,
+from the command line or from Home. It is in the state folder rather
+than beside `settings.toml` because its paths are this machine's: on
+Windows the settings roam, and a list of another machine's folders would
+only be noise. A list Kiln can't read starts Home empty with the reason
+in the footer; Kiln rewrites the file whole.
 
 ## What it is for
 
@@ -138,7 +205,8 @@ Normal mode, as in Fenix's pages:
 | `J` | take the item's status from its Jira ticket (`kiln jira pull ID`) |
 | `s` `l` `U` `n` `N`, `H` `L` | the edits above |
 | `R` | reload now (and, on Exports and Comments, read them again) |
-| `SPC` | the leader: the pages above, `SPC e` the edits, `SPC R` reload, `SPC q` quit, with the which-key popup Fenix shows |
+| `SPC h`, `gh` | Home: the projects (see "Home") |
+| `SPC` | the leader: the pages above, `SPC e` the edits, `SPC R` reload, `SPC h` Home, `SPC q` quit, with the which-key popup Fenix shows |
 | `q`, `C-q` | quit |
 | `Esc` | clears a pending key, the leader, the filter or the prompt |
 
@@ -181,6 +249,21 @@ reload, quit) (`app`). The window, the GPU and the text (`window`, `gpu`,
 `render`) only draw a `Screen` and turn winit's events into key presses.
 Tests drive `app` with keys and compare screens as text.
 
+Home is the same shape: `home` is keys in, a `Screen` and an effect
+(open this project, save the list, quit) out, laid out in cells so tests
+read it as text; `projects` reads and writes the list and summarises a
+project. A `Screen` from Home also carries bands (the find field, the
+key cap, the entry under the cursor with Fenix's focus rail) and rules
+placed in cells, which the renderer draws at the font's measured
+advance, and where the lockup goes: `kiln-brand` draws it at the pixel
+height of three rows in the theme's text colour, and `image` draws it as
+one textured quad (Fenix's `pdf_texture` pipeline, cut down). The window
+shows either Home or a project with its threads; opening a project from
+Home runs on a thread through a function the binary hands over (the
+same one `kiln gui` opens with: the project, its baseline, its Jira
+mirror and its host), so the window never blocks on git. Switching drops
+the project shown with its threads' answers.
+
 Edits are decided in `app`, checked with `kiln-index`'s `plan_set` and
 `check_link` against the project shown, and made by `edit::apply`, which
 reads the project again and calls `kiln-index`'s `apply_set`,
@@ -211,7 +294,8 @@ window runs once on a thread, so the GUI never handles a token.
 tool, and a GUI-subsystem program is not waited for by `cmd.exe`, which
 would break exit codes in scripts. `kilnw.exe`, built from the same crate,
 is a GUI-subsystem program that only opens the window: what a shortcut or
-Flint's "Open in Kiln" starts, with no console window. On Linux and macOS
+Flint's "Open in Kiln" starts, with no console window. A shortcut usually
+starts in a folder that isn't a project, so it opens on Home. On Linux and macOS
 there is one `kiln`. (ADR-010 records the tradeoff; DESIGN.md's earlier
 "`--console` on Windows" was Fenix's and Flint's answer, for programs
 that are GUIs first.)
@@ -239,6 +323,9 @@ Editing an item's body, or any multi-line text (Fenix does that: `Enter`
 opens it); undo (git is the undo); overriding a refused Confluence plan,
 adopting a page or pruning retired ones (`kiln export --force`, `--adopt`,
 `--prune-removed`); `kiln auth` (the GUI never handles a token); `kiln
-init`; refreshing the Jira mirror while the window is open (it is read
-once, at start); Kiln-specific themes; remembering the last page between
-runs.
+init` (Home adds folders that have a `kiln.toml`; it doesn't make one);
+deleting a project's folder (Home only takes it off the list); pinning or
+grouping projects on Home, which Fenix's project hub does; two projects
+in one window at once; refreshing the Jira mirror while the window is
+open (it is read once, when the project opens); Kiln-specific themes;
+remembering the last page between runs.
