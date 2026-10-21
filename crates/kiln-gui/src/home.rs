@@ -1074,6 +1074,8 @@ mod tests {
 \u{20}                                                    opened    2 h ago
 -- Enter open · 1–9 open · j k move · a add · d remove · / find · R refresh · q quit
 ";
+        // Paths under the home folder show with the platform's separator.
+        let expected = expected.replace("~/", &format!("~{}", std::path::MAIN_SEPARATOR));
         assert_eq!(dump, expected, "\n{dump}");
         let s = h.screen();
         assert_eq!(s.logo, Some((1, 2)));

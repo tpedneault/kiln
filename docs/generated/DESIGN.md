@@ -209,7 +209,7 @@ From DESIGN.md, goal 6, and INTEGRATION.md, principle 1.
 
 **implemented**\
 **Implemented by:** [crates/kiln-gui/src/home.rs:205](../../crates/kiln-gui/src/home.rs#L205)\
-**Verified by:** [crates/kiln-gui/src/home.rs:1048](../../crates/kiln-gui/src/home.rs#L1048), [crates/kiln-gui/src/home.rs:1135](../../crates/kiln-gui/src/home.rs#L1135), [crates/kiln-gui/src/tests.rs:886](../../crates/kiln-gui/src/tests.rs#L886)
+**Verified by:** [crates/kiln-gui/src/home.rs:1048](../../crates/kiln-gui/src/home.rs#L1048), [crates/kiln-gui/src/home.rs:1137](../../crates/kiln-gui/src/home.rs#L1137), [crates/kiln-gui/src/tests.rs:886](../../crates/kiln-gui/src/tests.rs#L886)
 
 Before K12, `kiln gui` (and `kilnw`) found its project by walking up from the current folder to a `kiln.toml`, and stopped with "no kiln.toml in … or any folder above it" when there was none. So the window couldn't be started from a shortcut, the Start menu or Flint without first being in a project, and looking at a second project meant a second window from a second folder.
 
@@ -385,7 +385,7 @@ The presets follow the structure of arc42 and ISO/IEC/IEEE 29148 with wording of
 | [REQ-014](#215-req-014-no-secrets-in-kilntoml) | No secrets in kiln.toml | **verified** | [crates/kiln-parse/src/config.rs:240](../../crates/kiln-parse/src/config.rs#L240) | [crates/kiln-parse/src/config.rs:861](../../crates/kiln-parse/src/config.rs#L861) |
 | [REQ-015](#28-req-015-duplicate-ids-are-found-and-fixed-by-one-command) | Duplicate IDs are found and fixed by one command | **verified** | [crates/kiln-check/src/rules.rs:179](../../crates/kiln-check/src/rules.rs#L179), [crates/kiln-index/src/renumber.rs:44](../../crates/kiln-index/src/renumber.rs#L44) | [crates/kiln-check/src/tests.rs:113](../../crates/kiln-check/src/tests.rs#L113), [crates/kiln-index/src/tests.rs:270](../../crates/kiln-index/src/tests.rs#L270), [crates/kiln/tests/cli.rs:164](../../crates/kiln/tests/cli.rs#L164) |
 | [REQ-016](#24-req-016-changes-since-a-baseline-are-shown-item-by-item) | Changes since a baseline are shown item by item | **implemented** | [crates/kiln-index/src/diff.rs:240](../../crates/kiln-index/src/diff.rs#L240) | [crates/kiln-index/src/tests.rs:423](../../crates/kiln-index/src/tests.rs#L423), [crates/kiln/tests/cli.rs:642](../../crates/kiln/tests/cli.rs#L642) |
-| [REQ-017](#217-req-017-the-gui-opens-any-project-from-a-picker-and-switches-between-them) | The GUI opens any project from a picker and switches between them | **implemented** | [crates/kiln-gui/src/home.rs:205](../../crates/kiln-gui/src/home.rs#L205) | [crates/kiln-gui/src/home.rs:1048](../../crates/kiln-gui/src/home.rs#L1048), [crates/kiln-gui/src/home.rs:1135](../../crates/kiln-gui/src/home.rs#L1135), [crates/kiln-gui/src/tests.rs:886](../../crates/kiln-gui/src/tests.rs#L886) |
+| [REQ-017](#217-req-017-the-gui-opens-any-project-from-a-picker-and-switches-between-them) | The GUI opens any project from a picker and switches between them | **implemented** | [crates/kiln-gui/src/home.rs:205](../../crates/kiln-gui/src/home.rs#L205) | [crates/kiln-gui/src/home.rs:1048](../../crates/kiln-gui/src/home.rs#L1048), [crates/kiln-gui/src/home.rs:1137](../../crates/kiln-gui/src/home.rs#L1137), [crates/kiln-gui/src/tests.rs:886](../../crates/kiln-gui/src/tests.rs#L886) |
 
 ## 7 Appendix: open findings
 
