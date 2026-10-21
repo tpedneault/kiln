@@ -100,6 +100,8 @@ pub fn render_markdown(text: &str, ctx: &BodyContext) -> Vec<Block> {
             Event::Code(c) => b.inline(Inline::Code(c.to_string())),
             Event::InlineHtml(h) => match ctx.template.then(|| b.value_directive(&h)).flatten() {
                 Some(value) => b.inline(value),
+                // A note to the template's authors.
+                None if ctx.template && strip_notes(&h).trim().is_empty() => {}
                 // Shown as text, merged with the text around it.
                 None => b.text.push_str(&h),
             },
@@ -355,6 +357,11 @@ impl Builder<'_> {
                 }
             }
             Frame::Html(html, line) => {
+                let html = if self.ctx.template {
+                    strip_notes(&html)
+                } else {
+                    html
+                };
                 for (i, raw) in html.lines().enumerate() {
                     if raw.trim().is_empty() {
                         continue;
@@ -372,6 +379,33 @@ impl Builder<'_> {
             }
         }
     }
+}
+
+/// `html` without its HTML comments other than `kiln:` directives. In a
+/// template those are notes to its authors (guidance in a preset, say):
+/// GitLab and GitHub hide them, so an export does too. Each removed
+/// comment leaves its line breaks, so directives after it keep their line
+/// numbers. An unclosed comment is left as it is. Item bodies keep raw
+/// HTML as text (FORMAT.md, "Body"); only templates get this.
+pub(crate) fn strip_notes(html: &str) -> String {
+    let mut out = String::new();
+    let mut rest = html;
+    while let Some(start) = rest.find("<!--") {
+        let after = &rest[start + 4..];
+        let Some(end) = after.find("-->") else {
+            break;
+        };
+        let comment = &after[..end];
+        out.push_str(&rest[..start]);
+        if comment.trim_start().starts_with("kiln:") {
+            out.push_str(&rest[start..start + 4 + end + 3]);
+        } else {
+            out.extend(std::iter::repeat_n('\n', comment.matches('\n').count()));
+        }
+        rest = &after[end + 3..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// `<!-- kiln:name a b key="v" -->` on one line.
@@ -539,6 +573,35 @@ mod tests {
 
     fn id(s: &str) -> ItemId {
         s.parse().unwrap()
+    }
+
+    #[test]
+    fn a_templates_own_comments_are_hidden_and_its_directives_kept() {
+        let text = "# Goals\n\n<!--\nGuidance for the author,\nover lines.\n-->\n<!-- kiln:items type=\"requirement\" -->\n\nKept <!-- inline note -->text.\n";
+        let blocks = render_markdown(text, &ctx(true));
+        let Block::Directive(d) = &blocks[1] else {
+            panic!("{blocks:?}")
+        };
+        assert_eq!((d.name.as_str(), d.line), ("items", 16));
+        assert_eq!(blocks.len(), 3, "{blocks:?}");
+        assert_eq!(
+            kiln_render_plain(&blocks[2]),
+            "Kept text.",
+            "an inline note goes too"
+        );
+        // In an item body, raw HTML stays text.
+        let blocks = render_markdown("<!-- note -->\n", &ctx(false));
+        assert_eq!(
+            blocks,
+            vec![Block::Paragraph(vec![Inline::text("<!-- note -->")])]
+        );
+    }
+
+    fn kiln_render_plain(block: &Block) -> String {
+        match block {
+            Block::Paragraph(inlines) => crate::doc::plain(inlines),
+            other => format!("{other:?}"),
+        }
     }
 
     #[test]

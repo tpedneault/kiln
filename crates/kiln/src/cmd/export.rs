@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use kiln_confluence::{
-    desired_pages, plan, take_snapshot, titles, Applied, ApplyOptions, Attachment,
+    candidate_titles, desired_pages, plan, take_snapshot, Applied, ApplyOptions, Attachment,
     AttachmentSource, Confluence, DesiredContext, DesiredPage, OpKind, PageCache, Plan,
     PlanOptions, Snapshot,
 };
@@ -547,7 +547,7 @@ fn confluence_plan(prep: &Prepared, ctx: &Planning) -> Result<ConfluenceRun, Fai
         .clone()
         .unwrap_or_else(|| config.space.clone());
     let anchor = t.confluence.page.or(t.confluence.parent).unwrap_or(0);
-    let wanted: Vec<String> = titles(prep, &HashSet::new()).into_values().collect();
+    let wanted = candidate_titles(prep);
     let cache = crate::project::folders().map(|f| {
         f.state
             .join("confluence")
@@ -711,7 +711,7 @@ fn publish(
     // The space may have moved on while the plan was read or confirmed.
     if run.read_at.elapsed() > FRESH {
         let cache = PageCache::from_snapshot(&run.snapshot);
-        let wanted: Vec<String> = titles(prep, &HashSet::new()).into_values().collect();
+        let wanted = candidate_titles(prep);
         let fresh = take_snapshot(client, t, &run.options.project, &run.space, &wanted, &cache)
             .map_err(|e| Fail::new(EXIT_NETWORK, e.to_string()))?;
         let again = plan(&run.desired, &fresh, &run.options);

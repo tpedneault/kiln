@@ -667,3 +667,35 @@ fn a_reference_document_lends_its_styles_and_page_setup() {
     assert!(!document.contains("footerReference"));
     assert!(docx_part(bytes, "word/theme/theme1.xml").contains("Company"));
 }
+
+#[test]
+fn compact_items_keep_their_body_and_anchor_without_a_heading() {
+    let targets = "[[export]]\nname = \"glossary\"\nformat = \"markdown\"\nlayout = \"sections\"\ntemplate = \"design/templates/glossary.md\"\npath = \"out/glossary\"\n[export.markdown]\nflavour = \"commonmark\"\n";
+    let source = source(targets).with(
+        "design/templates/glossary.md",
+        "# Requirements\n\n<!-- kiln:items type=\"requirement\" -->\n\n# Decisions\n\n<!-- kiln:items type=\"decision\" status=\"accepted\" style=\"compact\" -->\n",
+    );
+    let project = Project::load(&source).unwrap();
+    assert!(project.findings.is_empty(), "{:?}", project.findings);
+    let all = prepared(&project, &source, &["glossary"]);
+    let page = all[0].split.page("section:decisions").unwrap();
+    assert_eq!(page.items().len(), 1, "the compact item is on its page");
+    let files = render_files(&all[0], &all, &web(&project), None, &FakePictures, &source);
+    let text = |suffix: &str| {
+        let (_, bytes) = files.iter().find(|(p, _)| p.ends_with(suffix)).unwrap();
+        String::from_utf8(bytes.clone()).unwrap()
+    };
+    let decisions = text("decisions.md");
+    assert!(
+        decisions.contains(
+            "<a id=\"ADR-002\"></a>**ADR-002 TOML front matter**\n\nComments survive edits."
+        ),
+        "{decisions}"
+    );
+    assert!(!decisions.contains("# 2.1"), "no item heading: {decisions}");
+    let requirements = text("requirements.md");
+    assert!(
+        requirements.contains("decisions.md#ADR-002"),
+        "a reference from another page lands on the anchor: {requirements}"
+    );
+}

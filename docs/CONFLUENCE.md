@@ -119,6 +119,8 @@ parent = 123456789          # create the (root) page under this page…
 # page = 987654321          # …or write into this existing page (document layout only; see "Adopting a page")
 space = "FLINT"             # optional: another space than [confluence] space
 labels = ["design-doc"]     # added to this target's pages
+qualify_titles = "taken"    # taken | always: when section and item pages carry the target's title (see "Pages and their identity")
+children = "macro"          # macro | list: how a sections or tree page lists its child pages (see "Storage format")
 ```
 
 `[confluence]` may be absent when no target uses it; a target with
@@ -168,9 +170,29 @@ in its `kiln` content property. Two targets can share a parent page, a
 space, even item IDs, and never touch each other's pages.
 
 Titles: the root page is the target's `title`. Section pages are
-`<number> <heading>` and item pages `<ID> <title>`; when the space already
-has a page with that title (another target's, or a foreign page), the
-target's `title` is appended in parentheses. Titles are capped at 255
+`<number> <heading>` and item pages `<ID> <title>`. Confluence wants every
+title unique in its space, and two projects publishing the same template
+to one space (two arc42 documents, say) both have a "1 Introduction and
+Goals". So a section or item page carries the target's `title` in
+parentheses, `1 Introduction and Goals (Shop — architecture)`:
+
+- with `qualify_titles = "taken"` (the default), only when the space
+  already has a page with the plain title (another target's, or a foreign
+  page). The shortest titles, but which project gets the plain one
+  depends on who published first, and a page's title can change later:
+  when the page holding the plain title goes, the next publish takes it,
+  and links to the old title by URL break;
+- with `qualify_titles = "always"`, from the first publish, whatever else
+  is in the space. Titles then depend only on the project, which is what
+  a space several projects publish to wants; the presets' Confluence
+  targets set it.
+
+The root page is never qualified: it is the target's own `title`, so a
+project names its document, and the presets put the project's name in
+it. A title Kiln can't make unique (the root's, or a qualified title
+another page also holds, as when two targets share a `title`) stops the
+plan before anything is written, naming the title; creating the page
+would fail half-way through a publish. Titles are capped at 255
 characters, truncating the item title with `…`, never the ID.
 
 ### Adopting a page
@@ -241,9 +263,14 @@ Kiln never looks at or touches other pages:
    publish takes it over instead of creating a second page of that title.
 5. Bodies are read only for pages whose version is past the property's
    `publishedVersion` (a possible edit), to compare their normalised hash.
-6. Each title a page would take is looked up in the space; a title held
-   by a page this target doesn't own is disambiguated (see "Pages and
-   their identity").
+6. Each title a page would take is looked up in the space, unless one
+   of this target's pages already holds it; when the plain title of a
+   section or item page is taken, its qualified title is looked up too. A
+   title held by a page this target doesn't own is disambiguated, or the
+   plan refuses (see "Pages and their identity"). An unchanged publish
+   whose pages hold their titles looks up none.
+   A page holding Kiln's placeholder with no property is a leftover (4.)
+   whose title isn't taken: the publish takes it over.
 
 The snapshot is plain JSON (`id`, `title`, `parentId`, `version`, author,
 time, the `kiln` property, `bodyHash`; plus `anchorTitle`, the title of
@@ -267,7 +294,7 @@ For each desired page, matched to a remote page by its key:
 | a remote page of this target with no desired page (`tree`: a removed item; any layout: a section that went away) | `retire`: move under "Removed from the repository" (created on demand under the root), replace the body with a banner and the last published content, label `kiln-removed` |
 | a retired page of this target that is desired again | `update`, "back in the repository": moved back, its banner gone |
 | a retired page older than `--prune-removed DAYS` | `prune`: sent to the space's trash (restorable there by a space admin) |
-| title collides and can't be disambiguated | error naming the pages; nothing applied |
+| a page's final title is held by a page this target doesn't own (the root's title, or a qualified title taken too) | refusal naming the title; nothing applied |
 
 Each written page gets a version message naming the commit and why, in
 the page history: `kiln 9f8e7d6: REQ-014 changed; REQ-031 new` (at most
@@ -453,7 +480,7 @@ raw HTML through.
 | relative images | attached as `image-<sha256 of the bytes, 12 hex>.<ext>` and shown with `ac:image` |
 | status | `status` macro, `colour` by group: initial Grey, done Green, closed Grey, others Blue; gaps Red |
 | table of contents (`kiln:toc`) | the `toc` macro (`maxLevel` 3 by default; `[export.confluence] toc_levels`) |
-| `sections`/`tree` root's list of child pages | the `children` macro with `all` = `true` (**verify** parameters; fall back to a generated list) |
+| `sections`/`tree` root's list of child pages | the `children` macro with `all` = `true` (**verify** parameters, and the order it lists pages in on each flavour: the page tree's, which if alphabetical puts "10 …" between "1 …" and "2 …", as arc42's twelve sections would show); with `children = "list"`, a list of links to the child pages by title, in document order, which is certain but changes the parent page when a child's title does |
 
 Because cross-page links go by title, a title change re-renders every page
 that links to the renamed item; the planner sees those as body changes and

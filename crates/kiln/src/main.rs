@@ -98,6 +98,14 @@ enum Command {
         /// Also register `kiln lsp` for Markdown in .fenix/tools.json (merged, never replaced).
         #[arg(long)]
         fenix: bool,
+        /// Also add a preset (`kiln preset list`): arc42, srs, design-doc.
+        #[arg(long, value_name = "NAME")]
+        preset: Option<String>,
+    },
+    /// Document templates Kiln ships, with their types and export: list them, or add one.
+    Preset {
+        #[command(subcommand)]
+        what: PresetCommand,
     },
     /// Create an item with the next free ID and print its path.
     New {
@@ -264,6 +272,19 @@ enum Command {
 }
 
 #[derive(Subcommand)]
+enum PresetCommand {
+    /// The presets and what each is for.
+    List,
+    /// Copy a preset into this project: its template, its types and an export; never overwrites.
+    Add {
+        name: String,
+        /// Print what would change; write nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum ConfluenceCommand {
     /// Unresolved footer comments on each target's pages, per item.
     Comments {
@@ -316,7 +337,17 @@ fn main() -> ExitCode {
         item: None,
     });
     let result = match command {
-        Command::Init { name, fenix } => cmd::init::run(project, name, fenix),
+        Command::Init {
+            name,
+            fenix,
+            preset,
+        } => cmd::init::run(project, name, fenix, preset.as_deref()),
+        Command::Preset {
+            what: PresetCommand::List,
+        } => cmd::preset::list(),
+        Command::Preset {
+            what: PresetCommand::Add { name, dry_run },
+        } => cmd::preset::add(project, &name, dry_run),
         Command::Provider { name, prefix } => kiln_flint::serve_stdio(kiln_flint::Options {
             name,
             prefix,

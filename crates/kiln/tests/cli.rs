@@ -991,3 +991,92 @@ fn jira_sync_creates_sub_tasks_records_their_keys_and_pull_takes_status_back() {
     let t2 = std::fs::read_to_string(d.join("design/tasks/TASK-002.md")).unwrap();
     assert!(t2.contains("status = \"done\""), "{t2}");
 }
+
+#[test]
+fn presets_are_listed_added_once_and_export_clean() {
+    let out = kiln(&["preset", "list"]);
+    assert!(out.status.success());
+    let names: Vec<String> = stdout(&out)
+        .lines()
+        .map(|l| l.split_whitespace().next().unwrap().to_owned())
+        .collect();
+    assert_eq!(names, ["arc42", "srs", "design-doc"]);
+
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    // An unknown preset writes nothing, not even the kiln.toml.
+    let out = kiln_in(d, &["init", "--preset", "arc43"]);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        stderr(&out).contains("no preset `arc43`"),
+        "{}",
+        stderr(&out)
+    );
+    assert!(!d.join("kiln.toml").exists());
+
+    let written = ok(d, &["init", "--name", "Shop", "--preset", "arc42"]);
+    assert!(written.contains("design/templates/arc42.md"), "{written}");
+    ok(d, &["new", "quality-goal", "--title", "Fast pages"]);
+    ok(
+        d,
+        &[
+            "new",
+            "quality-scenario",
+            "--title",
+            "Search under load",
+            "--parent",
+            "QG-001",
+        ],
+    );
+    ok(d, &["new", "term", "--title", "Basket"]);
+    ok(d, &["check"]);
+    ok(d, &["export", "arc42"]);
+    let index = std::fs::read_to_string(d.join("docs/arc42/index.md")).unwrap();
+    assert!(index.starts_with("# Shop — architecture\n"), "{index}");
+    assert!(index.contains("- [12 Glossary](glossary.md)"), "{index}");
+    let goals = std::fs::read_to_string(d.join("docs/arc42/introduction-and-goals.md")).unwrap();
+    assert!(goals.contains("| QG-001 | Fast pages |"), "{goals}");
+    assert!(
+        !goals.contains("<!--"),
+        "the template's notes stay out of the export: {goals}"
+    );
+    let scenario = std::fs::read_dir(d.join("design/quality-scenarios"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    assert!(std::fs::read_to_string(scenario)
+        .unwrap()
+        .contains("**Stimulus:**"));
+
+    // Twice: refused, nothing changes.
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    let out = kiln_in(d, &["preset", "add", "arc42"]);
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(
+        std::fs::read_to_string(d.join("kiln.toml")).unwrap(),
+        config
+    );
+
+    // A file in the way: refused before anything is written.
+    std::fs::write(d.join("design/templates/srs.md"), "mine\n").unwrap();
+    let out = kiln_in(d, &["preset", "add", "srs"]);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(stderr(&out).contains("design/templates/srs.md already exists"));
+    assert_eq!(
+        std::fs::read_to_string(d.join("kiln.toml")).unwrap(),
+        config
+    );
+    std::fs::remove_file(d.join("design/templates/srs.md")).unwrap();
+
+    // A dry run writes nothing; then the second preset sits beside the first.
+    let plan = ok(d, &["preset", "add", "srs", "--dry-run"]);
+    assert!(plan.contains("design/templates/srs.md: new"), "{plan}");
+    assert!(!d.join("design/templates/srs.md").exists());
+    ok(d, &["preset", "add", "srs"]);
+    ok(d, &["check"]);
+    ok(d, &["export", "srs"]);
+    let srs = std::fs::read_to_string(d.join("docs/SRS.md")).unwrap();
+    assert!(srs.contains("**TERM-001 Basket**"), "{srs}");
+}

@@ -1,5 +1,7 @@
 //! `kiln init`: a `kiln.toml` with FORMAT.md's default types and a
-//! `design/` folder. Never overwrites anything.
+//! `design/` folder. Never overwrites anything. `--preset` then adds a
+//! preset, as `kiln preset add` would: the defaults stay, since a preset
+//! adds only the types it lacks.
 //!
 //! `--fenix` also registers `kiln lsp` as an additional language server in
 //! the project's `.fenix/tools.json` (INTEGRATION.md, "Editing items"), for
@@ -14,7 +16,16 @@ use crate::Fail;
 
 const DESIGN_README: &str = "# Design\n\nKiln items live here: Markdown files that start with a `+++` front\nmatter block. `kiln new requirement --title \"…\"` creates one; `kiln check`\nchecks them. Files without front matter, like this one, are ignored.\n";
 
-pub fn run(project: Option<&Path>, name: Option<String>, fenix: bool) -> Result<u8, Fail> {
+pub fn run(
+    project: Option<&Path>,
+    name: Option<String>,
+    fenix: bool,
+    preset: Option<&str>,
+) -> Result<u8, Fail> {
+    // An unknown preset stops before anything is written.
+    if let Some(p) = preset {
+        super::preset::find(p)?;
+    }
     let dir = match project {
         Some(p) => p.to_path_buf(),
         None => std::env::current_dir()
@@ -24,13 +35,17 @@ pub fn run(project: Option<&Path>, name: Option<String>, fenix: bool) -> Result<
         return Err(Fail::usage(format!("{} isn't a folder", dir.display())));
     }
     let config = dir.join(kiln_parse::CONFIG_FILE);
-    if config.exists() && fenix {
+    if config.exists() && fenix && preset.is_none() {
         // An existing project only gets the editor setup.
         return register_lsp(&dir).map(|()| 0);
     }
     if config.exists() {
+        let hint = match preset {
+            Some(p) => format!(" (`kiln preset add {p}` adds the preset to it)"),
+            None => String::new(),
+        };
         return Err(Fail::usage(format!(
-            "{} already exists; kiln init never overwrites",
+            "{} already exists; kiln init never overwrites{hint}",
             config.display()
         )));
     }
@@ -55,6 +70,9 @@ pub fn run(project: Option<&Path>, name: Option<String>, fenix: bool) -> Result<
     println!("kiln.toml");
     println!("design/");
     eprintln!("kiln: started project \"{name}\"; `kiln new requirement --title \"…\"` adds the first item");
+    if let Some(p) = preset {
+        super::preset::add_at(&dir, p, false)?;
+    }
     if fenix {
         register_lsp(&dir)?;
     }

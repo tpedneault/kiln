@@ -248,6 +248,38 @@ pub struct ConfluenceTarget {
     pub toc_levels: Option<u8>,
     /// Restrict edits on an adopted page too.
     pub restrict_adopted: bool,
+    /// When a page other than the root carries the target's title in
+    /// parentheses.
+    pub qualify_titles: QualifyTitles,
+    /// How a `sections`/`tree` page lists its child pages.
+    pub children: ChildList,
+}
+
+/// `[export.confluence] qualify_titles`: page titles are unique in a
+/// space, so a section page shared by two projects ("1 Introduction and
+/// Goals") needs telling apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum QualifyTitles {
+    /// Only when another page in the space has the plain title: the
+    /// shortest titles, but which project gets the plain one depends on
+    /// who published first.
+    #[default]
+    Taken,
+    /// Always, from the first publish: titles that don't depend on what
+    /// else is in the space, for spaces several projects publish to.
+    Always,
+}
+
+/// `[export.confluence] children`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ChildList {
+    /// Confluence's `children` macro: always current, in the order the
+    /// space keeps its page tree, which isn't necessarily the document's.
+    #[default]
+    Macro,
+    /// A list of links Kiln writes, in document order: certain order, but
+    /// the root page changes when a child page's title does.
+    List,
 }
 
 /// Which Confluence API Kiln talks to.

@@ -24,8 +24,8 @@ pub struct Page {
 }
 
 impl Page {
-    /// Every item on this page: under its own heading, or as a row with an
-    /// anchor.
+    /// Every item on this page: under its own heading, or as a row or a
+    /// compact paragraph with an anchor.
     pub fn items(&self) -> Vec<ItemId> {
         fn walk(nodes: &[Node], out: &mut Vec<ItemId>) {
             for n in nodes {
@@ -35,6 +35,13 @@ impl Page {
                             out.push(id.clone());
                         }
                         walk(&s.nodes, out);
+                    }
+                    // A `style="compact"` item: its anchor opens its
+                    // paragraph.
+                    Node::Block(Block::Paragraph(inlines)) => {
+                        if let Some(kiln_render::Inline::Anchor(a)) = inlines.first() {
+                            out.extend(a.parse::<ItemId>().ok());
+                        }
                     }
                     Node::Block(Block::Table(t)) => {
                         for cell in t.rows.iter().filter_map(|r| r.first()) {

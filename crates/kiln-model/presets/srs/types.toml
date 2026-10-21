@@ -1,0 +1,40 @@
+# Types and link roles the software requirements specification places
+# (the outline of ISO/IEC/IEEE 29148). `kiln preset add` adds those
+# kiln.toml doesn't declare yet and keeps the others as they are.
+
+# Section 3: requirements, sorted into its subsections by tag
+# (`function`, `performance`, `usability`, `interface`, `data`,
+# `attribute`); untagged ones land in "Other requirements".
+[types.requirement]
+prefix = "REQ"
+statuses = ["draft", "proposed", "approved", "implemented", "verified", "obsolete"]
+initial = "draft"
+done = ["verified"]
+closed = ["obsolete"]
+parents = ["requirement"]
+template = "{dir}/templates/requirement.md"
+
+# Section 3.6: design constraints: standards, regulations, platforms.
+[types.constraint]
+prefix = "CON"
+statuses = ["proposed", "accepted", "obsolete"]
+closed = ["obsolete"]
+
+# Section 4: how each requirement is verified.
+[types.test]
+prefix = "TEST"
+statuses = ["draft", "ready", "passing", "failing", "obsolete"]
+closed = ["obsolete"]
+
+# Section 1.6: definitions; the body is the definition.
+[types.term]
+prefix = "TERM"
+title = "Term"
+plural = "Glossary"
+statuses = ["proposed", "accepted", "obsolete"]
+closed = ["obsolete"]
+
+[links.verifies]
+from = ["test", "code"]
+to = ["requirement"]
+inverse = "verified by"

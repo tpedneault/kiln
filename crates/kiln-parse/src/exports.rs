@@ -6,9 +6,9 @@
 use std::collections::HashSet;
 
 use kiln_model::{
-    ConfluenceConfig, ConfluenceFlavour, ConfluenceTarget, Diagrams, DocxOptions, ExportFormat,
-    ExportTarget, Flavour, HtmlOptions, ItemStyle, Layout, MarkdownOptions, OnDrift, Rule, Span,
-    TypeDef, REPORTS,
+    ChildList, ConfluenceConfig, ConfluenceFlavour, ConfluenceTarget, Diagrams, DocxOptions,
+    ExportFormat, ExportTarget, Flavour, HtmlOptions, ItemStyle, Layout, MarkdownOptions, OnDrift,
+    QualifyTitles, Rule, Span, TypeDef, REPORTS,
 };
 use toml_edit::Item;
 
@@ -577,6 +577,8 @@ fn confluence_target(w: &mut Walk, item: Option<&Item>) -> ConfluenceTarget {
             "labels",
             "toc_levels",
             "restrict_adopted",
+            "qualify_titles",
+            "children",
         ],
         Rule::K003,
         "in [export.confluence]",
@@ -626,13 +628,41 @@ fn confluence_target(w: &mut Walk, item: Option<&Item>) -> ConfluenceTarget {
         .get("restrict_adopted")
         .and_then(|i| w.boolean(i, Rule::K005, "`restrict_adopted`"))
         .unwrap_or(false);
+    if let Some((s, span)) = t
+        .get("qualify_titles")
+        .and_then(|i| w.string(i, Rule::K005, "`qualify_titles`"))
+    {
+        match s.as_str() {
+            "taken" => out.qualify_titles = QualifyTitles::Taken,
+            "always" => out.qualify_titles = QualifyTitles::Always,
+            _ => w.report(
+                Rule::K005,
+                span,
+                format!("`qualify_titles` `{s}` isn't taken or always"),
+            ),
+        }
+    }
+    if let Some((s, span)) = t
+        .get("children")
+        .and_then(|i| w.string(i, Rule::K005, "`children`"))
+    {
+        match s.as_str() {
+            "macro" => out.children = ChildList::Macro,
+            "list" => out.children = ChildList::List,
+            _ => w.report(
+                Rule::K005,
+                span,
+                format!("`children` `{s}` isn't macro or list"),
+            ),
+        }
+    }
     out
 }
 
 #[cfg(test)]
 mod tests {
     use crate::parse_config;
-    use kiln_model::{ExportFormat, Finding, Flavour, ItemStyle, Layout};
+    use kiln_model::{ChildList, ExportFormat, Finding, Flavour, ItemStyle, Layout, QualifyTitles};
 
     fn parse(extra: &str) -> (kiln_model::Config, Vec<String>) {
         let text = format!("{}{extra}", kiln_model::default_config("Flint"));
@@ -752,6 +782,51 @@ path = "out/e2.html"
                 // `changes` is a report now; only `gossip` on line 22 isn't.
                 "K005@4", "K005@7", "K005@15", "K005@11", "K005@22", "K003@28", "K005@32", "K005@29"
             ]
+        );
+    }
+
+    #[test]
+    fn confluence_titles_and_child_lists() {
+        let (config, codes) = parse(
+            r#"
+[confluence]
+url = "https://confluence.example.com"
+space = "FLINT"
+
+[[export]]
+name = "arc"
+format = "confluence"
+layout = "sections"
+[export.confluence]
+parent = 1
+qualify_titles = "always"
+children = "list"
+
+[[export]]
+name = "plain"
+format = "confluence"
+[export.confluence]
+parent = 1
+
+[[export]]
+name = "bad"
+format = "confluence"
+[export.confluence]
+parent = 1
+qualify_titles = "sometimes"
+children = "tree"
+"#,
+        );
+        assert_eq!(codes, ["K005@26", "K005@27"]);
+        let arc = &config.export("arc").unwrap().confluence;
+        assert_eq!(
+            (arc.qualify_titles, arc.children),
+            (QualifyTitles::Always, ChildList::List)
+        );
+        let plain = &config.export("plain").unwrap().confluence;
+        assert_eq!(
+            (plain.qualify_titles, plain.children),
+            (QualifyTitles::Taken, ChildList::Macro)
         );
     }
 }

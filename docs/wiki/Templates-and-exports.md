@@ -96,7 +96,7 @@ Format-specific settings go in a sub-table that only that format reads:
 | `[export.markdown]` | `flavour` (`gitlab`, `github`, `commonmark`; default `gitlab`), `diagrams` (`source` or `image`; default `source`) |
 | `[export.html]` | `theme` (only `light` exists so far, and is the default) |
 | `[export.docx]` | `reference` (a `.docx` whose styles and page setup to use) |
-| `[export.confluence]` | `parent` or `page`, `space`, `labels`, `toc_levels`, `restrict_adopted` (see [Publishing to Confluence](Publishing-to-Confluence)) |
+| `[export.confluence]` | `parent` or `page`, `space`, `labels`, `toc_levels`, `restrict_adopted`, `qualify_titles`, `children` (see [Publishing to Confluence](Publishing-to-Confluence)) |
 
 A sub-table belongs to the `[[export]]` written just above it in the
 file, as TOML always works.
@@ -217,7 +217,12 @@ A **template** is a Markdown file in your repository (by convention under
 `design/templates/`) that gives the document its own shape and prose.
 Kiln fills it in through **directives**: HTML comments that start with
 `kiln:`. Because they are comments, the template still reads as a plain
-outline on GitLab or GitHub.
+outline on GitLab or GitHub. Any other HTML comment is a note to whoever
+edits the template: GitLab and GitHub hide it, and exports leave it out
+too. (In an item's body, raw HTML is shown as text instead.)
+
+You don't have to start from nothing: see
+[Presets: arc42 and others](#presets-arc42-and-others).
 
 ### Directives
 
@@ -252,6 +257,7 @@ all of them.
 | `nest="flat"` / `nest="parent"` | `flat` (the default, except in the `tree` layout): every item is a heading at the same level, each parent followed by its children, so the table of contents lists them all; `parent`: children are headings one level below their parent |
 | `style="full"` | the default: each item as a heading, with its properties line and body |
 | `style="row"` | all selected items as one table (ID, title, status, links), bodies left out. Suits many small items such as tests or decisions |
+| `style="compact"` | each item as a bold "ID title" line with its body below, no heading and no properties. Suits items read for their prose, such as glossary terms: they keep their text without filling the table of contents |
 | `split="auto"` / `split="no"` | in the `tree` layout, `no` keeps these items inline in their section page instead of a page each |
 
 ### Rules
@@ -271,7 +277,7 @@ all of them.
 - **Nesting.** Items keep their `parent` nesting within one directive.
   An item whose parent isn't placed by the same directive starts at the
   directive's own level.
-- **Row items.** Items placed with `style="row"` have no heading. In
+- **Row and compact items.** Items placed with `style="row"` or `style="compact"` have no heading. In
   HTML, Word and Confluence each row carries an anchor named by the ID, so
   references land on the row; GitLab and GitHub keep no anchors of Kiln's
   making, so in Markdown a reference to a row item links to the section
@@ -298,6 +304,57 @@ all of them.
   declares is a reference, and an error (K102) if no such item exists. To
   write a foreign ID that happens to share a prefix, put it in a
   `code span`.
+
+### Presets: arc42 and others
+
+Kiln ships a few templates ready to use, as **presets**. `kiln preset
+list` names them; `kiln preset add NAME` copies one into your project
+(or `kiln init --preset NAME` starts a project with one):
+
+| Preset | What you get | Layout |
+|---|---|---|
+| `arc42` | arc42 architecture documentation (arc42.org): its twelve sections | `sections`: a main page listing one page per section |
+| `srs` | a software requirements specification after the outline of ISO/IEC/IEEE 29148, requirements sorted into its sections by tag | `document` |
+| `design-doc` | a design document: goals, requirements, design, decisions, milestones, risks, traceability | `document` |
+
+A preset brings three things, and then they are yours:
+
+1. **The template**, `design/templates/NAME.md`, with guidance for each
+   section in HTML comments (left out of the export) and placeholder
+   sentences to replace. Delete the sections you don't need, add your
+   own, move them around.
+2. **The types it places**, added to `kiln.toml` if you don't have them
+   yet, each with a comment saying what it is for. For arc42:
+
+   | arc42 section | Kiln |
+   |---|---|
+   | 1.2 Quality goals | `quality-goal` items (QG), as a table |
+   | 2 Constraints | `constraint` items (CON), as a table |
+   | 3, 4, 6, 7, 8 Context, strategy, runtime, deployment, concepts | prose and Mermaid diagrams in the template |
+   | 5 Building block view | `block` items (BB), nested by `parent`: levels 1, 2, 3 |
+   | 9 Architecture decisions | `decision` items (ADR) |
+   | 10 Quality requirements | `quality-scenario` items (QS), each with its goal as `parent` |
+   | 11 Risks and technical debt | `risk` items and the risks report |
+   | 12 Glossary | `term` items, `style="compact"`: the body is the definition |
+
+   Decisions and blocks can link to the goals they serve
+   (`addresses`) and the risks they reduce (`mitigates`).
+3. **An export target** named after the preset, writing Markdown, and the
+   same target for Confluence commented out below it. For a shared
+   Confluence space it sets `qualify_titles = "always"`, so two projects
+   using the same preset don't fight over "1 Introduction and Goals" (see
+   [Publishing to Confluence](Publishing-to-Confluence#several-projects-in-one-space)).
+
+```console
+$ kiln init --name Shop --preset arc42
+$ kiln new quality-goal --title "Pages answer within a second"
+$ kiln new quality-scenario --title "Search under load" --parent QG-001
+$ kiln export arc42
+```
+
+A newer Kiln never changes a preset you have added: it was copied, not
+linked. The presets follow arc42's and the standard's structure; their
+wording is Kiln's own.
 
 ### Template errors (K112)
 

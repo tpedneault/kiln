@@ -156,6 +156,28 @@ All notable changes to Kiln are recorded here. The format follows
   carry no section numbers ([docs/EXPORT.md](docs/EXPORT.md),
   "`confluence-wiki`").
 
+- K11: presets. `kiln preset list` and `kiln preset add NAME` (or `kiln
+  init --preset NAME`) copy a ready-made document into the project: its
+  template in `design/templates/`, the types and link roles it places
+  that `kiln.toml` lacks (inserted with their comments, the rest of the
+  file left as written), item templates for those types, and an export
+  target, with a Confluence one commented out. `arc42` (twelve sections,
+  a page each; quality goals and scenarios, constraints, building blocks,
+  decisions, risks, glossary terms), `srs` (a requirements specification
+  after ISO/IEC/IEEE 29148) and `design-doc`. Never overwrites; copied,
+  not referenced, so a newer Kiln never changes them (ADR-015). Templates
+  keep guidance in HTML comments, which exports now leave out, and
+  `kiln:items style="compact"` shows items as a bold line and their body,
+  without a heading, for glossaries ([docs/CLI.md](docs/CLI.md),
+  [docs/EXPORT.md](docs/EXPORT.md), [docs/DESIGN.md](docs/DESIGN.md),
+  "Presets").
+- Confluence: `[export.confluence] qualify_titles = "always"` gives
+  every section and item page the target's title in parentheses from the
+  first publish, so several projects can publish the same template to one
+  space without the titles depending on who published first; `children =
+  "list"` lists child pages as links in document order instead of the
+  `children` macro ([docs/CONFLUENCE.md](docs/CONFLUENCE.md)).
+
 ### Changed
 
 - Confluence (Data Center): pages below the published root are found by
@@ -164,6 +186,12 @@ All notable changes to Kiln are recorded here. The format follows
   an already-published document no longer fails until the page is
   deleted ([docs/CONFLUENCE.md](docs/CONFLUENCE.md)).
 
+- Confluence: a page title held by a page the target doesn't own, and
+  that Kiln can't make unique (the root's, or a qualified title taken
+  too, as when two targets share a `title`), stops the plan before
+  anything is written, naming the title, instead of failing half-way
+  through a publish; qualified titles are now looked up as well as plain
+  ones ([docs/CONFLUENCE.md](docs/CONFLUENCE.md)).
 - Confluence: the plan names the parent page by title as well as ID
   (`→ space DEMO, page 123456789 "Demo"`, `parentTitle` in JSON), so a
   wrong `parent` is caught before publishing. It costs no extra call.

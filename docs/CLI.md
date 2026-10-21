@@ -1,6 +1,6 @@
 # Command line
 
-How to run `kiln`, as it stands (K10). The commands planned for later
+How to run `kiln`, as it stands (K11). The commands planned for later
 milestones are in [DESIGN.md](DESIGN.md), "Command line"; each is
 documented here when it ships. The file format is
 [FORMAT.md](FORMAT.md); `kiln.toml` is summed up in
@@ -15,13 +15,16 @@ Results go to stdout, messages to stderr, so `kiln list --format json |
 
 ## Starting
 
-### `kiln init [--name NAME] [--fenix]`
+### `kiln init [--name NAME] [--fenix] [--preset NAME]`
 
 Writes `kiln.toml` with FORMAT.md's default types and links, and a
 `design/` folder with a README. `NAME` defaults to the folder's name.
 Never overwrites: with a `kiln.toml` already there it stops (exit 2). Add
 a `[code]` section yourself to have source code scanned for code
 references.
+
+`--preset NAME` then adds a preset, exactly as `kiln preset add NAME`
+does (below); an unknown name stops before anything is written.
 
 `--fenix` also registers `kiln lsp` in `.fenix/tools.json` as an
 additional language server (`"lsp": {"additional": [{"name": "kiln",
@@ -53,6 +56,49 @@ title (up to 50 characters of it). The front matter has `id`, `type`,
 control channel), else by starting `fenix <path>:4`, else, when Fenix
 isn't installed, with the operating system's default editor; stderr says
 which. The item is created either way.
+
+### `kiln preset list`
+
+The presets Kiln ships, one per line with what it is for:
+
+```
+$ kiln preset list
+arc42       arc42 architecture documentation: twelve sections, one page each
+srs         a software requirements specification after ISO/IEC/IEEE 29148, one document
+design-doc  a design document: requirements, design, decisions, milestones, risks
+```
+
+### `kiln preset add NAME [--dry-run]`
+
+Copies a preset into the project (DESIGN.md, "Presets"):
+
+- its export template, to `<first of paths>/templates/NAME.md`;
+- the types and link roles it places that `kiln.toml` doesn't declare,
+  each inserted after the file's last type (or role) with its comment;
+  item body templates for the types it adds, so `kiln new quality-scenario`
+  starts from one. A type `kiln.toml` already has is kept as it is; a
+  role it already has gains the types the preset links from or to;
+- an `[[export]]` target named `NAME`, writing Markdown, and the same
+  target for Confluence commented out below it, at the end of `kiln.toml`.
+
+The rest of `kiln.toml`, comments and layout included, stays as it was.
+Then edit the template like any other file; `kiln export NAME` writes the
+document.
+
+```
+$ kiln preset add arc42
+kiln.toml
+design/templates/arc42.md
+design/templates/quality-scenario.md
+design/templates/building-block.md
+kiln: added the arc42 preset (types quality-goal, quality-scenario, constraint, block, term; kept kiln.toml's own decision, risk; roles addresses; mitigates gains from decision, block; export `arc42`); `kiln export arc42` writes it
+```
+
+Never overwrites, and changes nothing when it refuses (exit 2): a file it
+would write that already exists, an export already named `NAME` (the
+preset was added before), a type whose prefix another type has, or a
+result `kiln check` would find an export or template error in.
+`--dry-run` prints what would change and writes nothing.
 
 ## Reading
 

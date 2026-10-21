@@ -1,0 +1,18 @@
+# The design document (`kiln preset add design-doc`): one document.
+# `kiln export design-doc` writes it.
+[[export]]
+name = "design-doc"
+format = "markdown"
+title = "{name} — design document"
+template = "{dir}/templates/design-doc.md"
+path = "docs/DESIGN-DOCUMENT.md"
+
+# To publish the same document to Confluence, set [confluence] url and
+# space, then uncomment this target and set its parent page:
+# [[export]]
+# name = "design-doc-confluence"
+# format = "confluence"
+# title = "{name} — design document"
+# template = "{dir}/templates/design-doc.md"
+# [export.confluence]
+# parent = 123456789          # the page the document goes under

@@ -269,6 +269,11 @@ impl<'a> State<'a> {
                         return Vec::new();
                     }
                     vec![Node::Block(self.row_table(&selected))]
+                } else if d.attr("style") == Some("compact") {
+                    for &i in &selected {
+                        self.placed.insert(self.project().items[i].id.clone());
+                    }
+                    self.compact(&selected)
                 } else {
                     let nest = match d.attr("nest") {
                         Some("flat") => false,
@@ -576,6 +581,41 @@ impl<'a> State<'a> {
             },
             entries,
         }
+    }
+
+    /// `style="compact"`: each item as a bold "ID Title" paragraph with
+    /// its anchor, then its body; no heading, no properties. For many
+    /// small items read for their prose, such as glossary terms: unlike
+    /// `row` the body stays, and unlike `full` they don't fill the table
+    /// of contents. The body's own headings become bold paragraphs, since
+    /// there is no item heading to put them under.
+    fn compact(&self, selected: &[usize]) -> Vec<Node> {
+        let p = self.project();
+        let mut out = Vec::new();
+        for &i in selected {
+            let item = &p.items[i];
+            out.push(Node::Block(Block::Paragraph(vec![
+                Inline::Anchor(item.id.to_string()),
+                Inline::Strong(vec![Inline::text(format!("{} {}", item.id, item.title))]),
+            ])));
+            let dir = item.path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
+            let ctx = BodyContext {
+                dir,
+                first_line: item.body_line,
+                prefixes: &self.prefixes,
+                link_bare_ids: p.config.link_bare_ids,
+                template: false,
+            };
+            for block in render_markdown(&item.body, &ctx) {
+                out.push(Node::Block(match block {
+                    Block::Heading { content, .. } => {
+                        Block::Paragraph(vec![Inline::Strong(content)])
+                    }
+                    other => other,
+                }));
+            }
+        }
+        out
     }
 
     /// `style="row"`: one table, bodies left out.

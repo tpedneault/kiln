@@ -17,12 +17,14 @@ Windows) and K8 (the `docx` format, the Jira mirror with K207 and `kiln
 auth jira`; Fenix gaps G6 and G9 worked around) and K9 (the GUI edits
 front matter through the editing commands' shared functions, never prose,
 ADR-012; Item, Check, Exports and Comments pages) and K10 (`kiln jira
-sync` and `pull`: a sub-task per task kept in step, ADR-014) are done.
+sync` and `pull`: a sub-task per task kept in step, ADR-014) and K11
+(presets: `kiln preset add arc42|srs|design-doc`, copied not referenced,
+ADR-015; `qualify_titles` for spaces several projects share) are done.
 
 ## Read first, in this order
 
 1. `docs/DESIGN.md` — goals, non-goals, architecture, crates, CLI,
-   budgets and milestones K0–K10.
+   budgets and milestones K0–K11.
 2. `docs/FORMAT.md` — the item file format and `kiln.toml`; the contract.
    `kiln-model`/`kiln-parse` implement exactly this; change both together.
 3. `docs/EXPORT.md` — export targets, the three layouts (one document is
