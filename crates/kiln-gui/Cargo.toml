@@ -17,6 +17,9 @@ kiln-index.workspace = true
 kiln-check.workspace = true
 kiln-fenix.workspace = true
 kiln-jira.workspace = true
+# The window icon, drawn from the same geometry the binary embeds in the
+# Windows executables.
+kiln-brand.workspace = true
 fenix-keymap.workspace = true
 toml_edit.workspace = true
 bytemuck.workspace = true

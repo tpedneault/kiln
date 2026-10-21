@@ -43,6 +43,11 @@ path = "src/main.rs"
 name = "kilnw"
 path = "src/bin/kilnw.rs"
 
+# build.rs embeds the icon in kiln.exe and kilnw.exe on Windows.
+[build-dependencies]
+winresource.workspace = true
+kiln-brand = { workspace = true, features = ["ico"] }
+
 [dev-dependencies]
 kiln-confluence = { workspace = true, features = ["fake"] }
 kiln-jira = { workspace = true, features = ["fake"] }
