@@ -6,7 +6,7 @@ The GUI edits front matter, never prose. It does what `kiln set`, `kiln link`, `
 
 | Command | Opens |
 |---|---|
-| `kiln` | the window on the project around the current folder |
+| `kiln` | the window on the project around the current folder; outside a project, [Home](#home-switching-projects), the projects dashboard |
 | `kiln gui` | the same |
 | `kiln gui --since v1.0` | with `v1.0` as the baseline of the Changes page (a tag, branch or commit) |
 | `kiln gui --item REQ-014` | with the cursor on `REQ-014` |
@@ -14,7 +14,39 @@ The GUI edits front matter, never prose. It does what `kiln set`, `kiln link`, `
 
 The Changes page compares the project with a baseline. Without `--since`, the baseline is the most recent git tag. With no tag and no `--since`, the Changes page says so and tells you how to set one.
 
-**Windows.** `kiln.exe` is a console program, so starting it from a shortcut flashes a console window. Use `kilnw.exe`, installed next to `kiln.exe`: it takes the same arguments (`kilnw gui --item REQ-014`) and opens only the window. Shortcuts and Flint's "Open in Kiln" action use it. On Linux and macOS there is one `kiln`.
+**Windows.** `kiln.exe` is a console program, so starting it from a shortcut flashes a console window. Use `kilnw.exe`, installed next to `kiln.exe`: it takes the same arguments (`kilnw gui --item REQ-014`) and opens only the window. Shortcuts and Flint's "Open in Kiln" action use it. A shortcut without `--project` opens on Home, where you pick the project. On Linux and macOS there is one `kiln`.
+
+## Home: switching projects
+
+Started outside a project, the window opens on **Home**, a dashboard modelled on Fenix's: Kiln's logo and the date, a find field, the projects you have opened before (most recent first), and a preview of the one under the cursor.
+
+```text
+projects 2 ─────────────────── a add   Kiln ─────────────────── Enter open
+ 1  Kiln                       2 h ●   ~/src/kiln
+    ~/src/kiln
+ 2  Flint                      3 d ○   items     42 · 30 open
+    ~/src/flint                        types     requirement 12 · decision 14
+ +  add a project                  a   next      MS-003 Beta · due 2026-11-30 · 3/5
+                                       check     2 errors · 1 warning
+                                       opened    2 h ago
+```
+
+The dot after each project says how `kiln check` finds it: green when clean, the warning colour with warnings, red with errors or when its `kiln.toml` has gone.
+
+| Keys | Do |
+|---|---|
+| `j` `k`, `↓` `↑` | move between projects; the last entry is *add a project* |
+| `Enter`, double click | open the project |
+| `1`–`9` | open one of the first nine directly |
+| `/` | find a project by name or path; `Enter` opens the match, `Esc` clears |
+| `a` | add a project: type its folder; `Tab` completes folder names, `~` is your home folder. A folder inside a project adds that project; one with no `kiln.toml` is refused (run `kiln init` there first) |
+| `d` | take the project off the list, after `y`; its folder isn't touched |
+| `R` | read the projects again |
+| `q` | quit |
+
+On a project's pages, `SPC h` (or `gh`) goes back to Home, with that project first; open another to switch. While an export or a publish is running, Home waits until it finishes.
+
+Every project you open, from Home or with `kiln` in its folder, joins the list. The list is `projects.toml` in Kiln's state folder (see [Configuration](Configuration)); it belongs to this machine and is never written into a repository.
 
 **No display.** Without a display (an SSH session, a CI container), `kiln gui` fails with one line and exit 2:
 
@@ -309,6 +341,7 @@ Normal mode, as in Fenix's pages:
 | `SPC m` | Comments |
 | `SPC e` | the edits: `s` status, `t` title, `p` parent, `o` owner, `d` due date, `l` link, `u` unlink, `n` new item, `N` new child, `r` renumber |
 | `SPC R` | reload |
+| `SPC h` | Home: the projects (also `gh`) |
 | `SPC q` | quit |
 
 `Esc` cancels a leader sequence. An unknown key says `SPC: no such key` in the footer.
@@ -396,6 +429,8 @@ Every key is optional. An unknown key, an unknown theme or a size out of range i
 - Undo an edit: use git.
 - Override a refused Confluence plan, adopt a page, or prune retired pages: use `kiln export` with `--force`, `--adopt` or `--prune-removed`.
 - Store a token: run `kiln auth confluence` or `kiln auth jira`.
+- Create a project: run `kiln init` in its folder, then add it on Home with `a`.
+- Delete a project's folder: `d` on Home only takes it off the list.
 - Refresh the Jira mirror while open.
 - Remember the last page between runs.
 
@@ -405,6 +440,7 @@ Every key is optional. An unknown key, an unknown theme or a size out of range i
 |---|---|
 | `couldn't connect to the display` | no graphical session. Run it on a desktop, or use the command line (`kiln trace`, `kiln impact`, `kiln diff`) |
 | On Windows, nothing happens when you start `kilnw` | `kilnw` has no console to print to. It writes why the window couldn't open to `kilnw.log` in the temporary folder (`%TEMP%\kilnw.log`) |
+| Home says `no kiln.toml in … any more` | the project moved or its `kiln.toml` was removed. `d` takes it off the list; `a` adds it where it is now |
 | Changes page says "No baseline" | the repository has no tag. Tag a release, or start with `kiln gui --since <commit>` |
 | `--since` fails | the revision doesn't exist in this clone. Fetch tags (`git fetch --tags`) |
 | `Enter` doesn't open Fenix | Fenix isn't installed or not on `PATH`; the default editor opens instead. If several Fenix instances run, set `FENIX_HOME` to choose one |

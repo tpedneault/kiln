@@ -630,12 +630,14 @@ kiln gui [--since REV] [--item ID]
 kiln
 ```
 
-Opens the GUI: eleven pages (Tree, Trace, Impact, Board, Roadmap, Decisions, Changes, Item, Check, Exports, Comments), driven with Vim keys. It also sets statuses and other front-matter values, links and unlinks, creates and renumbers items, writes exports and publishes to Confluence after a confirm, through the same code as the commands. [The GUI](The-GUI) describes every page and key.
+Opens the GUI: eleven pages (Tree, Trace, Impact, Board, Roadmap, Decisions, Changes, Item, Check, Exports, Comments), driven with Vim keys. It also sets statuses and other front-matter values, links and unlinks, creates and renumbers items, writes exports and publishes to Confluence after a confirm, through the same code as the commands. Outside a project it opens on Home, the projects dashboard, where you open, add, remove and switch projects. [The GUI](The-GUI) describes every page and key.
 
 | Option | Does |
 |---|---|
 | `--since REV` | the baseline for the Changes page. Default: the most recent tag |
 | `--item ID` | puts the cursor on this item |
+
+`--since` and `--item` need a project: outside one they fail with `no kiln.toml …` and exit 2 instead of opening Home.
 
 ```console
 $ kiln gui
@@ -763,7 +765,7 @@ kiln: https://acme.atlassian.net is Jira Cloud, which fenix-jira can't sign in t
 
 ## Project discovery
 
-Every command except `kiln init` needs a project. Kiln finds it by walking up from the current folder to the nearest `kiln.toml`. `--project DIR` starts that walk from `DIR` instead, so `--project design` from the project root still finds the root.
+Every command except `kiln init` needs a project, and so does the window except on [Home](The-GUI#home-switching-projects), where `kiln` alone opens outside a project. Kiln finds it by walking up from the current folder to the nearest `kiln.toml`. `--project DIR` starts that walk from `DIR` instead, so `--project design` from the project root still finds the root.
 
 ```console
 $ cd /tmp

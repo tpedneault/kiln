@@ -60,7 +60,10 @@ between runs, and one Confluence page cache per target
 `kiln` property), which saves a call per unchanged page and lets the Flint
 provider open an item's page without asking the server;
 `state/flint-project`, the project the Flint provider last followed Fenix
-to; and the Jira mirror (`state/jira/<host>.json`: each linked ticket's
+to; `state/projects.toml`, the projects the GUI's Home lists (each folder
+and when it was last opened; in the state folder because the paths are
+this machine's, so the list must not roam with the settings); and the
+Jira mirror (`state/jira/<host>.json`: each linked ticket's
 status and assignee, used for ten minutes). Any of them can be deleted at
 any time.
 

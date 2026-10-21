@@ -881,3 +881,28 @@ fn jira_syncs_from_exports_and_pulls_a_status_from_any_item() {
         .dump()
         .contains("-- REQ-001 has no ticket under the project issue"));
 }
+
+#[test]
+// verifies: REQ-017
+fn home_is_one_key_away_unless_a_job_is_running() {
+    let mut a = app();
+    assert_eq!(press(&mut a, "gh"), Effect::Home);
+    assert_eq!(press(&mut a, " h"), Effect::Home);
+    press(&mut a, " ");
+    assert!(
+        a.screen().dump().contains("h  Home: projects"),
+        "the leader lists it:\n{}",
+        a.screen().dump()
+    );
+    press(&mut a, "\x1b");
+    // A plan running on Exports keeps the project open until it is done.
+    press(&mut a, " p");
+    assert_eq!(a.next_job(), Some(Job::PlanExports));
+    assert_eq!(press(&mut a, " h"), Effect::None);
+    assert!(a
+        .screen()
+        .dump()
+        .contains("Busy: Planning the exports… Home once it is done"));
+    a.done(Done::Exports(Vec::new()));
+    assert_eq!(press(&mut a, "gh"), Effect::Home);
+}

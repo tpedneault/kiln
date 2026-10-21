@@ -36,6 +36,8 @@ pub enum Effect {
     /// Make this edit, then reload.
     Edit(Edit),
     Reload,
+    /// Leave the project for Home, the projects dashboard.
+    Home,
     Quit,
 }
 
@@ -57,6 +59,7 @@ enum Action {
     Page(Page),
     Edit(EditKey),
     Reload,
+    Home,
     Quit,
 }
 
@@ -131,6 +134,7 @@ fn leader() -> KeyTrie<Action> {
         ('p', "Exports", Action::Page(Page::Exports)),
         ('m', "Comments", Action::Page(Page::Comments)),
         ('R', "Reload", Action::Reload),
+        ('h', "Home: projects", Action::Home),
         ('q', "Quit", Action::Quit),
     ] {
         t.insert(&[KeyPress::char(key)], label, action);
@@ -524,6 +528,9 @@ impl App {
                 self.first_selectable();
                 return Effect::None;
             }
+            if k == KeyPress::char('h') {
+                return self.home();
+            }
         }
         let half = (self.visible / 2).max(1) as isize;
         match k.code {
@@ -630,6 +637,20 @@ impl App {
         Effect::None
     }
 
+    /// `SPC h`, `gh`: back to Home, unless a job is running, whose answer
+    /// would have no page to land on (a publish half seen is worse than
+    /// a wait).
+    fn home(&mut self) -> Effect {
+        match self.running.as_ref().or(self.queued.as_ref()) {
+            Some(job) => {
+                let busy = job.describe();
+                self.say(format!("Busy: {busy} Home once it is done"), true);
+                Effect::None
+            }
+            None => Effect::Home,
+        }
+    }
+
     /// The Item page for `id`; `remember` keeps the one shown before for
     /// `C-o`.
     fn view(&mut self, id: ItemId, remember: bool) {
@@ -721,6 +742,7 @@ impl App {
                 Effect::None
             }
             Some(Action::Reload) => Effect::Reload,
+            Some(Action::Home) => self.home(),
             Some(Action::Quit) => Effect::Quit,
             None => {
                 self.leader_path = Some(path);
@@ -1108,6 +1130,11 @@ impl App {
                 self.queue(Job::Baseline(answer));
                 Effect::None
             }
+            // Home's questions; never asked on a project's pages.
+            Then::AddProject | Then::RemoveProject { .. } => {
+                self.prompt = None;
+                Effect::None
+            }
         }
     }
 
@@ -1338,6 +1365,7 @@ impl App {
             footer,
             footer_error,
             popup,
+            ..Screen::default()
         }
     }
 
@@ -1383,8 +1411,9 @@ impl App {
         let count = (0..self.rows.len()).filter(|i| self.selectable(*i)).count();
         let noun = if count == 1 { "row" } else { "rows" };
         line.push(span(format!("{count} {noun}  "), Role::Muted));
-        let mut hints =
-            String::from("Enter open · i impact · v item · / filter · SPC pages · q quit");
+        let mut hints = String::from(
+            "Enter open · i impact · v item · / filter · SPC pages · SPC h projects · q quit",
+        );
         match self.page {
             Page::Tree | Page::Board => {
                 hints.push_str(if self.options.closed {
