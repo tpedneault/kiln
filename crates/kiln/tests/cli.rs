@@ -992,15 +992,15 @@ fn jira_sync_creates_sub_tasks_records_their_keys_and_pull_takes_status_back() {
     assert!(t2.contains("status = \"done\""), "{t2}");
 }
 
-/// The `toml` blocks of the wiki's Presets page marked
-/// `<!-- tested: NAME -->`, in order: the configuration the page tells
-/// people to paste, so a test can paste it too.
-fn wiki_config(name: &str) -> Vec<String> {
+/// The `toml` blocks of the wiki's Presets page marked `<!-- MARK -->`
+/// (`added: arc42`, `tested: arc42`), in order: what the page says a
+/// preset adds, and the options it tells people to paste.
+fn wiki_blocks(mark: &str) -> Vec<String> {
     let page = std::fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/wiki/Presets.md"),
     )
     .expect("the wiki's Presets page is there");
-    let marker = format!("<!-- tested: {name} -->");
+    let marker = format!("<!-- {mark} -->");
     let mut out = Vec::new();
     let mut rest = page.as_str();
     while let Some(at) = rest.find(&marker) {
@@ -1017,8 +1017,8 @@ fn wiki_config(name: &str) -> Vec<String> {
 }
 
 /// Pastes `snippet` into `config` as the wiki says: a `[types.*]` or
-/// `[links.*]` table the file already has is replaced (the default
-/// file's tables end at a blank line).
+/// `[links.*]` table the file already has is replaced (the file's tables
+/// end at a blank line).
 fn paste(config: &str, snippet: &str) -> String {
     let mut config = config.to_owned();
     for header in snippet
@@ -1037,7 +1037,7 @@ fn paste(config: &str, snippet: &str) -> String {
 }
 
 #[test]
-fn presets_add_only_their_template_and_the_wiki_configuration_works() {
+fn presets_populate_kiln_toml_once_and_the_wiki_says_what_they_add() {
     let out = kiln(&["preset", "list"]);
     assert!(out.status.success());
     let names: Vec<String> = stdout(&out)
@@ -1046,111 +1046,148 @@ fn presets_add_only_their_template_and_the_wiki_configuration_works() {
         .collect();
     assert_eq!(names, ["arc42", "srs", "design-doc"]);
 
-    let dir = tempfile::tempdir().unwrap();
-    let d = dir.path();
     // An unknown preset writes nothing, not even the kiln.toml.
-    let out = kiln_in(d, &["init", "--preset", "arc43"]);
+    let dir = tempfile::tempdir().unwrap();
+    let out = kiln_in(dir.path(), &["init", "--preset", "arc43"]);
     assert_eq!(out.status.code(), Some(2));
     assert!(
         stderr(&out).contains("no preset `arc43`"),
         "{}",
         stderr(&out)
     );
-    assert!(!d.join("kiln.toml").exists());
+    assert!(!dir.path().join("kiln.toml").exists());
 
+    // Each preset alone writes what the wiki says it adds.
     for name in ["arc42", "srs", "design-doc"] {
         let dir = tempfile::tempdir().unwrap();
         let d = dir.path();
-        ok(d, &["init", "--name", "Shop"]);
-        let before = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
-        let plan = ok(d, &["preset", "add", name, "--dry-run"]);
-        assert_eq!(plan, format!("design/templates/{name}.md: new\n"));
-        assert_eq!(
-            ok(d, &["preset", "add", name]),
-            format!("design/templates/{name}.md\n")
+        let written = ok(d, &["init", "--name", "Shop", "--preset", name]);
+        assert!(
+            written.contains(&format!("design/templates/{name}.md")),
+            "{written}"
         );
-        assert_eq!(
-            std::fs::read_to_string(d.join("kiln.toml")).unwrap(),
-            before,
-            "{name}: kiln.toml is left alone"
-        );
-        // Twice: refused.
-        let out = kiln_in(d, &["preset", "add", name]);
-        assert_eq!(out.status.code(), Some(2));
-        assert!(stderr(&out).contains("already exists"), "{}", stderr(&out));
-
-        // The wiki's configuration, every option included, checks and
-        // exports clean.
-        let mut config = before.clone();
-        for snippet in wiki_config(name) {
-            config = paste(&config, &snippet);
-        }
-        std::fs::write(d.join("kiln.toml"), &config).unwrap();
-        std::fs::write(
-            d.join("design/templates/quality-scenario.md"),
-            "**Stimulus:** what happens.\n",
-        )
-        .unwrap();
-        if name == "arc42" {
-            ok(d, &["new", "quality-goal", "--title", "Fast pages"]);
-            ok(
-                d,
-                &[
-                    "new",
-                    "quality-scenario",
-                    "--title",
-                    "Search under load",
-                    "--parent",
-                    "QG-001",
-                ],
-            );
-            ok(d, &["new", "constraint", "--title", "Runs on Kubernetes"]);
-            ok(d, &["new", "block", "--title", "Front end"]);
-            ok(
-                d,
-                &["new", "block", "--title", "Basket", "--parent", "BB-001"],
-            );
-            ok(d, &["new", "decision", "--title", "Server-side rendering"]);
-            ok(d, &["new", "term", "--title", "Basket"]);
-            ok(d, &["new", "concept", "--title", "Error handling"]);
-            ok(d, &["new", "runtime", "--title", "Checkout"]);
-            ok(d, &["new", "test", "--title", "Load test"]);
-            for (id, role, target) in [
-                ("ADR-001", "addresses", "QG-001"),
-                ("ADR-001", "affects", "BB-001"),
-                ("ADR-001", "respects", "CON-001"),
-                ("BB-002", "uses", "BB-001"),
-                ("BB-002", "applies", "CPT-001"),
-                ("RT-001", "involves", "BB-002"),
-                ("TEST-001", "verifies", "QS-001"),
-            ] {
-                ok(d, &["link", id, role, target]);
+        let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+        for block in wiki_blocks(&format!("added: {name}")) {
+            for line in block
+                .lines()
+                .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            {
+                assert!(
+                    config.contains(line),
+                    "{name}: the wiki says it adds {line:?}\n{config}"
+                );
             }
-            std::fs::create_dir_all(d.join("src")).unwrap();
-            std::fs::write(
-                d.join("src/basket.rs"),
-                format!("// {}: BB-002\n", "implements"),
-            )
-            .unwrap();
-            let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
-            std::fs::write(
-                d.join("kiln.toml"),
-                config.replace("# [code]\n# paths = [\"src\"]", "[code]\npaths = [\"src\"]"),
-            )
-            .unwrap();
         }
         ok(d, &["check"]);
         ok(d, &["export", name]);
-        if name == "arc42" {
-            let read = |f: &str| std::fs::read_to_string(d.join("docs/arc42").join(f)).unwrap();
-            assert!(read("glossary.md").contains("**TERM-001 Basket**"));
-            let blocks = read("building-block-view.md");
-            assert!(
-                blocks.contains("src/basket.rs"),
-                "code implements a block: {blocks}"
-            );
-            assert!(blocks.contains("**Used by:**"), "{blocks}");
-            assert!(read("quality-requirements.md").contains("**Verified by:**"));
-        }
     }
+
+    // All three in one project: nothing twice.
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Shop"]);
+    for name in ["arc42", "srs", "design-doc"] {
+        ok(d, &["preset", "add", name]);
+    }
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    let mut seen = std::collections::HashSet::new();
+    for line in config.lines().filter(|l| {
+        l.starts_with("[types.") || l.starts_with("[links.") || l.starts_with("name = ")
+    }) {
+        assert!(seen.insert(line), "{line} twice\n{config}");
+    }
+    // Again: refused, nothing changes; a dry run writes nothing.
+    let out = kiln_in(d, &["preset", "add", "srs"]);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(stderr(&out).contains("already has an export named `srs`"));
+    assert_eq!(
+        std::fs::read_to_string(d.join("kiln.toml")).unwrap(),
+        config
+    );
+
+    // The wiki's arc42 options on top, then items linked by every role.
+    let mut config = config;
+    for snippet in wiki_blocks("tested: arc42") {
+        config = paste(&config, &snippet);
+    }
+    std::fs::write(d.join("kiln.toml"), &config).unwrap();
+    ok(d, &["new", "quality-goal", "--title", "Fast pages"]);
+    ok(
+        d,
+        &[
+            "new",
+            "quality-scenario",
+            "--title",
+            "Search under load",
+            "--parent",
+            "QG-001",
+        ],
+    );
+    ok(d, &["new", "constraint", "--title", "Runs on Kubernetes"]);
+    ok(d, &["new", "block", "--title", "Front end"]);
+    ok(
+        d,
+        &["new", "block", "--title", "Basket", "--parent", "BB-001"],
+    );
+    ok(d, &["new", "decision", "--title", "Server-side rendering"]);
+    ok(d, &["new", "term", "--title", "Basket"]);
+    ok(d, &["new", "concept", "--title", "Error handling"]);
+    ok(d, &["new", "runtime", "--title", "Checkout"]);
+    ok(d, &["new", "test", "--title", "Load test"]);
+    for (id, role, target) in [
+        ("ADR-001", "addresses", "QG-001"),
+        ("ADR-001", "affects", "BB-001"),
+        ("ADR-001", "respects", "CON-001"),
+        ("ADR-001", "mitigates", "RISK-001"),
+        ("BB-002", "uses", "BB-001"),
+        ("BB-002", "applies", "CPT-001"),
+        ("RT-001", "involves", "BB-002"),
+        ("TEST-001", "verifies", "QS-001"),
+    ] {
+        if id == "ADR-001" && role == "mitigates" {
+            ok(d, &["new", "risk", "--title", "Peak load"]);
+        }
+        ok(d, &["link", id, role, target]);
+    }
+    let scenario = std::fs::read_dir(d.join("design/quality-scenarios"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    assert!(std::fs::read_to_string(scenario)
+        .unwrap()
+        .contains("**Stimulus:**"));
+    std::fs::create_dir_all(d.join("src")).unwrap();
+    std::fs::write(
+        d.join("src/basket.rs"),
+        format!("// {}: BB-002\n", "implements"),
+    )
+    .unwrap();
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    std::fs::write(
+        d.join("kiln.toml"),
+        config.replace("# [code]\n# paths = [\"src\"]", "[code]\npaths = [\"src\"]"),
+    )
+    .unwrap();
+    ok(d, &["check"]);
+    ok(d, &["export", "arc42", "srs", "design-doc"]);
+    let read = |f: &str| std::fs::read_to_string(d.join("docs/arc42").join(f)).unwrap();
+    assert!(read("glossary.md").contains("**TERM-001 Basket**"));
+    let blocks = read("building-block-view.md");
+    assert!(
+        blocks.contains("src/basket.rs"),
+        "code implements a block: {blocks}"
+    );
+    assert!(blocks.contains("**Used by:**"), "{blocks}");
+    assert!(read("quality-requirements.md").contains("**Verified by:**"));
+    assert!(
+        !read("introduction-and-goals.md").contains("<!--"),
+        "the template's notes stay out of the export"
+    );
+    let srs = std::fs::read_to_string(d.join("docs/SRS.md")).unwrap();
+    assert!(
+        srs.contains("**TERM-001 Basket**"),
+        "the shared term type serves both"
+    );
 }

@@ -309,10 +309,10 @@ all of them.
 
 Kiln ships a few templates ready to use: `arc42`, `srs` (a requirements
 specification after ISO/IEC/IEEE 29148) and `design-doc`. `kiln preset
-add arc42` copies one into `design/templates/`; the types it places and
-the export that uses it are yours to add to `kiln.toml`.
-[Presets](Presets) has that configuration for each, ready to paste, and
-the options.
+add arc42` copies one into `design/templates/` and adds the types it
+places and an export for it to `kiln.toml`; several presets share what
+they have in common. [Presets](Presets) says what each adds, and the
+options.
 
 ### Template errors (K112)
 

@@ -34,4 +34,4 @@ pub use finding::{Finding, Rule, Severity, Span};
 pub use folders::{Folders, Platform};
 pub use id::{is_prefix, IdError, ItemId};
 pub use item::{CodeRef, Date, Item, LinkEntry, Mention, Ref, RelativeLink};
-pub use preset::{preset, Preset, PRESETS};
+pub use preset::{dir_prefix, preset, ItemTemplate, Preset, PRESETS};

@@ -157,19 +157,23 @@ All notable changes to Kiln are recorded here. The format follows
   "`confluence-wiki`").
 
 - K11: presets. `kiln preset list` and `kiln preset add NAME` (or `kiln
-  init --preset NAME`) copy a ready-made document template into the
-  project's `templates/` folder: `arc42` (twelve sections, a page each),
-  `srs` (a requirements specification after ISO/IEC/IEEE 29148) and
-  `design-doc`. Only the template is written; `kiln.toml` is left alone,
-  and `add` names what the template needs from it. The wiki's new
-  "Presets" page has each preset's types, links and export, ready to
-  paste and tested against the templates, and the options (tests
-  verifying quality scenarios, code implementing building blocks, blocks
-  using blocks, concepts and runtime scenarios as items…). Never
-  overwrites; copied, not referenced (ADR-015). Templates keep guidance
-  in HTML comments, which exports now leave out, and `kiln:items
-  style="compact"` shows items as a bold line and their body, without a
-  heading, for glossaries ([docs/CLI.md](docs/CLI.md),
+  init --preset NAME`) copy a ready-made document into the project: its
+  template in `design/templates/`, the types and link roles it places
+  that `kiln.toml` lacks (inserted with their comments, the rest of the
+  file left as written), item templates for those types, and an export
+  target, with a Confluence one commented out. `arc42` (twelve sections,
+  a page each; quality goals and scenarios, constraints, building blocks,
+  decisions, risks, glossary terms), `srs` (a requirements specification
+  after ISO/IEC/IEEE 29148) and `design-doc`. Presets stack without
+  declaring anything twice: a type already there is kept, a shared role
+  gains only what it lacks. Never overwrites; copied, not referenced
+  (ADR-015). The wiki's new "Presets" page says what each adds and the
+  options to add by hand (tests verifying quality scenarios, code
+  implementing building blocks, blocks using blocks, concepts and
+  runtime scenarios as items…), its blocks tested in CI. Templates keep
+  guidance in HTML comments, which exports now leave out, and
+  `kiln:items style="compact"` shows items as a bold line and their body,
+  without a heading, for glossaries ([docs/CLI.md](docs/CLI.md),
   [docs/EXPORT.md](docs/EXPORT.md), [docs/DESIGN.md](docs/DESIGN.md),
   "Presets").
 - Confluence: `[export.confluence] qualify_titles = "always"` gives

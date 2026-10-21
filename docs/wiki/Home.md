@@ -73,7 +73,7 @@ design-md (markdown, document) → docs/DESIGN.md
 | [Configuration](Configuration) | every `kiln.toml` setting, custom types and links, environment variables |
 | [Checking](Checking) | `kiln check` and every rule, with fixes |
 | [Templates and exports](Templates-and-exports) | targets, layouts, templates, reports; Markdown, HTML and Word |
-| [Presets](Presets) | arc42, a requirements specification and a design document: the templates Kiln ships, and how to configure each |
+| [Presets](Presets) | arc42, a requirements specification and a design document: the templates Kiln ships, what each adds to kiln.toml, and the options |
 | [Publishing to Confluence](Publishing-to-Confluence) | one page or a page tree, drift, comments, CI |
 | [Changes and baselines](Changes-and-baselines) | `kiln diff`, `export --since`, release reviews |
 | [Jira](Jira) | Jira keys, the read-only mirror, rule K207 |

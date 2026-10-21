@@ -6,14 +6,12 @@ here is Kiln's. Edit it freely: it is this project's file now.
 Comments like this one are notes for whoever edits the template: they
 don't appear in the export. Everything else does, so replace the
 placeholder sentences with this system's own text, and delete the
-sections you don't need.
-
-The sections that list items need these types in kiln.toml:
-quality-goal, constraint, block, decision, quality-scenario, risk and
-term, and an [[export]] whose `template` is this file. The wiki's
-"Presets" page has that configuration, the links worth adding between
-them, and the options. `kiln check` validates this file once an export
-uses it.
+sections you don't need. Sections that list items fill themselves from
+the items in the design folder: `kiln new quality-goal --title "…"` adds
+one. `kiln check` validates this file; `kiln export arc42` writes it.
+The wiki's "Presets" page has options for kiln.toml: tests verifying
+quality scenarios, code implementing building blocks, blocks using
+blocks, concepts and runtime scenarios as items.
 -->
 
 <!-- kiln:summary -->

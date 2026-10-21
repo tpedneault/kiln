@@ -23,9 +23,8 @@ Never overwrites: with a `kiln.toml` already there it stops (exit 2). Add
 a `[code]` section yourself to have source code scanned for code
 references.
 
-`--preset NAME` then adds a preset's template, exactly as `kiln preset
-add NAME` does (below); an unknown name stops before anything is
-written.
+`--preset NAME` then adds a preset, exactly as `kiln preset add NAME`
+does (below); an unknown name stops before anything is written.
 
 `--fenix` also registers `kiln lsp` in `.fenix/tools.json` as an
 additional language server (`"lsp": {"additional": [{"name": "kiln",
@@ -65,28 +64,46 @@ The presets Kiln ships, one per line with what it is for:
 ```
 $ kiln preset list
 arc42       arc42 architecture documentation: twelve sections, one page each
-srs         a software requirements specification after ISO/IEC/IEEE 29148
+srs         a software requirements specification after ISO/IEC/IEEE 29148, one document
 design-doc  a design document: requirements, design, decisions, milestones, risks
 ```
 
 ### `kiln preset add NAME [--dry-run]`
 
-Copies the preset's template to `<first of paths>/templates/NAME.md`,
-and nothing else: `kiln.toml` is left alone (DESIGN.md, "Presets"). The
-types the template places, how they link and the export that uses it
-are the project's to configure; the wiki's "Presets" page has the
-configuration for each preset and its options. On stderr, `add` names
-what the template needs that `kiln.toml` doesn't declare yet:
+Copies a preset into the project (DESIGN.md, "Presets"):
+
+- its export template, to `<first of paths>/templates/NAME.md`;
+- the types and link roles it places that `kiln.toml` doesn't declare,
+  each inserted after the file's last type (or role) with its comment,
+  and item body templates for the types it adds, so `kiln new
+  quality-scenario` starts from one;
+- an `[[export]]` target named `NAME`, writing Markdown, and the same
+  target for Confluence commented out below it, at the end of `kiln.toml`.
+
+The rest of `kiln.toml`, comments and layout included, stays as it was.
 
 ```
 $ kiln preset add arc42
+kiln.toml
 design/templates/arc42.md
-kiln: added the arc42 template; before an export can use it, kiln.toml needs what it places: `quality-goal` isn't a type; `constraint` isn't a type; `block` isn't a type; `quality-scenario` isn't a type; `term` isn't a type (the wiki's "Presets" page has the configuration and its options)
+design/templates/quality-scenario.md
+design/templates/building-block.md
+kiln: added the arc42 preset (types quality-goal, quality-scenario, constraint, block, term; already in kiln.toml, kept as they are: decision, risk; roles addresses; mitigates gains from decision, block; export `arc42`); `kiln export arc42` writes it
 ```
 
-Never overwrites: with the file already there it stops (exit 2).
-`--dry-run` names the file and writes nothing. Once an export uses the
-template, `kiln check` checks it (K112).
+Several presets add to each other and declare nothing twice: a type
+`kiln.toml` already has, from you or another preset, is kept as it is; a
+link role it already has gains only the `from` and `to` types it lacks;
+each preset's export has the preset's name. `arc42` then `srs` shares
+`constraint` and `term`.
+
+Never overwrites, and changes nothing when it refuses (exit 2): a file it
+would write that already exists, an export already named `NAME` (the
+preset was added before), a type whose prefix another type has, or a
+result `kiln check` would find an export or template error in.
+`--dry-run` prints what would change and writes nothing. The wiki's
+"Presets" page lists what each preset adds and the options to add by
+hand.
 
 ## Reading
 

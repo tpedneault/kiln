@@ -2,10 +2,10 @@
 
 A **preset** is a document template Kiln ships: arc42, a software
 requirements specification, a design document. `kiln preset add` copies
-one into your project; everything else is up to you: the item types the
-template places, how they link to each other, and the export that turns
-it into a document. This page has the configuration for each preset,
-ready to paste, and the options worth knowing about.
+one into your project and adds what it needs to `kiln.toml`: the item
+types the template places, the links between them, and an export. This
+page says what each preset adds, and the options worth knowing about
+once it is there.
 
 - [Adding a preset](#adding-a-preset)
 - [arc42](#arc42)
@@ -18,39 +18,73 @@ ready to paste, and the options worth knowing about.
 ```console
 $ kiln preset list
 arc42       arc42 architecture documentation: twelve sections, one page each
-srs         a software requirements specification after ISO/IEC/IEEE 29148
+srs         a software requirements specification after ISO/IEC/IEEE 29148, one document
 design-doc  a design document: requirements, design, decisions, milestones, risks
 $ kiln preset add arc42
+kiln.toml
 design/templates/arc42.md
-kiln: added the arc42 template; before an export can use it, kiln.toml needs what it places: `quality-goal` isn't a type; `constraint` isn't a type; `block` isn't a type; `quality-scenario` isn't a type; `term` isn't a type (the wiki's "Presets" page has the configuration and its options)
+design/templates/quality-scenario.md
+design/templates/building-block.md
+kiln: added the arc42 preset (types quality-goal, quality-scenario, constraint, block, term; already in kiln.toml, kept as they are: decision, risk; roles addresses; mitigates gains from decision, block; export `arc42`); `kiln export arc42` writes it
 ```
 
 `kiln init --preset arc42` does the same in a new project. `--dry-run`
-names the file without writing it.
+prints what would change and writes nothing.
 
-`kiln preset add` writes **one file**, the template, into the
-`templates/` folder of your items folder (`design/templates/arc42.md`).
-It never overwrites: if the file is there, it stops. It doesn't touch
-`kiln.toml`. It tells you what the template needs that `kiln.toml`
-doesn't have yet, and this page has it.
+`kiln preset add` writes:
 
-Then, for any preset:
+- **the template**, `design/templates/arc42.md` (the `templates/`
+  folder of your first `paths` entry);
+- **the types and link roles it places**, into `kiln.toml`, each after
+  your last type (or role), with a comment saying what it is for;
+- **starting text for new items** of the types it adds
+  (`design/templates/quality-scenario.md`, used by `kiln new
+  quality-scenario`);
+- **an export**, `[[export]] name = "arc42"`, writing Markdown, and the
+  same export for Confluence commented out below it, at the end of
+  `kiln.toml`.
 
-1. **Add the types and links** from the preset's section below to
-   `kiln.toml`. Where `kiln.toml` already has a table with the same name
-   (`[links.mitigates]`, say), replace it with the one here.
-2. **Add the export**, the `[[export]]` in the same section.
-3. **Run `kiln check`.** It now checks the template too (K112): a
-   directive naming a type you don't have says so, with the line.
-4. **Create items** (`kiln new quality-goal --title "…"`) and run
-   `kiln export arc42`.
+The rest of `kiln.toml`, comments and layout included, stays as it was.
 
-The template is yours from then on. Its comments (`<!-- … -->`) are
-guidance for whoever edits it: GitLab and GitHub hide them and exports
-leave them out. Replace the placeholder sentences, delete the sections
-you don't need, move them around. A newer Kiln never changes a template
-you have added; to see the current one, run `kiln preset add` in an
-empty folder after `kiln init`.
+### Several presets in one project
+
+Presets add to each other; nothing is declared twice:
+
+- **A type `kiln.toml` already has is kept as it is**, whether you wrote
+  it or another preset added it. `arc42` and `srs` both use `constraint`
+  and `term`; whichever you add second finds them there and leaves them
+  alone. The templates use no status names, so they work with your own
+  definitions.
+- **A link role `kiln.toml` already has gains only what is missing** in
+  its `from` and `to` lists, never a second table, never a repeated
+  entry.
+- **Each preset has its own export**, named after it, so `kiln export
+  arc42` and `kiln export srs` write separate documents. Adding a preset
+  whose export is already there stops: it was added before.
+
+```console
+$ kiln preset add srs
+kiln.toml
+design/templates/srs.md
+kiln: added the srs preset (already in kiln.toml, kept as they are: requirement, constraint, test, term; export `srs`); `kiln export srs` writes it
+$ kiln preset add srs
+kiln: kiln.toml already has an export named `srs`; the srs preset is added already, or rename that export first
+```
+
+It never overwrites and, when it refuses, changes nothing: a file it
+would write that is already there, an export of the same name, a type
+whose prefix another type already has (rename one first), or a result
+`kiln check` would find an export or template error in.
+
+### After adding
+
+Create items (`kiln new quality-goal --title "…"`) and run `kiln export
+arc42`. The template and the configuration are yours from then on. The
+template's comments (`<!-- … -->`) are guidance for whoever edits it:
+GitLab and GitHub hide them and exports leave them out. Replace the
+placeholder sentences, delete the sections you don't need, move them
+around. A newer Kiln never changes a preset you have added; to see the
+current one, run `kiln init --preset NAME` in an empty folder.
 
 ## arc42
 
@@ -81,13 +115,15 @@ items.
 With `layout = "sections"`, each of the twelve is a page (or a file),
 under a main page that lists them.
 
-### Configuration
+### What it adds to kiln.toml
 
-Add this to the `kiln.toml` that `kiln init` writes. `decision` and
-`risk` are already there; replace `[links.mitigates]` with the one below,
-which adds decisions and blocks to what can mitigate a risk.
+To the `kiln.toml` that `kiln init` writes, `kiln preset add arc42` adds
+the types below; `decision` and `risk` are already there and kept. In
+`[links.mitigates]` it adds `decision` and `block` to `from`, so they can
+mitigate a risk. Here for a project named Shop, whose items are in
+`design/`:
 
-<!-- tested: arc42 -->
+<!-- added: arc42 -->
 ```toml
 # arc42 section 1.2: the few quality goals that matter most.
 [types.quality-goal]
@@ -104,6 +140,7 @@ statuses = ["proposed", "agreed", "met", "obsolete"]
 done = ["met"]
 closed = ["obsolete"]
 parents = ["quality-goal"]
+template = "design/templates/quality-scenario.md"
 
 # Section 2: technical and organisational constraints, conventions.
 [types.constraint]
@@ -118,6 +155,7 @@ title = "Building block"
 statuses = ["draft", "accepted", "obsolete"]
 closed = ["obsolete"]
 parents = ["block"]
+template = "design/templates/building-block.md"
 
 # Section 12: one item per term; the body is the definition.
 [types.term]
@@ -133,11 +171,6 @@ from = ["decision", "block"]
 to = ["quality-goal", "quality-scenario"]
 inverse = "addressed by"
 
-[links.mitigates]
-from = ["requirement", "design", "task", "decision", "block"]
-to = ["risk"]
-inverse = "mitigated by"
-
 [[export]]
 name = "arc42"
 format = "markdown"
@@ -147,9 +180,9 @@ template = "design/templates/arc42.md"
 path = "docs/arc42"
 ```
 
-That is enough for every section of the template. Put your system's name
-in `title`; it is the main page's title (and, on Confluence, has to be
-unique in the space).
+That is enough for every section of the template. The export's `title`
+is the main page's title, `<project name> — architecture`; change it as
+you like (on Confluence it has to be unique in the space).
 
 A quality goal and one of its scenarios:
 
@@ -162,9 +195,11 @@ design/quality-scenarios/QS-001-search-under-peak-load.md
 
 ### Options
 
-Each option below is independent. The links ones are what make Kiln
-worth more than a wiki for arc42: `kiln impact`, `kiln trace` and
-`kiln show` follow them.
+Each option below is independent and goes into `kiln.toml` by hand.
+Where `kiln.toml` already has a table with the same name
+(`[links.verifies]`, say), replace it with the one here. The links ones
+are what make Kiln worth more than a wiki for arc42: `kiln impact`,
+`kiln trace` and `kiln show` follow them.
 
 #### Tests verify quality scenarios
 
@@ -245,38 +280,11 @@ inverse = "respected by"
 
 #### Starting text for new items
 
-A type's `template` is the body `kiln new` writes. A quality scenario
-in arc42's six parts:
-
-<!-- tested: arc42 -->
-```toml
-[types.quality-scenario]
-prefix = "QS"
-title = "Quality scenario"
-statuses = ["proposed", "agreed", "met", "obsolete"]
-done = ["met"]
-closed = ["obsolete"]
-parents = ["quality-goal"]
-template = "design/templates/quality-scenario.md"
-```
-
-`design/templates/quality-scenario.md` (a file without front matter, so
-it is not an item):
-
-```markdown
-**Source:** who or what causes it.
-
-**Stimulus:** what happens.
-
-**Environment:** in which conditions (normal operation, peak load…).
-
-**Response:** what the system does.
-
-**Measure:** how the response is judged, with a number where there is one.
-```
-
-The same works for blocks (purpose, interfaces, where the code is) and
-decisions (context, decision, consequences).
+The preset gives quality scenarios and building blocks a starting text:
+`template = "design/templates/quality-scenario.md"` in the type, and the
+file, arc42's six parts of a scenario (source, stimulus, environment,
+response, measure). Edit the files to change what `kiln new` writes, or
+add a `template` to `decision` for context, decision and consequences.
 
 #### Technical debt apart from risks
 
@@ -395,11 +403,12 @@ appendices. One document.
 | 4 Verification | `test`, a table, then the traceability report |
 | Appendix: open findings | `kiln check`'s findings |
 
-### Configuration
+### What it adds to kiln.toml
 
-`requirement`, `test` and `verifies` come with `kiln init`; add:
+`requirement`, `test` and `verifies` come with `kiln init` and are kept;
+`kiln preset add srs` adds:
 
-<!-- tested: srs -->
+<!-- added: srs -->
 ```toml
 [types.constraint]
 prefix = "CON"
@@ -441,9 +450,11 @@ tags = ["performance"]
 - **Fail CI on gaps.** `[check] K201 = "error"` fails `kiln check` when
   an approved requirement has nothing verifying it; `K202` the same for
   implementing ([Checking](Checking)).
-- **Starting text for requirements.** `template =
-  "design/templates/requirement.md"` under `[types.requirement]`, with
-  "The system shall…", rationale and acceptance criteria.
+- **Starting text for requirements.** On a project without a
+  `requirement` type, the preset adds one with `template =
+  "design/templates/requirement.md"` ("The system shall…", rationale,
+  acceptance). With the `kiln init` one, add that line yourself and write
+  the file.
 - **Your own kinds.** Change the tags in the template's section 3, or
   add sections: `<!-- kiln:items type="requirement" tag="security" -->`.
 - **A page per section.** `layout = "sections"` when the document grows
@@ -453,10 +464,10 @@ tags = ["performance"]
 
 The general design document: goals and non-goals, requirements, design,
 decisions, milestones, risks, traceability and open findings, in one
-document. It places the types `kiln init` writes, so it needs only an
-export:
+document. It places the types `kiln init` writes, so on such a project
+it adds only an export:
 
-<!-- tested: design-doc -->
+<!-- added: design-doc -->
 ```toml
 [[export]]
 name = "design-doc"
@@ -471,8 +482,10 @@ path = "docs/DESIGN-DOCUMENT.md"
 
 ## Publishing a preset to Confluence
 
-The same export with `format = "confluence"`, after the `[confluence]`
-connection is set up ([Publishing to Confluence](Publishing-to-Confluence)):
+Each preset's export is followed in `kiln.toml` by the same export for
+Confluence, commented out. Set up the `[confluence]` connection
+([Publishing to Confluence](Publishing-to-Confluence)), uncomment it and
+set its `parent`:
 
 <!-- tested: arc42 -->
 ```toml
