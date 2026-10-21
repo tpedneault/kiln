@@ -1,0 +1,26 @@
+[package]
+name = "kiln-brand"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# Encoding the multi-size .ico: what the binary's build script and the
+# write-icon example need. On by default so a plain `cargo test` also
+# checks the committed kiln.ico against the geometry; the GUI takes the
+# crate without it, so no image codec enters its build.
+default = ["ico"]
+ico = ["dep:image"]
+
+[dependencies]
+image = { workspace = true, optional = true }
+
+[[example]]
+name = "write-icon"
+required-features = ["ico"]

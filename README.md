@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="docs/brand/kiln-lockup-light-bg.png#gh-light-mode-only" alt="Kiln" height="80">
+  <img src="docs/brand/kiln-lockup-dark-bg.png#gh-dark-mode-only" alt="Kiln" height="80">
+</p>
+
 # Kiln
 
 **Requirements, design decisions and project progress, kept as Markdown

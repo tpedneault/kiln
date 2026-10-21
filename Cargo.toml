@@ -15,6 +15,7 @@ members = [
     "crates/kiln-lsp",
     "crates/kiln-flint",
     "crates/kiln-jira",
+    "crates/kiln-brand",
     "crates/kiln-gui",
     "crates/kiln-fenix",
     "crates/kiln-secrets",
@@ -48,6 +49,9 @@ kiln-secrets = { path = "crates/kiln-secrets" }
 kiln-lsp = { path = "crates/kiln-lsp" }
 kiln-flint = { path = "crates/kiln-flint" }
 kiln-gui = { path = "crates/kiln-gui" }
+# Without its `ico` feature by default, so the GUI draws its window icon
+# with no image codec; the binary's build script turns it on.
+kiln-brand = { path = "crates/kiln-brand", default-features = false }
 kiln-jira = { path = "crates/kiln-jira" }
 
 clap = { version = "4.5", features = ["derive"] }
@@ -86,6 +90,10 @@ glyphon = "0.12"
 pollster = "1"
 wgpu = "30.0.1"
 winit = { version = "0.30.13", default-features = false }
+# The icon (kiln-brand): the `.ico` encoder and, on Windows, embedding it
+# in the executables. The same versions as Fenix's.
+image = { version = "0.25", default-features = false, features = ["ico", "png"] }
+winresource = "0.1"
 
 fenix-storage = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }
 fenix-diagram = { git = "https://github.com/tpedneault/fenix", rev = "ce118a2af1a0b70733d0a2dd426f94365cf5eb1a" }

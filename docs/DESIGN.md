@@ -132,6 +132,7 @@ own unit tests; I/O only where the crate's role is I/O.
 | `kiln-fenix` | Fenix control-channel client use (`fenix-control`): open at a line, agenda lookups. | no |
 | `kiln-jira` | The Jira mirror: linked tickets' status through `fenix-jira`, read-only, cached ten minutes; K207. | mirror and K207 yes; fetch no |
 | `kiln-secrets` | Tokens from environment variables or the OS credential store (`keyring`, the suite's names), and prompting without echo. | no |
+| `kiln-brand` | Kiln's mark, wordmark and app icon from one vector definition, drawn the way `fenix-brand` draws Fenix's (GUI.md, "Icon"). | yes |
 | `kiln-gui` | The GUI (K7, GUI.md). wgpu + winit + glyphon, like Fenix and Flint. | pages and app yes; window no |
 | `kiln` | The binary: `clap` CLI; and `kilnw`, which opens the GUI without a console on Windows (ADR-010). | no |
 
