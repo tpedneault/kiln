@@ -4,9 +4,11 @@
 //! `kiln list --jira`, `kiln check` (K207) and the GUI don't each ask
 //! Jira again.
 //!
-//! The mirror and K207 are pure; [`fetch`] is the one function that talks
-//! to Jira. Nothing here creates, edits or transitions a ticket: that is
-//! Fenix's Jira page and Jira's own job.
+//! The mirror and K207 are pure; [`fetch`] reads it. From K10 Kiln also
+//! pushes the items it manages (`[jira] project`) as sub-tasks of one
+//! project issue (ADR-014): [`sync`] plans, purely, and [`push`] reads and
+//! applies. Nothing else is written: assignees, sprints and comments stay
+//! Jira's, and no ticket is ever deleted.
 //!
 //! `fenix-jira` speaks Jira Server/Data Center with a personal access
 //! token. Jira Cloud needs Fenix's G6, and a proxy from the environment
@@ -176,6 +178,14 @@ pub fn k207(project: &Project, mirror: &Mirror) -> Vec<Finding> {
         } else {
             continue;
         };
+        // Where Kiln manages the tickets, say how to bring them together.
+        let message = match &project.config.jira_sync {
+            Some(sync) if sync.types.contains(&item.type_name) => format!(
+                "{message} (`kiln jira sync` moves the ticket; `kiln jira pull {}` takes its status)",
+                item.id
+            ),
+            _ => message,
+        };
         out.push(Finding::new(
             Rule::K207,
             &item.path,
@@ -273,6 +283,9 @@ fn ticket(issue: fenix_jira::IssueSummary) -> Ticket {
         assignee: issue.assignee,
     }
 }
+
+pub mod push;
+pub mod sync;
 
 /// The fake server, for this crate's tests and, with the `fake` feature,
 /// the binary's.

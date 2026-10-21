@@ -25,6 +25,8 @@ All examples on this page come from one small scratch project, made with `kiln i
 | [`kiln confluence comments`](#kiln-confluence-comments) | unresolved reader comments on published pages |
 | [`kiln auth confluence`](#kiln-auth-confluence) | stores a Confluence token in the OS credential store |
 | [`kiln auth jira`](#kiln-auth-jira) | stores a Jira token in the OS credential store |
+| [`kiln jira sync`](#kiln-jira-sync) | keeps the project's Jira sub-tasks in step with its tasks |
+| [`kiln jira pull`](#kiln-jira-pull) | takes tickets' statuses into the tasks |
 
 ## Global options
 
@@ -659,6 +661,30 @@ stored the token for https://confluence.example.com (signed in as Thomas) in the
 ```
 
 Notes: `KILN_CONFLUENCE_TOKEN`, when set, is used instead of the stored token. CI sets that variable rather than running `kiln auth`. On a headless Linux machine without a Secret Service, the store can't be read and the error says so.
+
+### kiln jira sync
+
+```text
+kiln jira sync [--dry-run] [--yes]
+```
+
+Creates, updates and moves the Jira sub-tasks of the project issue to
+match the synced items (`[jira] project`; see [Jira](Jira#keeping-jira-in-step-kiln-jira-sync)), after printing the plan. Without `--yes` it asks on a terminal; not on a terminal, it stops after the plan with exit 1. The keys it creates are written into `kiln.toml` (`parent`) and the items (`jira`): commit them.
+
+| Option | Does |
+|---|---|
+| `--dry-run` | prints the plan; changes nothing in Jira or the files |
+| `--yes` | syncs without asking |
+
+Exit codes: 0 synced (or nothing to do), 1 a ticket's move was refused by the workflow, or the sync wasn't confirmed, 2 no `[jira] project` or no token, 3 Jira couldn't be reached (the keys created before the error are still written).
+
+### kiln jira pull
+
+```text
+kiln jira pull [ID…]
+```
+
+Takes the status of each item's ticket (a sub-task of the project issue) into the item, mapped back through `[jira.status]` or the status category, for tickets someone moved in Jira. Without IDs, every synced item. Prints each change as `kiln set` does.
 
 ### kiln auth jira
 

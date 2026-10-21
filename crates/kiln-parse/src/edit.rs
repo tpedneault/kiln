@@ -93,6 +93,36 @@ pub fn set_field(text: &str, key: &str, value: Option<FieldValue>) -> Result<Str
     })
 }
 
+/// Sets `key = "value"` in `kiln.toml`'s `[table]`, which must exist: the
+/// rest of the file, comments and layout included, is left as it is. For
+/// what Kiln records there itself (`kiln jira sync` writing `[jira]
+/// parent`).
+pub fn set_config_key(
+    text: &str,
+    table: &str,
+    key: &str,
+    value: &str,
+) -> Result<String, EditError> {
+    let mut doc: DocumentMut = text
+        .parse()
+        .map_err(|_| EditError("kiln.toml isn't valid TOML (run `kiln check`)".into()))?;
+    let t = doc
+        .get_mut(table)
+        .and_then(Item::as_table_like_mut)
+        .ok_or_else(|| EditError(format!("kiln.toml has no [{table}]")))?;
+    match t.get_mut(key).and_then(Item::as_value_mut) {
+        Some(old) => {
+            let mut new = Value::from(value);
+            *new.decor_mut() = old.decor().clone();
+            *old = new;
+        }
+        None => {
+            t.insert(key, Item::Value(Value::from(value)));
+        }
+    }
+    Ok(doc.to_string())
+}
+
 /// Adds `target` to `[links] role`, creating either as needed. Adding a
 /// link that is already there is not an error; the text comes back
 /// unchanged.

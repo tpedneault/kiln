@@ -30,12 +30,47 @@ pub struct Config {
     pub link_bare_ids: bool,
     /// `[jira] url`.
     pub jira_url: Option<String>,
+    /// `[jira] project` and what goes with it: Kiln pushes these items to
+    /// Jira (`kiln jira sync`). `None` without `project`: links only.
+    pub jira_sync: Option<JiraSync>,
     /// `[check]` overrides.
     pub severities: BTreeMap<Rule, Severity>,
     /// `[confluence]`, when present and usable.
     pub confluence: Option<ConfluenceConfig>,
     /// `[[export]]`, the valid ones, in order.
     pub exports: Vec<ExportTarget>,
+}
+
+/// What `kiln jira sync` pushes, and where (INTEGRATION.md, "Jira").
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JiraSync {
+    /// The Jira project's key, where tickets are created.
+    pub project: String,
+    /// The issue standing for this Kiln project; its sub-tasks are the
+    /// tickets Kiln manages. Written by the first sync when absent.
+    pub parent: Option<String>,
+    /// The project issue's type, when the sync creates it.
+    pub parent_type: String,
+    /// The sub-tasks' issue type; `None`: the project's sub-task type.
+    pub subtask_type: Option<String>,
+    /// The Kiln types synced.
+    pub types: Vec<String>,
+    /// Kiln status → Jira status name; a status not here maps to a
+    /// status category.
+    pub status: BTreeMap<String, String>,
+}
+
+impl Default for JiraSync {
+    fn default() -> Self {
+        JiraSync {
+            project: String::new(),
+            parent: None,
+            parent_type: "Task".into(),
+            subtask_type: None,
+            types: vec!["task".into()],
+            status: BTreeMap::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -345,6 +380,7 @@ mod tests {
             coverage_roles: vec![],
             link_bare_ids: true,
             jira_url: None,
+            jira_sync: None,
             severities: BTreeMap::new(),
             confluence: None,
             exports: vec![],

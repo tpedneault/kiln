@@ -340,6 +340,46 @@ pub fn apply_link(
     ))
 }
 
+/// Records `key` as `id`'s Jira ticket (`jira = "DEMO-102"`): what `kiln
+/// jira sync` writes after creating the ticket, so the next sync updates
+/// it rather than creating another.
+pub fn apply_jira_key(
+    p: &Project,
+    source: &DiskSource,
+    id: &ItemId,
+    key: &str,
+) -> Result<(), EditError> {
+    let item = unique(p, id).map_err(invalid)?;
+    let (text, bytes, stamp) = read_item(source, &item.path)?;
+    let new = set_field(&text, "jira", Some(FieldValue::String(key.to_owned())))
+        .map_err(|e| invalid(format!("{}: {e}", item.path)))?;
+    write_back(
+        &source.path(&item.path),
+        &item.path,
+        &bytes,
+        stamp,
+        &new,
+        true,
+    )?;
+    Ok(())
+}
+
+/// Sets `key = "value"` in `kiln.toml`'s `[table]` (`[jira] parent`),
+/// keeping the rest of the file as written.
+pub fn apply_config_key(
+    source: &DiskSource,
+    table: &str,
+    key: &str,
+    value: &str,
+) -> Result<(), EditError> {
+    let rel = kiln_parse::CONFIG_FILE;
+    let (text, bytes, stamp) = read_item(source, rel)?;
+    let new = kiln_parse::set_config_key(&text, table, key, value)
+        .map_err(|e| invalid(format!("{rel}: {e}")))?;
+    write_back(&source.path(rel), rel, &bytes, stamp, &new, true)?;
+    Ok(())
+}
+
 /// What [`apply_renumber`] did.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Renumbered {

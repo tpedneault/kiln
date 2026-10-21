@@ -575,6 +575,7 @@ fn reports() -> Vec<ExportReport> {
         ExportReport {
             name: "doc".into(),
             confluence: false,
+            jira: false,
             lines: vec![
                 "doc (markdown, document) → docs/DESIGN.md".into(),
                 "  would update docs/DESIGN.md".into(),
@@ -584,6 +585,7 @@ fn reports() -> Vec<ExportReport> {
         ExportReport {
             name: "spec".into(),
             confluence: true,
+            jira: false,
             lines: vec![
                 "spec (confluence, document) → space FLINT, page 1 \"Flint\"".into(),
                 "  update    \"Flint — design document\": REQ-014 changed (42 KiB)".into(),
@@ -594,6 +596,7 @@ fn reports() -> Vec<ExportReport> {
         ExportReport {
             name: "edited".into(),
             confluence: true,
+            jira: false,
             lines: vec![
                 "edited (confluence, document) → space FLINT, page 2 \"Other\"".into(),
                 "  refused: \"Other\" was edited in Confluence by Alice".into(),
@@ -820,4 +823,61 @@ fn the_check_page_says_when_a_check_is_still_running() {
         squash(a.text()),
         ["kiln check: 0 errors, 0 warnings", "No findings."]
     );
+}
+
+#[test]
+fn jira_syncs_from_exports_and_pulls_a_status_from_any_item() {
+    let mut a = app();
+    press(&mut a, " p");
+    assert_eq!(a.next_job(), Some(Job::PlanExports));
+    let jira = ExportReport {
+        name: "jira".into(),
+        confluence: false,
+        jira: true,
+        lines: vec![
+            "jira (DEMO) → DEMO-100 \"Kiln: Demo\"".into(),
+            "  move       DEMO-101 TASK-001: To Do → Done".into(),
+            "  0 create, 0 update, 1 move, 2 unchanged".into(),
+        ],
+        error: None,
+    };
+    a.done(Done::Exports(vec![jira.clone()]));
+    press(&mut a, "w");
+    assert!(a
+        .screen()
+        .dump()
+        .contains("isn't a file target: P publishes it"));
+    press(&mut a, "P");
+    assert!(a
+        .screen()
+        .dump()
+        .contains("-- Publish jira (DEMO) → DEMO-100 \"Kiln: Demo\"? y/n"));
+    press(&mut a, "y");
+    assert_eq!(
+        a.next_job(),
+        Some(Job::Publish {
+            target: "jira".into(),
+            shown: jira.plan()
+        })
+    );
+    a.done(Done::Published(Ok(vec![
+        "jira: 0 created, 0 updated, 1 moved".into(),
+    ])));
+    assert!(a
+        .screen()
+        .dump()
+        .contains("-- jira: 0 created, 0 updated, 1 moved"));
+
+    // J on an item takes its ticket's status.
+    press(&mut a, "1");
+    a.next_job();
+    press(&mut a, "J");
+    assert_eq!(a.next_job(), Some(Job::JiraPull("REQ-001".into())));
+    a.done(Done::Pulled(Err(
+        "REQ-001 has no ticket under the project issue".into(),
+    )));
+    assert!(a
+        .screen()
+        .dump()
+        .contains("-- REQ-001 has no ticket under the project issue"));
 }
