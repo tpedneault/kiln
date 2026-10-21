@@ -34,7 +34,9 @@ mod storage;
 pub use apply::{apply, Applied, ApplyOptions};
 pub use cache::{cache_file_name, CachedPage, PageCache};
 pub use client::{connect, ClientError, Comment, Confluence, Created, ErrorKind, Http, Identity};
-pub use desired::{desired_pages, titles, DesiredContext, DesiredPage, MAX_TITLE};
+pub use desired::{
+    candidate_titles, desired_pages, titles, DesiredContext, DesiredPage, MAX_TITLE,
+};
 pub use model::{KilnProperty, RemotePage, Snapshot};
 pub use normalise::{body_hash, hash, normalise};
 pub use plan::{plan, Op, OpKind, Plan, PlanOptions};

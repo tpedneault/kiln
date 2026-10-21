@@ -13,6 +13,7 @@
 
 **Documents**
 - [Templates and exports](Templates-and-exports)
+- [Presets: arc42 and others](Presets)
 - [Publishing to Confluence](Publishing-to-Confluence)
 - [Changes and baselines](Changes-and-baselines)
 

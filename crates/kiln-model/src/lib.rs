@@ -13,7 +13,8 @@
 //!
 //! Also the export targets and Confluence connection (K2), and Kiln's own
 //! folders (settings, state, logs, `KILN_HOME`), whose rules are pure
-//! here and resolved against the platform by the binary.
+//! here and resolved against the platform by the binary. And the presets
+//! (K11): the document templates Kiln ships, as data.
 
 mod config;
 mod export;
@@ -21,13 +22,16 @@ mod finding;
 mod folders;
 mod id;
 mod item;
+mod preset;
 
 pub use config::{default_config, slug, CodeConfig, Config, JiraSync, LinkRole, TypeDef, CODE};
 pub use export::{
-    ConfluenceConfig, ConfluenceFlavour, ConfluenceTarget, Diagrams, DocxOptions, ExportFormat,
-    ExportTarget, Flavour, HtmlOptions, ItemStyle, Layout, MarkdownOptions, OnDrift, REPORTS,
+    ChildList, ConfluenceConfig, ConfluenceFlavour, ConfluenceTarget, Diagrams, DocxOptions,
+    ExportFormat, ExportTarget, Flavour, HtmlOptions, ItemStyle, Layout, MarkdownOptions, OnDrift,
+    QualifyTitles, REPORTS,
 };
 pub use finding::{Finding, Rule, Severity, Span};
 pub use folders::{Folders, Platform};
 pub use id::{is_prefix, IdError, ItemId};
 pub use item::{CodeRef, Date, Item, LinkEntry, Mention, Ref, RelativeLink};
+pub use preset::{dir_prefix, preset, ItemTemplate, Preset, PRESETS};

@@ -68,6 +68,11 @@ nothing the second time.
     └── B Open findings
 ```
 
+The main page lists its child pages with Confluence's Children macro, in
+the order Confluence keeps them; `children = "list"` has Kiln write the
+list in document order instead (see
+[Several projects in one space](#several-projects-in-one-space)).
+
 ### `tree`
 
 ```text
@@ -140,6 +145,8 @@ without the keys it needs fails `kiln check` (K005), naming them.
 | `labels` | `[]` | Labels added to this target's pages, on top of `[confluence] labels`. |
 | `toc_levels` | `3` | How many heading levels the table of contents (`kiln:toc`) shows. |
 | `restrict_adopted` | `false` | With `restrict_edits`, also restrict an adopted page. |
+| `qualify_titles` | `taken` | `taken` or `always`: when section and item pages carry the target's title in parentheses (see [Several projects in one space](#several-projects-in-one-space)). |
+| `children` | `macro` | `macro` (Confluence's `children` macro) or `list` (links Kiln writes, in document order): how a `sections` or `tree` page lists its child pages. |
 
 Give exactly one of `parent` or `page`. `page` with a layout other than
 `document` is a K005 error.
@@ -307,6 +314,44 @@ Page titles in a space are unique. The root page takes the target's
 target's, or a page someone else made), Kiln appends the target's title in
 parentheses. Titles are capped at 255 characters, shortening the item
 title with `…`, never the ID.
+
+### Several projects in one space
+
+Two projects using the same template, such as two arc42 documents, both
+have a page called "1 Introduction and Goals". By default the first to
+publish gets that title and the second gets "1 Introduction and Goals
+(Basket service — architecture)". That works, but which project gets
+which depends on who published first, and if the first project's page
+goes away, the second project's page is renamed on its next publish,
+which breaks links people saved.
+
+For a space several projects publish to, set it once and for all:
+
+```toml
+[export.confluence]
+parent = 123456789
+qualify_titles = "always"   # every section page carries this target's title, from the first publish
+```
+
+Every section and item page then carries the target's title, so its title
+depends only on its own project. The root page is the target's `title`
+itself, so give each project's document a title with its name in it (the
+[Presets](Presets) do: `Shop — architecture`).
+
+When a title can't be made unique, because the root's title is taken or
+two targets share the same `title`, the plan stops before anything is
+written and names the title:
+
+```console
+$ kiln export arc42-confluence
+kiln: the title "Architecture" is held by another page in the space, which this export doesn't own; give the export another `title`
+```
+
+The order of child pages: a `sections` page lists its children with
+Confluence's `children` macro, in the order Confluence keeps the page
+tree. If that comes out alphabetical, "10 Quality Requirements" lands
+between "1 …" and "2 …". `children = "list"` has Kiln write the list
+itself, in document order.
 
 ## The plan: create, update, unchanged, drift, retire
 

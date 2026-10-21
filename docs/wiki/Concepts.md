@@ -213,6 +213,12 @@ headings and prose, plus **directives** (`<!-- kiln:items type="requirement"
 findings, changes) go. [Templates and exports](Templates-and-exports)
 covers it all.
 
+A **preset** is a template Kiln ships (arc42, a requirements
+specification, a design document) together with the types it places and
+an export for it. `kiln preset add arc42` copies it into your project,
+where it is yours to change; several presets share the types they have
+in common. See [Presets](Presets).
+
 ## Baseline
 
 A **baseline** is a git revision (a tag, branch or commit) that the

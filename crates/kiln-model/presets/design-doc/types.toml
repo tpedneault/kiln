@@ -1,0 +1,70 @@
+# Types and link roles the design document places: Kiln's default
+# types. `kiln preset add` adds those kiln.toml doesn't declare yet and
+# keeps the others as they are.
+
+[types.requirement]
+prefix = "REQ"
+statuses = ["draft", "proposed", "approved", "implemented", "verified", "obsolete"]
+initial = "draft"
+done = ["verified"]
+closed = ["obsolete"]
+parents = ["requirement"]
+
+[types.design]
+prefix = "DES"
+statuses = ["draft", "accepted", "obsolete"]
+closed = ["obsolete"]
+parents = ["design"]
+
+[types.decision]
+prefix = "ADR"
+statuses = ["proposed", "accepted", "rejected", "superseded"]
+closed = ["rejected", "superseded"]
+
+[types.milestone]
+prefix = "MS"
+statuses = ["planned", "active", "done", "dropped"]
+done = ["done"]
+closed = ["dropped"]
+
+[types.task]
+prefix = "TASK"
+statuses = ["todo", "doing", "blocked", "done", "dropped"]
+done = ["done"]
+closed = ["dropped"]
+parents = ["task"]
+
+[types.test]
+prefix = "TEST"
+statuses = ["draft", "ready", "passing", "failing", "obsolete"]
+closed = ["obsolete"]
+
+[types.risk]
+prefix = "RISK"
+statuses = ["open", "mitigated", "accepted", "closed"]
+closed = ["closed"]
+
+[links.implements]
+from = ["design", "task", "code"]
+to = ["requirement"]
+inverse = "implemented by"
+
+[links.verifies]
+from = ["test", "code"]
+to = ["requirement"]
+inverse = "verified by"
+
+[links.part-of]
+from = ["task"]
+to = ["milestone"]
+inverse = "includes"
+
+[links.supersedes]
+from = ["decision"]
+to = ["decision"]
+inverse = "superseded by"
+
+[links.mitigates]
+from = ["requirement", "design", "task"]
+to = ["risk"]
+inverse = "mitigated by"

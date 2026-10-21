@@ -299,13 +299,15 @@ store them with `kiln auth confluence` / `kiln auth jira` (see
 `layout`, two targets with the same `name`, `page =` with a layout other
 than `document`, a file format (markdown, html, docx) without `path`, a
 Confluence target when `[confluence]` lacks `url` or `space`, a `link_to`
-naming no target.
+naming no target, a `qualify_titles` other than `taken` or `always`, a
+`children` other than `macro` or `list`.
 
 ```text
 kiln.toml:111:10: K005 error: format `pdf` isn't confluence, markdown, html or docx
 kiln.toml:89:8: K005 error: export `md` writes markdown files and needs a `path`
 kiln.toml:93:8: K005 error: Confluence target `spec` needs [confluence] url and space
 kiln.toml:96:9: K005 error: [export.confluence] page = … writes one existing page, so it needs layout = "document"
+kiln.toml:98:18: K005 error: `qualify_titles` `sometimes` isn't taken or always
 ```
 
 **Fix:** complete or correct the target (see
@@ -519,10 +521,13 @@ several targets share it.
 kiln.toml:1:1: K112 error: export `md`: template design/templates/missing.md doesn't exist or isn't UTF-8
 design/templates/doc.md:3:1: K112 error: `widget` isn't a type
 design/templates/doc.md:5:1: K112 error: unknown directive kiln:frobnicate (items, item, report, summary, toc, value)
+design/templates/doc.md:9:1: K112 error: style `table` isn't full, row or compact
 ```
 
 **Fix:** correct the path or the directive. The directives are on
-[Templates and exports](Templates-and-exports).
+[Templates and exports](Templates-and-exports). A preset's template
+names the preset's types; if you rename or remove one of them, change the
+template's directives too ([Presets](Presets#renaming-a-type-a-template-uses)).
 
 ## Design rules (K201–K207)
 

@@ -528,8 +528,11 @@ fn snapshots_read_the_same_from_both_flavours() {
     let (project, _) = project();
     let target = project.config.export("browse").unwrap();
     let wanted = vec![
-        "REQ-002 Fast <enough>".to_owned(),
-        "1 Requirements".to_owned(),
+        (
+            "REQ-002 Fast <enough>".to_owned(),
+            Some("REQ-002 Fast <enough> (Flint)".to_owned()),
+        ),
+        ("1 Requirements".to_owned(), None),
     ];
     let mut snapshots = Vec::new();
     for cloud in [false, true] {
@@ -657,11 +660,11 @@ fn publish(
     let mut resolved = all.clone();
     resolve_all(&mut resolved, &all, &project);
     let p = resolved.iter().find(|p| p.target.name == name).unwrap();
-    let wanted: Vec<String> = crate::titles(p, &HashSet::new()).into_values().collect();
+    let wanted = crate::candidate_titles(p);
     let snapshot = take_snapshot(
         c.as_ref(),
         &target,
-        "Flint",
+        &project.config.name,
         "FLINT",
         &wanted,
         &crate::PageCache::default(),
@@ -686,6 +689,7 @@ fn publish(
     };
     let desired = desired_pages(p, &ctx);
     let mut options = PlanOptions {
+        project: project.config.name.clone(),
         export: name.into(),
         max_page_kib: 1024,
         adopting: target.confluence.page.is_some(),
@@ -708,7 +712,7 @@ fn publish(
         space: "FLINT",
         anchor: target.confluence.page.or(target.confluence.parent).unwrap(),
         adopting: options.adopting,
-        project: "Flint",
+        project: &project.config.name,
         export: name,
         target_title: &target.title,
         commit: "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432",
@@ -727,6 +731,110 @@ fn publish(
         &apply_options,
     );
     (the_plan, applied)
+}
+
+/// A project named `name` with one requirement and a `sections` target
+/// titled `title` under page 100, plus `settings` in its
+/// `[export.confluence]`.
+fn sections_project(name: &str, title: &str, settings: &str) -> MemorySource {
+    let config = format!(
+        "{}\n[confluence]\nurl = \"https://confluence.example.com\"\nspace = \"FLINT\"\n\n[[export]]\nname = \"arc\"\nformat = \"confluence\"\nlayout = \"sections\"\ntitle = \"{title}\"\ntypes = [\"requirement\"]\nreports = []\n[export.confluence]\nparent = 100\n{settings}\n",
+        kiln_model::default_config(name)
+    );
+    MemorySource::new().with("kiln.toml", config).with(
+        "design/REQ-001-a.md",
+        item("REQ-001", "requirement", "A", "draft", ""),
+    )
+}
+
+fn titles_in(state: &State) -> Vec<String> {
+    let mut out: Vec<String> = state.pages.values().map(|p| p.title.clone()).collect();
+    out.sort();
+    out
+}
+
+#[test]
+fn two_projects_share_a_space_without_a_title_clash() {
+    for cloud in [false, true] {
+        // First come, first served: the second project's section page
+        // carries its export's title.
+        let fake = Fake::start(empty_space(), cloud);
+        let alpha = sections_project("Alpha", "Alpha — architecture", "");
+        let beta = sections_project("Beta", "Beta — architecture", "");
+        publish(&fake, cloud, &alpha, "arc", |_| {}).1.unwrap();
+        publish(&fake, cloud, &beta, "arc", |_| {}).1.unwrap();
+        assert_eq!(
+            titles_in(&fake.state.lock().unwrap()),
+            [
+                "1 Requirements",
+                "1 Requirements (Beta — architecture)",
+                "Alpha — architecture",
+                "Beta — architecture",
+                "Designs",
+            ]
+        );
+
+        // `qualify_titles = "always"`: titles don't depend on who
+        // published first, and the child list is links in order.
+        let fake = Fake::start(empty_space(), cloud);
+        let settings = "qualify_titles = \"always\"\nchildren = \"list\"";
+        let alpha = sections_project("Alpha", "Alpha — architecture", settings);
+        let beta = sections_project("Beta", "Beta — architecture", settings);
+        publish(&fake, cloud, &beta, "arc", |_| {}).1.unwrap();
+        publish(&fake, cloud, &alpha, "arc", |_| {}).1.unwrap();
+        let state = fake.state.lock().unwrap();
+        assert_eq!(
+            titles_in(&state),
+            [
+                "1 Requirements (Alpha — architecture)",
+                "1 Requirements (Beta — architecture)",
+                "Alpha — architecture",
+                "Beta — architecture",
+                "Designs",
+            ]
+        );
+        let root = state
+            .pages
+            .values()
+            .find(|p| p.title == "Alpha — architecture")
+            .unwrap();
+        assert!(
+            root.body
+                .contains("<ri:page ri:content-title=\"1 Requirements (Alpha — architecture)\"")
+                && !root.body.contains("ac:name=\"children\""),
+            "{}",
+            root.body
+        );
+        drop(state);
+        // Published again unchanged: every title is its own page's, so
+        // none is looked up in the space.
+        fake.state.lock().unwrap().log.clear();
+        let (p, _) = publish(&fake, cloud, &alpha, "arc", |_| {});
+        assert!(!p.changes());
+        let log = fake.state.lock().unwrap().log.clone();
+        assert!(
+            !log.iter().any(|l| l.contains("title=")),
+            "no title lookups: {log:?}"
+        );
+
+        // The same export title twice: nothing can tell the roots apart,
+        // so the plan refuses before anything is created.
+        let fake = Fake::start(empty_space(), cloud);
+        let alpha = sections_project("Alpha", "Architecture", "");
+        let beta = sections_project("Beta", "Architecture", "");
+        publish(&fake, cloud, &alpha, "arc", |_| {}).1.unwrap();
+        let before = fake.state.lock().unwrap().writes();
+        let (p, applied) = publish(&fake, cloud, &beta, "arc", |_| {});
+        assert!(applied.is_err());
+        // Only the root: "1 Requirements (Architecture)" is still free.
+        assert_eq!(p.refusals.len(), 1, "{:?}", p.refusals);
+        assert!(
+            p.refusals[0].contains("\"Architecture\" is held by another page"),
+            "{:?}",
+            p.refusals
+        );
+        assert_eq!(fake.state.lock().unwrap().writes(), before);
+    }
 }
 
 fn kinds_of(p: &crate::Plan) -> Vec<String> {

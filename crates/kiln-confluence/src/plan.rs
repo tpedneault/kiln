@@ -128,6 +128,17 @@ pub fn plan(desired: &[DesiredPage], snapshot: &Snapshot, options: &PlanOptions)
                 options.max_page_kib
             ));
         }
+        // Titles are unique in a space. `titles` qualifies a taken one,
+        // so a title still taken here is one Kiln can't make unique: the
+        // root's (the target's `title`), or a qualified title another
+        // page holds too. Creating it would fail half-way through apply.
+        let keeps_title = d.key == "doc" && options.adopting;
+        if !keeps_title && snapshot.taken_titles.contains(&d.title) {
+            out.refusals.push(format!(
+                "the title \"{}\" is held by another page in the space, which this export doesn't own; give the export another `title`",
+                d.title
+            ));
+        }
         let op = |kind, page_id, reasons: Vec<String>| Op {
             kind,
             key: d.key.clone(),

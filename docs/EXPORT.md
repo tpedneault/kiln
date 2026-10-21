@@ -96,7 +96,7 @@ broken export fails the merge request, not the publish after it.
 | Layout | Confluence | Markdown / HTML / Word |
 |---|---|---|
 | **`document`** | one page holding the whole document | one file |
-| **`sections`** | a page with the opening material and a list of its child pages; one child page per top-level section (each type section, each report) | `index.md` / `index.html` / `index.docx` plus one file per section |
+| **`sections`** | a page with the opening material and a list of its child pages (Confluence's `children` macro, or links in document order with `children = "list"`, CONFLUENCE.md); one child page per top-level section (each type section, each report) | `index.md` / `index.html` / `index.docx` plus one file per section |
 | **`tree`** | as `sections`, and each item its own page under its section, nested by `parent` | a folder per section, a file per item |
 
 `document` is the default because it is what a design document is: one
@@ -123,7 +123,16 @@ contents, one section per type in `types` that has items, then the
 A template is a Markdown file in the repository that gives the document
 its own shape and prose: an introduction, scope, definitions, the order
 of sections. **Directives** are HTML comments, so the template still reads
-as a plain outline on GitLab or GitHub:
+as a plain outline on GitLab or GitHub. Any other HTML comment in a
+template is a note to whoever edits it: GitLab and GitHub hide it, and so
+does every export (an item body is different: raw HTML there is shown as
+text, FORMAT.md, "Body").
+
+Kiln ships ready-made templates as **presets** (DESIGN.md, "Presets"):
+`kiln preset add arc42` (or `srs`, `design-doc`) copies one into
+`design/templates/`, with the types it places and a target for it, and
+from then on it is the project's own file, with guidance in its
+comments. A template of one's own:
 
 ~~~markdown
 # Introduction
@@ -183,7 +192,7 @@ Flint covers Windows and Linux (KDE Plasma 6 on Wayland). It does not…
 | `tag="performance"` | by tag |
 | `root="REQ-002"` | that item and its descendants |
 | `jira="FLINT-*"` | items with a matching Jira key |
-| `style="full\|row"` | `full` (default): each item as a heading with its properties and body; `row`: all of them as one table (ID, title, status, links), bodies left out, which suits many small items such as tests |
+| `style="full\|row\|compact"` | `full` (default): each item as a heading with its properties and body; `row`: all of them as one table (ID, title, status, links), bodies left out, which suits many small items such as tests; `compact`: each item as a bold "ID title" line followed by its body, no heading and no properties, which suits items read for their prose, such as glossary terms |
 | `nest="flat\|parent"` | `flat` (default, except in `tree`): every item a heading at the directive's level, in tree order, each parent followed by its children; `parent`: children one heading level below their parent (the default in `tree`, where it makes the page tree) |
 | `split="auto\|no"` | in `tree`, `no` keeps these items inline in their section page instead of a page each |
 
@@ -200,10 +209,13 @@ Rules:
   that document; `kiln export --dry-run` lists what each target leaves
   out, so an omission is a decision, not an accident.
 - Items placed with `style="row"` have no heading; each row carries an
-  anchor named by the ID, so references still land on it. Items a report
-  lists (the roadmap's milestones, the risks) and that nothing else
-  placed are placed on their row the same way, after everything else,
-  so a report never takes an item from a later `kiln:items`.
+  anchor named by the ID, so references still land on it. The same goes
+  for `style="compact"`, whose anchor opens the item's bold line; the
+  body's own headings become bold paragraphs, since there is no item
+  heading to put them under. Items a report lists (the roadmap's
+  milestones, the risks) and that nothing else placed are placed on
+  their row the same way, after everything else, so a report never takes
+  an item from a later `kiln:items`.
 - Items are a flat list at the directive's level, in tree order: each
   item is followed by its children (within the directive), depth first,
   so related items stay together while every one is a heading of the
@@ -274,7 +286,7 @@ titles and links don't move when the baseline does: Markdown puts it in
 italics on the line under the heading (`*Changed*`), because GitLab and
 GitHub derive anchors from heading text; HTML and Confluence put a lozenge
 inside the heading after its text. Items placed in a `style="row"` table
-aren't marked; the changes report lists them.
+or with `style="compact"` aren't marked; the changes report lists them.
 
 What counts as a change, and how REV is read, is FORMAT.md's "Baselines".
 `<!-- kiln:value since -->` is the baseline as `v1.0 (1a2b3c4)`, empty

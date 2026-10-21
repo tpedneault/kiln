@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use kiln_export::{short, Prepared, RepoLinks, Revision};
 use kiln_index::Project;
-use kiln_model::ConfluenceConfig;
+use kiln_model::{ChildList, ConfluenceConfig, QualifyTitles};
 
 use crate::normalise::hash;
 use crate::storage::{emit, Attachment, EmitContext};
@@ -65,22 +65,59 @@ fn cap(title: &str) -> String {
     format!("{}…", kept.trim_end())
 }
 
+/// A page's title with the target's title in parentheses.
+fn qualified(p: &Prepared, base: &str) -> String {
+    cap(&format!("{base} ({})", p.target.title))
+}
+
 /// Every page's final title: the base title, or with the target's title
-/// in parentheses when another page in the space has it.
+/// in parentheses when another page in the space has it, or always with
+/// `qualify_titles = "always"`. The root page keeps the target's title:
+/// when that is taken too, the plan refuses (`plan`, "title taken").
 pub fn titles(p: &Prepared, taken: &HashSet<String>) -> HashMap<String, String> {
+    let always = p.target.confluence.qualify_titles == QualifyTitles::Always;
     p.split
         .pages
         .iter()
         .map(|page| {
             let base = base_title(&p.target.title, &page.key, &page.title);
-            let title = if page.key != "doc" && taken.contains(&base) {
-                cap(&format!("{base} ({})", p.target.title))
+            let title = if page.key != "doc" && (always || taken.contains(&base)) {
+                qualified(p, &base)
             } else {
                 base
             };
             (page.key.clone(), title)
         })
         .collect()
+}
+
+/// The titles the snapshot looks up in the space, each with the title
+/// to look up only if it is taken: (plain, qualified) with
+/// `qualify_titles = "taken"`, so a qualified title, which a third
+/// project or a target with the same `title` can hold too, costs a call
+/// only when it would be used; just the qualified one with `"always"`;
+/// and the root's own title, which has no fallback.
+pub fn candidate_titles(p: &Prepared) -> Vec<(String, Option<String>)> {
+    let always = p.target.confluence.qualify_titles == QualifyTitles::Always;
+    let mut out: Vec<(String, Option<String>)> = p
+        .split
+        .pages
+        .iter()
+        .map(|page| {
+            let base = base_title(&p.target.title, &page.key, &page.title);
+            match (page.key == "doc", always) {
+                (true, _) => (base, None),
+                (false, true) => (qualified(p, &base), None),
+                (false, false) => {
+                    let q = qualified(p, &base);
+                    (base, Some(q))
+                }
+            }
+        })
+        .collect();
+    out.sort();
+    out.dedup();
+    out
 }
 
 /// The desired pages of a resolved Confluence target.
@@ -165,6 +202,13 @@ pub fn desired_pages(p: &Prepared, ctx: &DesiredContext) -> Vec<DesiredPage> {
                 banner,
                 image_hash: ctx.image_hash,
                 toc_levels,
+                child_list: (p.target.confluence.children == ChildList::List).then(|| {
+                    p.split
+                        .children(&page.key)
+                        .iter()
+                        .filter_map(|c| own_titles.get(&c.key).cloned())
+                        .collect()
+                }),
             };
             let emitted = emit(page, &emit_ctx);
             let items: BTreeMap<String, String> = page

@@ -12,6 +12,7 @@ pub mod init;
 pub mod jira;
 pub mod list;
 pub mod new;
+pub mod preset;
 pub mod renumber;
 pub mod show;
 pub mod trace;

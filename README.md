@@ -102,6 +102,9 @@ design-md (markdown, document) → docs/DESIGN.md
   - **Layouts:** one page, a page per section, or a page per item.
   - **Templates:** you write the headings and prose; Kiln places the
     items and reports. Diagrams in Mermaid are drawn.
+  - **Presets:** start from arc42, a requirements specification (after
+    ISO/IEC/IEEE 29148) or a design document with `kiln preset add`,
+    then make it your own.
 - **Change review.** `kiln diff v1.0` and `kiln export --since v1.0`
   show what changed in the design since a release.
 - **Safe edits.** `kiln new`, `set`, `link` and `renumber` change only

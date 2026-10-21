@@ -53,6 +53,10 @@ pub struct EmitContext<'a> {
     pub image_hash: &'a dyn Fn(&str) -> Option<String>,
     /// The table of contents' depth.
     pub toc_levels: u8,
+    /// `children = "list"`: this page's child pages' final titles, in
+    /// document order, written as links in place of the `children` macro.
+    /// `None`: the macro.
+    pub child_list: Option<Vec<String>>,
 }
 
 struct Emitter<'a> {
@@ -226,7 +230,23 @@ impl Emitter<'_> {
             Block::Directive(_) => String::new(),
             Block::Toc => macro_empty("toc", &[("maxLevel", &self.ctx.toc_levels.to_string())]),
             Block::Props(p) => self.props(p),
-            Block::ChildPages => macro_empty("children", &[("all", "true")]),
+            Block::ChildPages => match &self.ctx.child_list {
+                None => macro_empty("children", &[("all", "true")]),
+                Some(titles) if titles.is_empty() => String::new(),
+                Some(titles) => {
+                    let mut out = "<ul>".to_owned();
+                    for title in titles {
+                        out.push_str(&format!(
+                            "<li><ac:link><ri:page ri:content-title=\"{}\" ri:space-key=\"{}\" /><ac:plain-text-link-body>{}</ac:plain-text-link-body></ac:link></li>",
+                            esc(title),
+                            esc(self.ctx.space),
+                            cdata(title)
+                        ));
+                    }
+                    out.push_str("</ul>");
+                    out
+                }
+            },
         }
     }
 

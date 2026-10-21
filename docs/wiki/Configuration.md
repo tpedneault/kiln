@@ -422,7 +422,8 @@ template = "design/templates/design-document.md"
   `link_to`, `path`, and per-format tables `[export.markdown]`
   (`flavour`, `diagrams`), `[export.html]` (`theme`), `[export.docx]`
   (`reference`) and `[export.confluence]` (`parent` or `page`, `space`,
-  `labels`, `toc_levels`). All are described on
+  `labels`, `toc_levels`, `restrict_adopted`, `qualify_titles`,
+  `children`). All are described on
   [Templates and exports](Templates-and-exports).
 - `[confluence]` keys: `url`, `space`, `flavour`, `user`, `auth`,
   `labels`, `jira_macro`, `jira_server_id`, `restrict_edits`, `on_drift`,

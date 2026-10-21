@@ -5,14 +5,15 @@ Where Kiln's code lives and which way its dependencies point.
 map of the workspace that does it, and is updated whenever a crate gains
 a role or a dependency.
 
-Status: K8, every milestone. The format crates (`kiln-model`,
+Status: K11, every milestone. The format crates (`kiln-model`,
 `kiln-parse`, `kiln-index`, `kiln-check`), the export crates
 (`kiln-render`, `kiln-export` with Markdown, HTML and Word,
 `kiln-confluence` with publishing), `kiln-git`, `kiln-secrets` (environment
 variables and the OS credential store through `keyring`), `kiln-fenix`
 (opening a file, clocking in, opening a URL), `kiln-lsp`, `kiln-flint`,
 `kiln-jira` (the Jira mirror), the GUI (`kiln-gui`) and the binary's
-commands are built.
+commands are built, and the presets (K11): their data in `kiln-model`,
+the merge into `kiln.toml` in `kiln-parse`, the files in the binary.
 
 ## Layout
 
@@ -50,8 +51,8 @@ access except through a value or trait the caller passes in.
 
 | Crate | Role | Pure? | Built in |
 |---|---|---|---|
-| `kiln-model` | `kiln.toml` schema (export targets and `[confluence]` too), `ItemId`, `Item`, `Ref`, `CodeRef`, `Finding`, the rules; Kiln's folders | yes | K1, K2 |
-| `kiln-parse` | front matter and `kiln.toml` with spans (`toml_edit`), references in bodies (`pulldown-cmark`) and code (`regex`), comment-preserving edits and front-matter formatting | yes | K1, K4 |
+| `kiln-model` | `kiln.toml` schema (export targets and `[confluence]` too), `ItemId`, `Item`, `Ref`, `CodeRef`, `Finding`, the rules; Kiln's folders; the presets as data (`presets/`, embedded with `include_str!`) | yes | K1, K2, K11 |
+| `kiln-parse` | front matter and `kiln.toml` with spans (`toml_edit`), references in bodies (`pulldown-cmark`) and code (`regex`), comment-preserving edits and front-matter formatting; adding a preset to `kiln.toml` (`add_preset`, spliced so comments stay, nothing declared twice) | yes | K1, K4, K11 |
 | `kiln-index` | the loaded project: walk (`ignore`), parse in parallel (`rayon`), graph, queries (including the facts `kiln show` and hover print), renumber and new-item plans; the editing commands' checks and writes (`plan_set`, `check_link`, `apply_*`, `create_item`, shared by the CLI, the GUI and the Flint provider); the item diff between two projects; re-reading one file (`update_file`) | yes, given a file-source trait | K1 (incremental, K4) |
 | `kiln-check` | the FORMAT.md rules and their output formats | yes | K1 |
 | `kiln-render` | Markdown and templates → document tree (`pulldown-cmark`); report builders; Mermaid validation (`fenix-diagram`) | yes | K2 |

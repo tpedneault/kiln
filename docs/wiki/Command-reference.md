@@ -7,6 +7,8 @@ All examples on this page come from one small scratch project, made with `kiln i
 | Command | Does |
 |---|---|
 | [`kiln init`](#kiln-init) | starts a project: writes `kiln.toml` and a `design/` folder |
+| [`kiln preset list`](#kiln-preset-list) | the document templates Kiln ships (arc42, srs, design-doc) |
+| [`kiln preset add`](#kiln-preset-add) | copies one into the project, with its types and an export |
 | [`kiln new`](#kiln-new) | creates an item with the next free ID |
 | [`kiln list`](#kiln-list) | lists items, filtered |
 | [`kiln show`](#kiln-show) | one item with its links in both directions, coverage and progress |
@@ -57,7 +59,7 @@ Commands:
 ### kiln init
 
 ```text
-kiln init [--name NAME] [--fenix] [--project DIR]
+kiln init [--name NAME] [--fenix] [--preset NAME] [--project DIR]
 ```
 
 Writes `kiln.toml` with the seven default types (requirement, design, decision, milestone, task, test, risk) and six default link roles, plus a `design/` folder with a README. It never overwrites: if a `kiln.toml` is already there, it stops with exit 2.
@@ -66,6 +68,7 @@ Writes `kiln.toml` with the seven default types (requirement, design, decision, 
 |---|---|
 | `--name NAME` | the project's name in reports and exports. Default: the folder's name |
 | `--fenix` | also registers `kiln lsp` in `.fenix/tools.json` as an additional language server for the Fenix editor, beside each language's own, for Markdown and the languages of the code `[code] paths` scans. It merges into an existing file. In a folder that already has a `kiln.toml`, `kiln init --fenix` does only this; run it again after adding `[code] paths` |
+| `--preset NAME` | also adds a preset, exactly as [`kiln preset add NAME`](#kiln-preset-add) does. An unknown name stops before anything is written |
 | `--project DIR` | writes the project in `DIR` instead of the current folder |
 
 ```console
@@ -87,6 +90,63 @@ Notes:
 - The files written go to stdout, one per line; the message goes to stderr.
 - Source code is not scanned for code references until you add a `[code]` section to `kiln.toml`. The generated file has one commented out. See [Configuration](Configuration).
 - `--fenix` keeps everything else in `.fenix/tools.json`, including another Markdown server, which stays the primary one. Kiln's older entry (Kiln as the Markdown server) is moved to the additional form. See [Editors and Flint](Editors-and-Flint#setting-it-up-in-fenix).
+
+### kiln preset list
+
+```text
+kiln preset list
+```
+
+The presets: document templates Kiln ships. See [Presets](Presets).
+
+```console
+$ kiln preset list
+arc42       arc42 architecture documentation: twelve sections, one page each
+srs         a software requirements specification after ISO/IEC/IEEE 29148, one document
+design-doc  a design document: requirements, design, decisions, milestones, risks
+```
+
+### kiln preset add
+
+```text
+kiln preset add NAME [--dry-run] [--project DIR]
+```
+
+Copies a preset into the project: its template to
+`design/templates/NAME.md`, the types and link roles it needs that
+`kiln.toml` doesn't have yet (with item templates for the types it adds),
+and an `[[export]]` target named `NAME` at the end of `kiln.toml`, with a
+Confluence version of it commented out. The rest of `kiln.toml`, comments
+included, is left as it was. [Presets](Presets) lists what each preset
+adds, and the options to add by hand.
+
+| Option | Does |
+|---|---|
+| `--dry-run` | prints what would change; writes nothing |
+
+```console
+$ kiln preset add arc42
+kiln.toml
+design/templates/arc42.md
+design/templates/quality-scenario.md
+design/templates/building-block.md
+kiln: added the arc42 preset (types quality-goal, quality-scenario, constraint, block, term; already in kiln.toml, kept as they are: decision, risk; roles addresses; mitigates gains from decision, block; export `arc42`); `kiln export arc42` writes it
+$ kiln preset add srs
+kiln.toml
+design/templates/srs.md
+kiln: added the srs preset (already in kiln.toml, kept as they are: requirement, constraint, test, term; export `srs`); `kiln export srs` writes it
+```
+
+Notes:
+
+- Presets stack without duplicates: a type you already have, yours or
+  another preset's, is kept as it is; a link role you already have gains
+  only the types it lacks; each preset's export has its own name.
+- It never overwrites, and when it refuses it changes nothing (exit 2): a
+  file it would write already exists, the export name is taken (the
+  preset was added before), one of its types uses a prefix another type
+  has, or `kiln check` would find an export or template error in the
+  result.
 
 ### kiln new
 

@@ -381,8 +381,10 @@ answers each requirement.
 ## Step 7: the design document
 
 The document is generated from a template: your own Markdown, with
-directives where Kiln places items and reports. A template that works
-for most projects:
+directives where Kiln places items and reports. `kiln preset add
+design-doc` writes one like this for you, and `kiln preset add arc42`
+an arc42 one ([Presets](Presets)).
+A template that works for most projects:
 
 ```markdown
 # Introduction

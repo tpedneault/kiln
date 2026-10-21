@@ -131,10 +131,10 @@ fn directive(d: &Directive, project: &Project, out: &mut Vec<TemplateProblem>) {
                 }
             }
             if let Some(style) = d.attr("style") {
-                if style != "full" && style != "row" {
+                if !["full", "row", "compact"].contains(&style) {
                     out.push(problem(
                         d.line,
-                        format!("style `{style}` isn't full or row"),
+                        format!("style `{style}` isn't full, row or compact"),
                     ));
                 }
             }

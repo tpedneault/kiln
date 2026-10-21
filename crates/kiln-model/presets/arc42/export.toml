@@ -1,0 +1,22 @@
+# The arc42 document (`kiln preset add arc42`): one page per section,
+# under a main page that lists them. `kiln export arc42` writes it.
+[[export]]
+name = "arc42"
+format = "markdown"
+layout = "sections"
+title = "{name} — architecture"
+template = "{dir}/templates/arc42.md"
+path = "docs/arc42"
+
+# To publish the same document to Confluence, set [confluence] url and
+# space, then uncomment this target and set its parent page:
+# [[export]]
+# name = "arc42-confluence"
+# format = "confluence"
+# layout = "sections"
+# title = "{name} — architecture"
+# template = "{dir}/templates/arc42.md"
+# [export.confluence]
+# parent = 123456789          # the page the document goes under
+# qualify_titles = "always"   # "1 Introduction and Goals ({name} — architecture)", so other projects can share the space
+# children = "list"           # the main page lists the sections in document order

@@ -12,13 +12,15 @@ use crate::model::{RemotePage, Snapshot};
 use crate::normalise::body_hash;
 
 /// Reads `target`'s pages. `wanted_titles` are the titles its pages
-/// would have, to find which are taken by pages it doesn't own.
+/// would have, to find which are taken by pages it doesn't own, each
+/// with the title it falls back to when taken, looked up only then
+/// (`candidate_titles`).
 pub fn take_snapshot(
     client: &dyn Confluence,
     target: &ExportTarget,
     project: &str,
     space: &str,
-    wanted_titles: &[String],
+    wanted_titles: &[(String, Option<String>)],
     cache: &PageCache,
 ) -> Result<Snapshot, ClientError> {
     let property = |id: u64, version: u64| -> Result<_, ClientError> {
@@ -91,14 +93,33 @@ pub fn take_snapshot(
         .filter(|p| ours(p) || p.leftover)
         .map(|p| p.title.clone())
         .collect();
-    let mut taken = Vec::new();
-    for title in wanted_titles {
+    let is_taken = |title: &String| -> Result<bool, ClientError> {
         if own_titles.contains(title) {
+            return Ok(false);
+        }
+        let Some(id) = client
+            .find_title(space, title)?
+            .filter(|id| Some(*id) != root_id)
+        else {
+            return Ok(false);
+        };
+        // A page still holding Kiln's placeholder, without a property, is
+        // what a publish that stopped right after a create leaves (the
+        // root's own included): apply takes it over, so its title isn't
+        // taken.
+        let leftover =
+            client.property(id)?.is_none() && client.body(id)? == crate::apply::PLACEHOLDER;
+        Ok(!leftover)
+    };
+    let mut taken = Vec::new();
+    for (title, fallback) in wanted_titles {
+        if !is_taken(title)? {
             continue;
         }
-        if let Some(id) = client.find_title(space, title)? {
-            if Some(id) != root_id {
-                taken.push(title.clone());
+        taken.push(title.clone());
+        if let Some(fallback) = fallback {
+            if is_taken(fallback)? {
+                taken.push(fallback.clone());
             }
         }
     }
