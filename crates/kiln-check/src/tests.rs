@@ -588,3 +588,31 @@ fn level_findings_say_what_to_link_or_declare() {
         ]
     );
 }
+
+#[test]
+fn k113_the_agent_guide_follows_kiln_toml() {
+    let config = kiln_model::default_config("Test");
+    let parsed = kiln_parse::parse_config(&config).0.unwrap();
+    let current = kiln_model::write_agents(&parsed, None).unwrap();
+    let f = |guide: &str| files(vec![("design/AGENTS.md".into(), guide.to_owned())]);
+
+    assert_eq!(run("", &f(&current)), none());
+    // Without Kiln's section, the file is the project's alone.
+    assert_eq!(run("", &f("# Ours\n")), none());
+    // A type added to kiln.toml and not to the guide.
+    let stale = run(
+        "\n[types.term]\nprefix = \"TERM\"\nstatuses = [\"draft\"]\n",
+        &f(&current),
+    );
+    let line = current
+        .lines()
+        .position(|l| l.starts_with("<!-- kiln:agents begin"))
+        .unwrap()
+        + 1;
+    assert_eq!(stale, [format!("design/AGENTS.md:{line}:1 K113")]);
+    let broken = current.replace("<!-- kiln:agents end -->\n", "");
+    assert_eq!(
+        run("", &f(&broken)),
+        [format!("design/AGENTS.md:{line}:1 K113")]
+    );
+}

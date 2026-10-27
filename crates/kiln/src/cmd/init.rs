@@ -1,6 +1,7 @@
-//! `kiln init`: a `kiln.toml` with FORMAT.md's default types and a
-//! `design/` folder. Never overwrites anything. `--preset` then adds a
-//! preset's template, as `kiln preset add` would.
+//! `kiln init`: a `kiln.toml` with FORMAT.md's default types, a
+//! `design/` folder and the agent guide in it (`design/AGENTS.md`, `kiln
+//! agents`). Never overwrites anything. `--preset` then adds a preset's
+//! template, as `kiln preset add` would, which refreshes the guide.
 //!
 //! `--fenix` also registers `kiln lsp` as an additional language server in
 //! the project's `.fenix/tools.json` (INTEGRATION.md, "Editing items"), for
@@ -68,6 +69,12 @@ pub fn run(
     }
     println!("kiln.toml");
     println!("design/");
+    let source = kiln_index::DiskSource::new(&dir);
+    if let Ok(project) = kiln_index::Project::load(&source) {
+        if let Some((path, true)) = super::agents::refresh(&dir, &project.config, true)? {
+            println!("{path}");
+        }
+    }
     eprintln!("kiln: started project \"{name}\"; `kiln new requirement --title \"…\"` adds the first item");
     if let Some(p) = preset {
         super::preset::add_at(&dir, p, false)?;

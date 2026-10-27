@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0–K13 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the Jira mirror with K207 and `kiln auth jira`, `kiln jira sync` and `pull` keeping a sub-task per task in step (K10), presets such as arc42 with `kiln preset add` (K11), Home, the GUI's projects dashboard, to open, add, remove and switch projects (K12), requirement levels with derived requirements, `kiln trace --levels` and the `levels` report (K13), this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
+Status: K0–K14 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the Jira mirror with K207 and `kiln auth jira`, `kiln jira sync` and `pull` keeping a sub-task per task in step (K10), presets such as arc42 with `kiln preset add` (K11), Home, the GUI's projects dashboard, to open, add, remove and switch projects (K12), requirement levels with derived requirements, `kiln trace --levels` and the `levels` report (K13), the agent guide `design/AGENTS.md` with `kiln agents` (K14), this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -193,7 +193,8 @@ nearest `kiln.toml` (`--project <dir>` overrides).
 
 | Command | Does | Milestone |
 |---|---|---|
-| `kiln init [--preset NAME]` | writes a `kiln.toml` with the default types and a `design/` folder; never overwrites; `--preset` adds a preset too | K1, K11 |
+| `kiln init [--preset NAME]` | writes a `kiln.toml` with the default types and a `design/` folder with the agent guide; never overwrites; `--preset` adds a preset too | K1, K11, K14 |
+| `kiln agents` | writes the agent guide, `design/AGENTS.md`, or brings its generated section up to date with `kiln.toml` (see "The agent guide") | K14 |
 | `kiln preset list` / `preset add NAME [--dry-run]` | the presets; copies one into the project: its template, the types and roles it lacks, an export target; presets stack without declaring anything twice; never overwrites (see "Presets") | K11 |
 | `kiln new <type> [--parent ID] [--title T]` | allocates the next ID, writes the file from the type's template, prints its path; `--open` opens it in Fenix at the title | K1 |
 | `kiln list [--type T] [--status S] [--tag X] [--jira] [--format text\|json]` | items, filtered; `--jira` adds each linked ticket's status from the Jira mirror | K1, K8 |
@@ -268,6 +269,35 @@ How adding works, and why (ADR-015):
   sets `qualify_titles = "always"` (CONFLUENCE.md, "Pages and their
   identity"), so two projects with the same preset can publish to one
   Confluence space without their section pages fighting for a title.
+
+## The agent guide
+
+Coding agents increasingly do the work a design describes, and some
+change the design itself. They read `AGENTS.md` files for how a
+repository works, and without one they edit front matter by hand,
+choose IDs, write inverse links and edit generated exports, each of
+which `kiln check` then rejects or, worse, accepts and a later export
+contradicts. So a Kiln project carries a guide for them (ADR-017):
+
+- **In the first item folder, `design/AGENTS.md`**, not beside
+  `kiln.toml`. `kiln.toml` usually sits at the repository root, where
+  the repository's own `AGENTS.md` (about its code) lives and is not
+  Kiln's to write. Agents that honour nested `AGENTS.md` files read this
+  one when they work in `design/`; the repository's own guide can point
+  to it in one line.
+- **Rules written once, then the project's.** How to read with Kiln,
+  change front matter only through the editing commands, link from the
+  source side, leave sign-off to people, add code references, keep
+  `kiln check` clean, never edit exports. Like a preset's template
+  (ADR-015), a team adapts them, and a newer Kiln never rewrites them.
+- **A generated section, kept current.** Between two marker lines, the
+  types, folders, statuses, link roles, code references, levels,
+  coverage and exports, from `kiln.toml` alone: no items, clock or
+  commit, so it changes only when the configuration does. `kiln agents`
+  rewrites it, `kiln preset add` refreshes it, and `kiln check` warns
+  when it is stale (K113), so the guide can't quietly describe a
+  configuration the project no longer has. A project that removes the
+  section, or the file, has opted out and gets no finding.
 
 ## GUI (K7)
 
@@ -361,8 +391,9 @@ changelog line.
 | K11 | Presets: `kiln preset list`/`add`, `kiln init --preset`, with `arc42`, `srs` and `design-doc`, each adding its types, roles and export to `kiln.toml` without duplicates, options on the wiki (ADR-015); `style="compact"` items; a template's own HTML comments left out of exports; Confluence titles that don't depend on who published first (`qualify_titles`), a refused plan instead of a failed create when a title is taken, and `children = "list"` | — |
 | K12 | Home, the projects dashboard (REQ-017): `kiln` outside a project opens on the projects opened before, with a preview of each (items, types, next milestone, `kiln check`'s findings), adding a folder, removing one from the list, switching with `SPC h`; the list in the state folder | — |
 | K13 | Requirement levels (REQ-018, ADR-016): `[requirements] levels` and `trace`, `derived = true`; K201 and K202 on every level, K208 (traces to nothing above), K209 (skips a level), K210 (nothing below refines it); `kiln trace --levels`; the `levels` report; "Derived" in item properties, `kiln show` and `kiln diff` | — |
+| K14 | The agent guide (REQ-019, ADR-017): `kiln agents` writes `design/AGENTS.md`, rules written once and a section generated from `kiln.toml` between markers; `kiln init` writes it, `kiln preset add` refreshes it, K113 reports it stale; this repository's own guide | — |
 
-Everything through K13 needs nothing new from Fenix or Flint to work. INTEGRATION.md
+Everything through K14 needs nothing new from Fenix or Flint to work. INTEGRATION.md
 lists the changes (G1–G9) that make the integration better and which
 milestone notices their absence.
 

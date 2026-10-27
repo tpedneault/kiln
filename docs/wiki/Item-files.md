@@ -51,7 +51,7 @@ surprises with implicit types (`no` stays a string).
 
 A file that starts with `+++` but has no closing `+++` line, or whose
 front matter isn't valid TOML, is error K100 (see
-[Checking](Checking#file-rules-k100k112)).
+[Checking](Checking#file-rules-k100k113)).
 
 ## Front-matter keys
 

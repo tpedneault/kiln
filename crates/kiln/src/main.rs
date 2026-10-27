@@ -102,6 +102,8 @@ enum Command {
         #[arg(long, value_name = "NAME")]
         preset: Option<String>,
     },
+    /// Write the agent guide (design/AGENTS.md), or bring Kiln's section of it up to date with kiln.toml.
+    Agents,
     /// Document templates Kiln ships (arc42, srs, design-doc): list them, or add one.
     Preset {
         #[command(subcommand)]
@@ -345,6 +347,7 @@ fn main() -> ExitCode {
             fenix,
             preset,
         } => cmd::init::run(project, name, fenix, preset.as_deref()),
+        Command::Agents => cmd::agents::run(project),
         Command::Preset {
             what: PresetCommand::List,
         } => cmd::preset::list(),

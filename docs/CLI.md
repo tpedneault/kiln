@@ -18,7 +18,8 @@ Results go to stdout, messages to stderr, so `kiln list --format json |
 ### `kiln init [--name NAME] [--fenix] [--preset NAME]`
 
 Writes `kiln.toml` with FORMAT.md's default types and links, and a
-`design/` folder with a README. `NAME` defaults to the folder's name.
+`design/` folder with a README and the agent guide, `design/AGENTS.md`
+(`kiln agents`, below). `NAME` defaults to the folder's name.
 Never overwrites: with a `kiln.toml` already there it stops (exit 2). Add
 a `[code]` section yourself to have source code scanned for code
 references.
@@ -81,6 +82,8 @@ Copies a preset into the project (DESIGN.md, "Presets"):
   target for Confluence commented out below it, at the end of `kiln.toml`.
 
 The rest of `kiln.toml`, comments and layout included, stays as it was.
+When the project has an agent guide, its generated section is brought up
+to date with the new types (`kiln agents`).
 
 ```
 $ kiln preset add arc42
@@ -88,6 +91,7 @@ kiln.toml
 design/templates/arc42.md
 design/templates/quality-scenario.md
 design/templates/building-block.md
+design/AGENTS.md
 kiln: added the arc42 preset (types quality-goal, quality-scenario, constraint, block, term; already in kiln.toml, kept as they are: decision, risk; roles addresses; mitigates gains from decision, block; export `arc42`); `kiln export arc42` writes it
 ```
 
@@ -104,6 +108,41 @@ result `kiln check` would find an export or template error in.
 `--dry-run` prints what would change and writes nothing. The wiki's
 "Presets" page lists what each preset adds and the options to add by
 hand.
+
+### `kiln agents`
+
+Writes the agent guide, `AGENTS.md` in the first of `paths`
+(`design/AGENTS.md`), for coding agents that change or implement the
+design (DESIGN.md, "The agent guide"), or brings it up to date. The file
+has two parts:
+
+- **the rules**, written once: read with `kiln show`, `list`, `impact`
+  and `trace`; create items with `kiln new` and change front matter with
+  `set`, `link` and `unlink`, never by hand; link from the source side;
+  leave sign-off (approving, accepting) to people; add code references
+  when implementing or testing; keep `kiln check` clean; never edit
+  generated exports. They are the project's to edit, and Kiln never
+  touches them again;
+- **Kiln's section**, between `<!-- kiln:agents begin … -->` and `<!--
+  kiln:agents end -->`, generated from `kiln.toml` alone: each type with
+  its prefix, folder, statuses (which is new, done, closed) and parents;
+  each link role with what it links and how it reads back; how code
+  references are written and where they are scanned; the requirement
+  levels; what coverage `kiln check` expects; each export and the file
+  it writes.
+
+Run again, it replaces only Kiln's section and prints the path, or says
+the guide is up to date and prints nothing. A file without the markers
+(an `AGENTS.md` you wrote) keeps its text and gains the section at its
+end; a begin marker with no end marker is refused (exit 2) naming the
+line. `kiln check` reports a section that no longer matches `kiln.toml`
+(K113); deleting the section, or the file, opts out.
+
+```
+$ kiln agents
+design/AGENTS.md
+kiln: brought Kiln's section of design/AGENTS.md up to date with kiln.toml
+```
 
 ## Reading
 

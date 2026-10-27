@@ -209,6 +209,17 @@ All notable changes to Kiln are recorded here. The format follows
   properties, `kiln show` its level, `kiln diff` a change to `derived`.
   Without `[requirements]` nothing changes
   ([docs/FORMAT.md](docs/FORMAT.md), "Requirement levels").
+- K14: the agent guide (REQ-019, ADR-017). `kiln agents` writes
+  `design/AGENTS.md` for coding agents: rules written once and then the
+  project's (read with Kiln, change front matter only through `kiln
+  new`, `set`, `link` and `unlink`, link from the source side, leave
+  sign-off to people, add code references, keep `kiln check` clean,
+  never edit exports), and a section between markers generated from
+  `kiln.toml` (types, folders, statuses, link roles, code references,
+  requirement levels, coverage, exports). `kiln init` writes it, `kiln
+  preset add` refreshes it, and K113 warns when the section no longer
+  matches `kiln.toml`. Kiln's own `design/AGENTS.md`
+  ([docs/CLI.md](docs/CLI.md), "`kiln agents`").
 
 ### Changed
 

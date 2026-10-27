@@ -14,8 +14,10 @@
 //! Also the export targets and Confluence connection (K2), and Kiln's own
 //! folders (settings, state, logs, `KILN_HOME`), whose rules are pure
 //! here and resolved against the platform by the binary. And the presets
-//! (K11): the document templates Kiln ships, as data.
+//! (K11): the document templates Kiln ships, as data. And the agent guide
+//! (K14), `AGENTS.md`'s generated section, as text from the configuration.
 
+mod agents;
 mod config;
 mod export;
 mod finding;
@@ -24,6 +26,9 @@ mod id;
 mod item;
 mod preset;
 
+pub use agents::{
+    agents_current, agents_path, agents_section, write_agents, AgentsError, AGENTS_FILE,
+};
 pub use config::{default_config, slug, CodeConfig, Config, JiraSync, LinkRole, TypeDef, CODE};
 pub use export::{
     ChildList, ConfluenceConfig, ConfluenceFlavour, ConfluenceTarget, Diagrams, DocxOptions,

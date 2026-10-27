@@ -28,7 +28,47 @@ pub fn findings(project: &Project, files: &dyn FileSource, today: Date) -> Vec<F
     status_rules(project, today, &mut out);
     diagram_rules(project, &mut out);
     template_rules(project, files, &mut out);
+    agents_rule(project, files, &mut out);
     out
+}
+
+/// K113: the agent guide's generated section matches `kiln.toml`. A
+/// project without the file, or whose file has no section, has chosen
+/// not to have one.
+// implements: REQ-019
+fn agents_rule(project: &Project, files: &dyn FileSource, out: &mut Vec<Finding>) {
+    let path = kiln_model::agents_path(&project.config);
+    let Some(text) = files
+        .read(&path)
+        .ok()
+        .and_then(|b| kiln_parse::normalize(&b))
+    else {
+        return;
+    };
+    let message = match kiln_model::agents_current(&project.config, &text) {
+        Ok(None | Some(true)) => return,
+        Ok(Some(false)) => {
+            "Kiln's section no longer matches kiln.toml; `kiln agents` brings it up to date"
+                .to_owned()
+        }
+        Err(e) => e.to_string(),
+    };
+    let line = text
+        .lines()
+        .position(|l| l.starts_with("<!-- kiln:agents begin"))
+        .map_or(1, |n| n as u32 + 1);
+    report(
+        out,
+        Rule::K113,
+        &path,
+        kiln_model::Span {
+            start: 0,
+            end: 0,
+            line,
+            column: 1,
+        },
+        message,
+    );
 }
 
 /// K111: a Mermaid block that doesn't draw, on its own line.

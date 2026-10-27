@@ -1283,6 +1283,7 @@ fn the_wiki_s_requirement_levels_work_as_pasted() {
         text = paste(&text, &snippet);
     }
     std::fs::write(&config, text).unwrap();
+    ok(d, &["agents"]);
     let check = kiln_in(d, &["check"]);
     assert_eq!(check.status.code(), Some(0), "{}", stdout(&check));
     assert_eq!(stderr(&check).trim(), "kiln: no findings");
@@ -1307,4 +1308,49 @@ fn the_wiki_s_requirement_levels_work_as_pasted() {
     );
     let csv = ok(d, &["trace", "--levels", "--format", "csv"]);
     assert!(csv.contains("\nSTK-001,SYS-001,SW-001,"), "{csv}");
+}
+
+#[test]
+// verifies: REQ-019
+fn the_agent_guide_is_written_by_init_and_kept_current() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    let init = ok(d, &["init", "--name", "Demo"]);
+    assert!(init.contains("design/AGENTS.md"), "{init}");
+    let guide = d.join("design/AGENTS.md");
+    let text = std::fs::read_to_string(&guide).unwrap();
+    assert!(text.starts_with("# Working on Demo's design"), "{text}");
+    assert!(text.contains("| requirement (Requirement) | `REQ-001` | `design/requirements/`"));
+    assert_eq!(stderr(&kiln_in(d, &["check"])).trim(), "kiln: no findings");
+
+    // The project's own words survive; kiln.toml changes show up as K113
+    // until `kiln agents` runs.
+    std::fs::write(&guide, text.replace("## Rules\n", "## Rules\n\n- Ours.\n")).unwrap();
+    let config = d.join("kiln.toml");
+    let toml = std::fs::read_to_string(&config).unwrap();
+    std::fs::write(
+        &config,
+        format!("{toml}\n[types.term]\nprefix = \"TERM\"\nstatuses = [\"draft\"]\n"),
+    )
+    .unwrap();
+    let check = stdout(&kiln_in(d, &["check"]));
+    assert!(
+        check.contains("K113 warning: Kiln's section no longer matches kiln.toml"),
+        "{check}"
+    );
+    assert_eq!(ok(d, &["agents"]).trim(), "design/AGENTS.md");
+    let text = std::fs::read_to_string(&guide).unwrap();
+    assert!(
+        text.contains("- Ours.\n") && text.contains("| term (Term) | `TERM-001`"),
+        "{text}"
+    );
+    assert_eq!(stderr(&kiln_in(d, &["check"])).trim(), "kiln: no findings");
+    let again = kiln_in(d, &["agents"]);
+    assert_eq!(stdout(&again), "");
+    assert!(stderr(&again).contains("up to date"));
+
+    // A preset's types reach the guide as they reach kiln.toml.
+    let added = ok(d, &["preset", "add", "srs"]);
+    assert!(added.contains("design/AGENTS.md"), "{added}");
+    assert_eq!(stderr(&kiln_in(d, &["check"])).trim(), "kiln: no findings");
 }

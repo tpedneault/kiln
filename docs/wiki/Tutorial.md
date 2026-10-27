@@ -27,15 +27,19 @@ $ git init
 $ kiln init --name Beacon
 kiln.toml
 design/
+design/AGENTS.md
 kiln: started project "Beacon"; `kiln new requirement --title "…"` adds the first item
 ```
 
-`kiln init` writes two things:
+`kiln init` writes three things:
 
 - **`kiln.toml`**, the project's configuration. It declares seven item
   **types**, the **link roles** between them, and nothing else yet.
 - **`design/`**, the folder your items will live in, with a short
   `README.md`.
+- **`design/AGENTS.md`**, a guide for coding agents: how to read and
+  change the design with Kiln, and how this project's design is
+  organised. See [Designing with Kiln](Designing-with-Kiln#with-coding-agents).
 
 The default types are a good starting point for most projects:
 

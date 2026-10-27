@@ -9,6 +9,7 @@ All examples on this page come from one small scratch project, made with `kiln i
 | [`kiln init`](#kiln-init) | starts a project: writes `kiln.toml` and a `design/` folder |
 | [`kiln preset list`](#kiln-preset-list) | the document templates Kiln ships (arc42, srs, design-doc) |
 | [`kiln preset add`](#kiln-preset-add) | copies one into the project, with its types and an export |
+| [`kiln agents`](#kiln-agents) | writes the agent guide, `design/AGENTS.md`, or brings it up to date |
 | [`kiln new`](#kiln-new) | creates an item with the next free ID |
 | [`kiln list`](#kiln-list) | lists items, filtered |
 | [`kiln show`](#kiln-show) | one item with its links in both directions, coverage and progress |
@@ -62,7 +63,7 @@ Commands:
 kiln init [--name NAME] [--fenix] [--preset NAME] [--project DIR]
 ```
 
-Writes `kiln.toml` with the seven default types (requirement, design, decision, milestone, task, test, risk) and six default link roles, plus a `design/` folder with a README. It never overwrites: if a `kiln.toml` is already there, it stops with exit 2.
+Writes `kiln.toml` with the seven default types (requirement, design, decision, milestone, task, test, risk) and six default link roles, plus a `design/` folder with a README and the agent guide, `design/AGENTS.md` ([`kiln agents`](#kiln-agents)). It never overwrites: if a `kiln.toml` is already there, it stops with exit 2.
 
 | Option | Does |
 |---|---|
@@ -75,6 +76,7 @@ Writes `kiln.toml` with the seven default types (requirement, design, decision, 
 $ kiln init --name Demo
 kiln.toml
 design/
+design/AGENTS.md
 kiln: started project "Demo"; `kiln new requirement --title "…"` adds the first item
 $ kiln init
 kiln: /home/me/demo/kiln.toml already exists; kiln init never overwrites
@@ -90,6 +92,31 @@ Notes:
 - The files written go to stdout, one per line; the message goes to stderr.
 - Source code is not scanned for code references until you add a `[code]` section to `kiln.toml`. The generated file has one commented out. See [Configuration](Configuration).
 - `--fenix` keeps everything else in `.fenix/tools.json`, including another Markdown server, which stays the primary one. Kiln's older entry (Kiln as the Markdown server) is moved to the additional form. See [Editors and Flint](Editors-and-Flint#setting-it-up-in-fenix).
+
+### kiln agents
+
+```text
+kiln agents [--project DIR]
+```
+
+Writes `AGENTS.md` in the first folder of `paths` (`design/AGENTS.md`): a guide for coding agents that implement or change the design. Run again, it brings Kiln's part of it up to date with `kiln.toml`.
+
+The file has two parts. The **rules** at the top (read with `kiln show` and `kiln list`, create items with `kiln new`, change front matter with `kiln set`, `link` and `unlink`, link from the source side, leave approvals to people, add code references, keep `kiln check` clean, never edit exports) are written once and are yours to edit. **Kiln's section**, between `<!-- kiln:agents begin … -->` and `<!-- kiln:agents end -->`, is generated from `kiln.toml`: the types with their prefixes, folders and statuses, the link roles, how code references are written, the requirement levels, coverage and the exports.
+
+```console
+$ kiln agents
+design/AGENTS.md
+kiln: brought Kiln's section of design/AGENTS.md up to date with kiln.toml
+$ kiln agents
+kiln: design/AGENTS.md is up to date
+```
+
+Notes:
+
+- Only the text between the markers is replaced; everything else in the file stays. An `AGENTS.md` you wrote without the markers keeps its text and gains Kiln's section at its end.
+- A begin marker without an end marker is refused (exit 2), naming the line.
+- `kiln init` writes the guide, and `kiln preset add` refreshes it. After editing `kiln.toml` by hand, run `kiln agents`; `kiln check` reminds you with K113 ([Checking](Checking#k113)).
+- To do without the guide, delete Kiln's section or the file; `kiln check` then says nothing about it.
 
 ### kiln preset list
 

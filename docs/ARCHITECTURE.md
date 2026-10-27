@@ -51,7 +51,7 @@ access except through a value or trait the caller passes in.
 
 | Crate | Role | Pure? | Built in |
 |---|---|---|---|
-| `kiln-model` | `kiln.toml` schema (export targets and `[confluence]` too), `ItemId`, `Item`, `Ref`, `CodeRef`, `Finding`, the rules; Kiln's folders; the presets as data (`presets/`, embedded with `include_str!`) | yes | K1, K2, K11 |
+| `kiln-model` | `kiln.toml` schema (export targets and `[confluence]` too), `ItemId`, `Item`, `Ref`, `CodeRef`, `Finding`, the rules; Kiln's folders; the presets as data (`presets/`, embedded with `include_str!`); the agent guide's text from the configuration (`agents`) | yes | K1, K2, K11, K14 |
 | `kiln-parse` | front matter and `kiln.toml` with spans (`toml_edit`), references in bodies (`pulldown-cmark`) and code (`regex`), comment-preserving edits and front-matter formatting; adding a preset to `kiln.toml` (`add_preset`, spliced so comments stay, nothing declared twice) | yes | K1, K4, K11 |
 | `kiln-index` | the loaded project: walk (`ignore`), parse in parallel (`rayon`), graph, queries (including the facts `kiln show` and hover print), renumber and new-item plans; the editing commands' checks and writes (`plan_set`, `check_link`, `apply_*`, `create_item`, shared by the CLI, the GUI and the Flint provider); the item diff between two projects; the requirement levels as a tree (`level_trace`, K13); re-reading one file (`update_file`) | yes, given a file-source trait | K1 (incremental, K4) |
 | `kiln-check` | the FORMAT.md rules and their output formats | yes | K1 |
