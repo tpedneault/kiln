@@ -392,7 +392,8 @@ What changes with levels:
 
 A three-level V-model, ready to paste below what `kiln init` wrote (the
 `[links.*]` tables replace the ones of the same name; delete
-`[types.requirement]` once no item uses it):
+`[types.requirement]` once no item uses it), followed by `kiln agents`
+so the agent guide describes the new types:
 
 <!-- tested: levels -->
 ```toml

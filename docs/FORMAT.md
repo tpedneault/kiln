@@ -183,7 +183,7 @@ Rules:
 ## Items
 
 An item is a `.md` file under `paths` whose first line is `+++`. Files
-without front matter are ignored (a `README.md` in `design/` is fine).
+without front matter are ignored (a `README.md` in `design/` is fine, and so is the agent guide, `AGENTS.md`).
 
 ~~~markdown
 +++
@@ -442,6 +442,7 @@ Severities: `error` (exit 1), `warning`, `off`, overridable in `[check]`.
 | K110 | error | relative link or image to a file that doesn't exist |
 | K111 | error | a Mermaid block fails to parse (the diagram's own line and message) |
 | K112 | error | an export template is invalid: unknown directive or attribute, unknown type, status or ID, a template file that doesn't exist; a Word target's `reference` document that doesn't exist or isn't a `.docx` |
+| K113 | warning | the agent guide (`AGENTS.md` in the first of `paths`, `kiln agents`) has Kiln's section and it doesn't match what `kiln.toml` gives now, or its begin marker has no end marker; a guide without the section, or no guide, is never a finding |
 | K201 | warning | a requirement (of any level, see "Requirement levels") past its type's `initial` status (non-draft, by default) and not closed, with no `verifies` coverage, when `verifies` can point at its type |
 | K202 | warning | the same with no `implements` coverage |
 | K203 | warning | a non-closed item links to a closed one (e.g. implements an obsolete requirement) |

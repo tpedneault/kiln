@@ -533,6 +533,31 @@ K202 = "error"   # an approved requirement nothing implements fails CI
 From then on, approving a requirement means planning how it is built and
 verified in the same change.
 
+### With coding agents
+
+`kiln init` writes `design/AGENTS.md`, which agents that read
+`AGENTS.md` files pick up when they work in `design/`: rules for
+changing the design through Kiln's commands, and a section generated
+from `kiln.toml` describing your types, folders, links and exports.
+Adapt the rules to your team (who may approve what, which items an agent
+may create), and keep the generated section current with `kiln agents`;
+`kiln check` reports it stale (K113).
+
+If your repository has its own `AGENTS.md` (or `CLAUDE.md`) at the root,
+add one line pointing at the design guide, so an agent working on the
+code knows it exists:
+
+```markdown
+The design (requirements, decisions, milestones) is in `design/`, kept
+with Kiln; read `design/AGENTS.md` before changing it or implementing
+what it describes.
+```
+
+In review, treat an agent's design changes like anyone's: the front
+matter changes are small and `kiln check` has run on them; read the
+prose, and check that it hasn't moved a requirement to approved or
+accepted a decision on its own.
+
 ### Two people, one ID
 
 Two branches can each create `REQ-015`. After the second merge, `kiln

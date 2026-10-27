@@ -24,12 +24,14 @@ types and an export, nothing twice, ADR-015; `qualify_titles` for spaces several
 project, it adds, removes and switches projects, REQ-017) and K13
 (requirement levels: `[requirements] levels` and `trace`, `derived =
 true`, K208–K210, `kiln trace --levels` and the `levels` report,
-ADR-016) are done.
+ADR-016) and K14 (the agent guide: `kiln agents` writes
+`design/AGENTS.md`, rules once and a section generated from `kiln.toml`,
+K113 when stale, ADR-017) are done.
 
 ## Read first, in this order
 
 1. `docs/DESIGN.md` — goals, non-goals, architecture, crates, CLI,
-   budgets and milestones K0–K13.
+   budgets and milestones K0–K14.
 2. `docs/FORMAT.md` — the item file format and `kiln.toml`; the contract.
    `kiln-model`/`kiln-parse` implement exactly this; change both together.
 3. `docs/EXPORT.md` — export targets, the three layouts (one document is
@@ -138,6 +140,7 @@ docs/CLI.md           the command line as it stands
 docs/CONFIGURATION.md kiln.toml and environment, the overview
 docs/wiki/            the user guide, published to the GitHub wiki (CI.md)
 kiln.toml, design/    Kiln's own Kiln project (dogfooding), checked in CI
+design/AGENTS.md      how to change design/ with Kiln; `kiln agents` after editing kiln.toml
 docs/generated/       its exported design document, `kiln export --check` in CI
 docs/brand/, kiln.ico the logo and icon, drawn by crates/kiln-brand (GUI.md, "Icon")
 crates/               the workspace (kiln-* libraries, kiln binary)

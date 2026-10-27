@@ -179,6 +179,12 @@ pub fn add_at(root: &Path, name: &str, dry_run: bool) -> Result<u8, Fail> {
     for (path, _) in &plan.files {
         println!("{path}");
     }
+    // The agent guide describes the types just added (K113 otherwise).
+    if let Ok(project) = Project::load(&disk) {
+        if let Some((path, true)) = super::agents::refresh(root, &project.config, false)? {
+            println!("{path}");
+        }
+    }
     eprintln!(
         "kiln: added the {name} preset ({}); `kiln export {}` writes it",
         summary.join("; "),

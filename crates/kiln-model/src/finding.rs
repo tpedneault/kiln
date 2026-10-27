@@ -105,6 +105,7 @@ rules! {
     K110 Error "K1" "relative link or image to a file that doesn't exist",
     K111 Error "K2" "a Mermaid block fails to parse",
     K112 Error "K2" "an export template is invalid",
+    K113 Warning "K14" "the agent guide's generated section is out of date or broken",
     K201 Warning "K1" "a requirement with no verifies coverage",
     K202 Warning "K1" "a requirement with no implements coverage",
     K203 Warning "K1" "a non-closed item links to a closed one",

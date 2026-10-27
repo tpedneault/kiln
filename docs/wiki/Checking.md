@@ -211,6 +211,7 @@ edit) and in exports with the `findings` report, at the same severities.
 | K110 | error | relative link or image to a file that doesn't exist |
 | K111 | error | a Mermaid diagram fails to parse |
 | K112 | error | an export template is invalid |
+| K113 | warning | the agent guide's generated section is out of date with `kiln.toml`, or broken |
 | K201 | warning | a requirement past its initial status with no `verifies` coverage |
 | K202 | warning | a requirement past its initial status with no `implements` coverage |
 | K203 | warning | an open item links to a closed one |
@@ -317,7 +318,7 @@ kiln.toml:98:18: K005 error: `qualify_titles` `sometimes` isn't taken or always
 [Templates and exports](Templates-and-exports)). An invalid target is left
 out; the others still export.
 
-## File rules (K100–K112)
+## File rules (K100–K113)
 
 These are about item files, code references and export templates.
 
@@ -531,6 +532,26 @@ design/templates/doc.md:9:1: K112 error: style `table` isn't full, row or compac
 [Templates and exports](Templates-and-exports). A preset's template
 names the preset's types; if you rename or remove one of them, change the
 template's directives too ([Presets](Presets#renaming-a-type-a-template-uses)).
+
+### K113
+
+**Triggers:** the agent guide (`AGENTS.md` in the first folder of
+`paths`, usually `design/AGENTS.md`) has Kiln's section, and that
+section is not what `kiln agents` would write from `kiln.toml` now (a
+type, status, role or export was added, changed or removed since), or
+its begin marker has no end marker.
+
+```text
+design/AGENTS.md:51:1: K113 warning: Kiln's section no longer matches kiln.toml; `kiln agents` brings it up to date
+```
+
+A stale guide tells coding agents about types and folders the project no
+longer has, so they file items in the wrong place or with the wrong
+statuses.
+
+**Fix:** run `kiln agents` and commit the result. Only Kiln's section
+changes. Without a guide, or with the section deleted, there is nothing
+to check.
 
 ## Design rules (K201–K210)
 
