@@ -161,6 +161,55 @@ fn a_project_from_init_to_check() {
 }
 
 #[test]
+fn a_reader_that_stops_early_ends_kiln_quietly() {
+    // `kiln list | head -1`: more output than a pipe buffers, so kiln is
+    // still printing when the reader closes its end.
+    use std::io::{BufRead, Read};
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    let folder = d.join("design/requirements");
+    std::fs::create_dir_all(&folder).unwrap();
+    let title = "A requirement with a title long enough to fill the pipe quickly";
+    for n in 1..=3000 {
+        std::fs::write(
+            folder.join(format!("REQ-{n:04}.md")),
+            format!(
+                "+++\nid = \"REQ-{n:04}\"\ntype = \"requirement\"\ntitle = \"{title}\"\nstatus = \"draft\"\n+++\n"
+            ),
+        )
+        .unwrap();
+    }
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_kiln"))
+        .arg("list")
+        .current_dir(d)
+        .env("FENIX_HOME", d.join("no-fenix"))
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("the kiln binary runs");
+    let mut out = std::io::BufReader::new(child.stdout.take().unwrap());
+    let mut first = String::new();
+    out.read_line(&mut first).unwrap();
+    assert!(first.starts_with("REQ-"), "{first:?}");
+    drop(out);
+    let mut err = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut err)
+        .unwrap();
+    let status = child.wait().unwrap();
+    assert!(!err.contains("panicked"), "{err}");
+    assert!(err.is_empty(), "{err}");
+    // Rust ignores SIGPIPE at startup, so the closed pipe reaches kiln as
+    // a write error on every platform, and that is a clean exit.
+    assert_eq!(status.code(), Some(0), "{status}");
+}
+
+#[test]
 // verifies: REQ-018
 fn trace_levels_follows_requirements_down_the_levels() {
     let dir = tempfile::tempdir().unwrap();

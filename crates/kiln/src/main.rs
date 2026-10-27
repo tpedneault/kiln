@@ -332,6 +332,7 @@ enum AuthService {
 }
 
 fn main() -> ExitCode {
+    quiet_on_closed_stdout();
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(err) => return report(&err),
@@ -461,6 +462,51 @@ fn main() -> ExitCode {
     }
 }
 
+/// Ends the process quietly with 0 when stdout is closed early, as in
+/// `kiln trace --levels | head -5`, the way `git log | head` does.
+///
+/// `println!` panics when stdout is a closed pipe. Restoring SIGPIPE's
+/// default disposition, as many Rust CLIs do, would need `unsafe` and
+/// `libc`, would still leave Windows (no SIGPIPE) panicking, and would
+/// also kill Kiln when a child process it writes to goes away.
+/// Instead one panic hook, for every command on every platform: a panic
+/// that is std's "failed printing to stdout" with an OS error of kind
+/// `BrokenPipe` exits 0 with nothing on stderr; any other panic goes to
+/// the default hook as before. The kind comes from the `(os error N)`
+/// std appends, not from the message text, which the OS words and
+/// localises. Commands that write through `io::Write` already ignore
+/// or report their own write errors and are unaffected.
+fn quiet_on_closed_stdout() {
+    let default = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let message = info
+            .payload()
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| info.payload().downcast_ref::<&str>().copied());
+        if message.is_some_and(is_closed_stdout) {
+            std::process::exit(0);
+        }
+        default(info);
+    }));
+}
+
+/// Whether a panic message is std's report of printing to a closed pipe:
+/// `failed printing to stdout: <OS text> (os error N)`, with `N` an error
+/// of kind `BrokenPipe` (EPIPE on Unix; ERROR_BROKEN_PIPE or
+/// ERROR_NO_DATA on Windows).
+fn is_closed_stdout(message: &str) -> bool {
+    let Some(rest) = message.strip_prefix("failed printing to stdout: ") else {
+        return false;
+    };
+    rest.rsplit_once("(os error ")
+        .and_then(|(_, code)| code.strip_suffix(')'))
+        .and_then(|code| code.parse::<i32>().ok())
+        .is_some_and(|code| {
+            std::io::Error::from_raw_os_error(code).kind() == std::io::ErrorKind::BrokenPipe
+        })
+}
+
 /// Help and version go out as clap renders them. A usage error is cut to
 /// its first line: clap's own rendering adds a usage block and tips over
 /// several lines, and every Kiln error is one line, so CI logs and
@@ -510,5 +556,28 @@ mod tests {
         assert!(!line.contains('\n'), "{line:?}");
         assert!(!line.starts_with("error:"), "{line:?}");
         assert!(line.contains("frobnicate"), "{line:?}");
+    }
+
+    #[test]
+    fn only_a_broken_pipe_on_stdout_is_a_closed_stdout() {
+        let epipe = std::io::Error::from(std::io::ErrorKind::BrokenPipe);
+        let code = if cfg!(windows) { 232 } else { 32 };
+        let closed = format!(
+            "failed printing to stdout: {}",
+            std::io::Error::from_raw_os_error(code)
+        );
+        assert!(is_closed_stdout(&closed), "{closed:?}");
+        let full = format!(
+            "failed printing to stdout: {}",
+            std::io::Error::from_raw_os_error(if cfg!(windows) { 112 } else { 28 })
+        );
+        assert!(!is_closed_stdout(&full), "{full:?}");
+        assert!(!is_closed_stdout(&format!(
+            "failed printing to stderr: {epipe}"
+        )));
+        assert!(!is_closed_stdout(&format!(
+            "failed printing to stdout: {epipe}"
+        )));
+        assert!(!is_closed_stdout("index out of bounds"));
     }
 }

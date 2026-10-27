@@ -608,3 +608,6 @@ kiln: a requirement can't be the source of `verifies` (from: test, code)
 | 1 | `kiln check` found an error, `kiln export --check` found changes, a Confluence plan was refused, or a change was refused (a file changed on disk) |
 | 2 | usage or configuration error: unknown command or ID, no `kiln.toml`, a `kiln.toml` Kiln can't read, a value the configuration doesn't allow |
 | 3 | network or server error (Confluence, or Jira for `list --jira` and `auth jira`) |
+
+A reader that stops early, as in `kiln list | head -5`, ends `kiln`
+quietly with exit 0, as `git log | head` does.

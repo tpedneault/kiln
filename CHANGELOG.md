@@ -251,3 +251,10 @@ All notable changes to Kiln are recorded here. The format follows
   spelling per number (`REQ-007`, not `REQ-7`); `[code] exclude`; the
   default code pattern; which rules apply when
   ([docs/FORMAT.md](docs/FORMAT.md)).
+
+### Fixed
+
+- CLI: a reader that stops early (`kiln trace --levels | head -5`) ends
+  `kiln` quietly with exit 0, as `git log | head` does, instead of a
+  "failed printing to stdout: Broken pipe" panic, on every command and
+  platform.
