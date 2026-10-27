@@ -66,6 +66,7 @@ front matter isn't valid TOML, is error K100 (see
 | `jira` | string or array of strings | no | Jira issue keys, such as `"DEMO-12"` or `["DEMO-40", "DEMO-41"]`. See [Jira](Jira). |
 | `owner` | string | no | A name or handle. Informational only: Kiln assigns nothing. |
 | `due` | date | no | A TOML local date, written without quotes: `due = 2026-11-30`. Meaningful for milestones and tasks. |
+| `derived` | boolean | no | `true` on a requirement below the top level that deliberately traces to nothing above it (see [`derived`](#derived)). |
 | `[links]` | table | no | Outgoing links: each key is a link role, each value an array of IDs. |
 | `[extra]` | table | no | Anything your project wants to record. Kiln keeps it untouched and never interprets it. |
 
@@ -123,6 +124,25 @@ due = 2026-11-30
 - `owner` is shown, nothing more.
 - `due` on a milestone is checked by K206 (a milestone past its date that
   is neither done nor closed). On other types it is shown only.
+
+### `derived`
+
+```toml
+id = "SW-012"
+type = "software"
+title = "A watchdog resets a stalled poller"
+status = "approved"
+derived = true
+```
+
+Only for projects with several requirement levels
+([Configuration](Configuration#requirements-requirement-levels)). A
+requirement below the top level normally refines one of the level above;
+one that answers none of them, because the design itself calls for it,
+says so with `derived = true`, and its body says why. Without either,
+it is warning K208. Exports show "Derived" in its properties, `kiln show`
+says `level 3 of 3, derived`, and `kiln diff` reports the change when it
+is set or cleared. `derived = false` is the same as leaving it out.
 
 ### `[links]`
 

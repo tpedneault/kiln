@@ -161,6 +161,77 @@ fn a_project_from_init_to_check() {
 }
 
 #[test]
+// verifies: REQ-018
+fn trace_levels_follows_requirements_down_the_levels() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    let one = kiln_in(d, &["trace", "--levels"]);
+    assert_eq!(one.status.code(), Some(2));
+    assert!(
+        stderr(&one).contains("one requirement level"),
+        "{}",
+        stderr(&one)
+    );
+
+    let config = d.join("kiln.toml");
+    let text = std::fs::read_to_string(&config).unwrap();
+    std::fs::write(
+        &config,
+        format!(
+            "{text}
+[types.system]
+prefix = \"SYS\"
+title = \"System requirement\"
+statuses = [\"draft\", \"approved\"]
+
+[links.refines]
+from = [\"system\"]
+to = [\"requirement\"]
+inverse = \"refined by\"
+
+[requirements]
+levels = [\"requirement\", \"system\"]
+"
+        ),
+    )
+    .unwrap();
+    ok(d, &["new", "requirement", "--title", "Faults are visible"]);
+    ok(d, &["new", "system", "--title", "Fault telemetry"]);
+    ok(d, &["new", "system", "--title", "Orphan"]);
+    ok(d, &["link", "SYS-001", "refines", "REQ-001"]);
+    ok(d, &["set", "SYS-002", "status=approved"]);
+    let check = ok(d, &["check"]);
+    assert!(
+        check.contains("K208 warning: SYS-002 is approved but refines no requirement"),
+        "{check}"
+    );
+
+    let text = ok(d, &["trace", "--levels"]);
+    assert!(text.starts_with("Requirement levels"), "{text}");
+    assert!(
+        text.contains("REQ-001  Faults are visible  (draft)\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("\n  SYS-001  Fault telemetry  (draft)\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("Not traced to the level above\n  SYS-002  Orphan  (approved)"),
+        "{text}"
+    );
+    let csv = ok(d, &["trace", "--levels", "--format", "csv"]);
+    assert!(csv.starts_with("Requirement,System requirement,"), "{csv}");
+    assert!(csv.contains("\nREQ-001,SYS-001,"), "{csv}");
+    assert!(csv.contains("\n,SYS-002,"), "{csv}");
+    let json: serde_json::Value =
+        serde_json::from_str(&ok(d, &["trace", "--levels", "--format", "json"])).unwrap();
+    assert_eq!(json["chains"][0]["below"][0]["id"], "SYS-001");
+    assert_eq!(json["untraced"][0]["id"], "SYS-002");
+}
+
+#[test]
 // verifies: REQ-015
 fn renumber_moves_an_id_everywhere() {
     let dir = tempfile::tempdir().unwrap();
@@ -1004,11 +1075,11 @@ fn jira_sync_creates_sub_tasks_records_their_keys_and_pull_takes_status_back() {
 /// The `toml` blocks of the wiki's Presets page marked `<!-- MARK -->`
 /// (`added: arc42`, `tested: arc42`), in order: what the page says a
 /// preset adds, and the options it tells people to paste.
-fn wiki_blocks(mark: &str) -> Vec<String> {
+fn wiki_blocks(page: &str, mark: &str) -> Vec<String> {
     let page = std::fs::read_to_string(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/wiki/Presets.md"),
+        Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../docs/wiki/{page}.md")),
     )
-    .expect("the wiki's Presets page is there");
+    .expect("the wiki page is there");
     let marker = format!("<!-- {mark} -->");
     let mut out = Vec::new();
     let mut rest = page.as_str();
@@ -1076,7 +1147,7 @@ fn presets_populate_kiln_toml_once_and_the_wiki_says_what_they_add() {
             "{written}"
         );
         let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
-        for block in wiki_blocks(&format!("added: {name}")) {
+        for block in wiki_blocks("Presets", &format!("added: {name}")) {
             for line in block
                 .lines()
                 .filter(|l| !l.is_empty() && !l.starts_with('#'))
@@ -1116,7 +1187,7 @@ fn presets_populate_kiln_toml_once_and_the_wiki_says_what_they_add() {
 
     // The wiki's arc42 options on top, then items linked by every role.
     let mut config = config;
-    for snippet in wiki_blocks("tested: arc42") {
+    for snippet in wiki_blocks("Presets", "tested: arc42") {
         config = paste(&config, &snippet);
     }
     std::fs::write(d.join("kiln.toml"), &config).unwrap();
@@ -1199,4 +1270,41 @@ fn presets_populate_kiln_toml_once_and_the_wiki_says_what_they_add() {
         srs.contains("**TERM-001 Basket**"),
         "the shared term type serves both"
     );
+}
+
+#[test]
+fn the_wiki_s_requirement_levels_work_as_pasted() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    let config = d.join("kiln.toml");
+    let mut text = std::fs::read_to_string(&config).unwrap();
+    for snippet in wiki_blocks("Configuration", "tested: levels") {
+        text = paste(&text, &snippet);
+    }
+    std::fs::write(&config, text).unwrap();
+    let check = kiln_in(d, &["check"]);
+    assert_eq!(check.status.code(), Some(0), "{}", stdout(&check));
+    assert_eq!(stderr(&check).trim(), "kiln: no findings");
+
+    ok(d, &["new", "stakeholder", "--title", "Faults are visible"]);
+    ok(d, &["new", "system", "--title", "Fault telemetry"]);
+    ok(d, &["new", "software", "--title", "Poll the register"]);
+    ok(d, &["link", "SYS-001", "refines", "STK-001"]);
+    ok(d, &["link", "SW-001", "refines", "SYS-001"]);
+    for id in ["STK-001", "SYS-001", "SW-001"] {
+        ok(d, &["set", id, "status=approved"]);
+    }
+    let check = stdout(&kiln_in(d, &["check"]));
+    // Nothing verifies them yet, and only the software level is
+    // implemented; refinement is complete.
+    assert!(check.contains("K201 warning: STK-001"), "{check}");
+    assert!(check.contains("K202 warning: SW-001"), "{check}");
+    assert!(!check.contains("K202 warning: SYS-001"), "{check}");
+    assert!(
+        !check.contains("K208") && !check.contains("K210"),
+        "{check}"
+    );
+    let csv = ok(d, &["trace", "--levels", "--format", "csv"]);
+    assert!(csv.contains("\nSTK-001,SYS-001,SW-001,"), "{csv}");
 }

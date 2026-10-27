@@ -176,6 +176,9 @@ enum Command {
     Trace {
         #[arg(long = "type", value_name = "TYPE")]
         type_name: Option<String>,
+        /// Follow the requirement levels down from the top: each chain, the derived and the untraced.
+        #[arg(long, conflicts_with = "type_name")]
+        levels: bool,
         #[arg(long, value_enum, default_value_t = TraceFormat::Text)]
         format: TraceFormat,
     },
@@ -384,7 +387,14 @@ fn main() -> ExitCode {
         Command::Renumber { id, to, file } => {
             cmd::renumber::run(project, &id, &to, file.as_deref())
         }
-        Command::Trace { type_name, format } => cmd::trace::run(project, type_name, format),
+        Command::Trace {
+            levels: true,
+            format,
+            ..
+        } => cmd::trace::run_levels(project, format),
+        Command::Trace {
+            type_name, format, ..
+        } => cmd::trace::run(project, type_name, format),
         Command::Impact { id, format } => cmd::impact::run(project, &id, format),
         Command::Diff {
             range,

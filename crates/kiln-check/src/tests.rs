@@ -482,3 +482,109 @@ fn k112_a_word_reference_that_isnt_a_docx() {
     with.push(("design/templates/company.docx", "PK\u{3}\u{4}rest".into()));
     assert!(run(config, &with).is_empty());
 }
+
+const LEVELS: &str = r#"
+[types.system]
+prefix = "SYS"
+title = "System requirement"
+statuses = ["draft", "approved", "obsolete"]
+closed = ["obsolete"]
+
+[types.software]
+prefix = "SW"
+title = "Software requirement"
+statuses = ["draft", "approved", "obsolete"]
+closed = ["obsolete"]
+parents = ["software"]
+
+[links.refines]
+from = ["system", "software"]
+to = ["requirement", "system"]
+inverse = "refined by"
+
+[requirements]
+levels = ["requirement", "system", "software"]
+
+[check]
+K201 = "off"
+K202 = "off"
+"#;
+
+fn levelled(id: &str, ty: &str, status: &str, rest: &str) -> (String, String) {
+    (format!("design/{id}.md"), item(id, ty, status, rest))
+}
+
+#[test]
+// verifies: REQ-018
+fn k208_k209_k210_requirement_levels() {
+    let refines = |id: &str| format!("[links]\nrefines = [\"{id}\"]\n");
+    let f = files(vec![
+        req("REQ-001", "approved", ""),
+        req("REQ-002", "approved", ""),
+        req("REQ-003", "draft", "derived = true\n"),
+        levelled("SYS-001", "system", "approved", &refines("REQ-001")),
+        levelled("SYS-002", "system", "approved", ""),
+        levelled("SYS-003", "system", "draft", ""),
+        levelled("SW-001", "software", "approved", &refines("SYS-001")),
+        levelled("SW-002", "software", "approved", "parent = \"SW-001\"\n"),
+        levelled("SW-003", "software", "approved", "derived = true\n"),
+        levelled("SW-004", "software", "approved", &refines("REQ-001")),
+        levelled(
+            "SW-005",
+            "software",
+            "draft",
+            &format!("derived = true\n{}", refines("SYS-001")),
+        ),
+    ]);
+    assert_eq!(
+        run(LEVELS, &f),
+        [
+            "design/REQ-002.md:2:7 K210",
+            "design/REQ-003.md:6:11 K208",
+            "design/SW-004.md:7:13 K209",
+            "design/SW-005.md:6:11 K208",
+            "design/SYS-002.md:2:7 K208",
+            "design/SYS-002.md:2:7 K210",
+        ]
+    );
+}
+
+#[test]
+fn level_findings_say_what_to_link_or_declare() {
+    let mut source = MemorySource::new().with(
+        "kiln.toml",
+        format!("{}{LEVELS}", kiln_model::default_config("Test")),
+    );
+    source.insert(
+        "design/REQ-001.md",
+        item("REQ-001", "requirement", "approved", ""),
+    );
+    source.insert(
+        "design/SW-001.md",
+        item(
+            "SW-001",
+            "software",
+            "approved",
+            "[links]\nrefines = [\"REQ-001\"]\n",
+        ),
+    );
+    source.insert(
+        "design/SYS-001.md",
+        item("SYS-001", "system", "approved", ""),
+    );
+    let project = Project::load(&source).unwrap();
+    let got: Vec<String> = check(&project, &source, TODAY)
+        .iter()
+        .map(|f| f.message.clone())
+        .collect();
+    assert_eq!(
+        got,
+        // SW-001's link skips a level: K209 reports it, and it still
+        // covers REQ-001, so one wrong link is one finding.
+        [
+            "SW-001 refines REQ-001, a requirement; `refines` points at the level directly above, a system requirement",
+            "SYS-001 is approved but refines no requirement; link it with `kiln link SYS-001 refines <ID>`, or set `derived = true` and say why in its body",
+            "SYS-001 is approved but no software requirement refines it",
+        ]
+    );
+}

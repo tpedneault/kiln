@@ -81,7 +81,7 @@ path = "target/kiln/design.html"
 | `template` | none | a Markdown file in the repo that arranges the document |
 | `types` | every type, in `kiln.toml` order | without a template: which types get a section |
 | `exclude_status` | each type's `closed` statuses | items left out |
-| `reports` | `["traceability", "findings"]` | without a template: report sections appended as appendices |
+| `reports` | `["traceability", "findings"]` | without a template: report sections appended as appendices (`levels` is titled "Requirement levels") |
 | `numbering` | `true` | section numbers (`2.1.3`) on headings |
 | `item_style` | `list` for `document` and `sections`, `table` for `tree` | how an item's properties are shown (see "Items in a document") |
 | `link_to` | `[]` | other exports to link into for items this one doesn't contain, in order |
@@ -178,7 +178,7 @@ Flint covers Windows and Linux (KDE Plasma 6 on Wayland). It does not…
 |---|---|
 | `<!-- kiln:items … -->` | the selected items, as a flat list (in `tree`: nested by `parent`), under the heading it sits in |
 | `<!-- kiln:item REQ-014 -->` | one item |
-| `<!-- kiln:report traceability\|findings\|roadmap\|changes\|risks … -->` | a report (see "Reports") |
+| `<!-- kiln:report traceability\|levels\|findings\|roadmap\|changes\|risks … -->` | a report (see "Reports") |
 | `<!-- kiln:summary -->` | the commit, its date, counts, coverage, progress |
 | `<!-- kiln:toc -->` | a table of contents (Confluence's `toc` macro; a generated list in files) |
 | `<!-- kiln:value name\|commit\|date\|since -->` | a value, inline (`since`: the `--since` baseline, empty without one) |
@@ -249,8 +249,9 @@ Jira: FLINT-88
 
 - `list` (default for `document` and `sections`): the status lozenge on
   its own line, then one line per relationship, its label in bold:
-  parent, outgoing links, inverses ("Verified by", "Implemented by" with
-  code locations), Jira. Each relationship reads on its own, and an item
+  parent, "Derived" for a derived requirement (FORMAT.md, "Requirement
+  levels"), outgoing links, inverses ("Verified by", "Implemented by"
+  with code locations), Jira. Each relationship reads on its own, and an item
   with none takes one line. Lines are broken inside one paragraph
   (Confluence and HTML `<br>`, Markdown's `\` hard break, wiki markup's
   `\\`, a Word line break), so the block stays compact.
@@ -272,7 +273,8 @@ and those that would pass level 6 become bold paragraphs.
 
 | Report | Content |
 |---|---|
-| `traceability` | per non-closed item of `type` (default requirement): implemented by, verified by, gaps marked |
+| `traceability` | per non-closed item of `type` (default: the highest requirement level, which is `requirement` without `[requirements]`): implemented by, verified by, gaps marked; `type="system"` traces one level |
+| `levels` | the requirement levels as a traceability matrix (FORMAT.md, "Requirement levels"): a line of totals, then one row per chain from a top-level requirement down, one column per level, then what covers the row's last requirement (`—` where a role can't point at its type). A requirement under several rows is shown on the first; a missing level below is a red "gap". Derived requirements follow with "derived" above them, then those tracing to nothing with "gap" above them. Says so when the project has one level. Upper levels' own verification is `traceability` with their `type` |
 | `findings` | `kiln check` warnings and errors, by rule, linked to the repository |
 | `roadmap` | milestones in `due` order, status, progress, included items |
 | `risks` | open risks and what mitigates them |

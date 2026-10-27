@@ -355,7 +355,101 @@ coverage       controls: yes
 ```
 
 Rules K201 and K202 don't read `roles`: they always check `verifies`
-and `implements` on the type named `requirement`.
+and `implements`, on every requirement level their `to` includes (one
+level, the type named `requirement`, unless `[requirements]` lists
+others; see below).
+
+## `[requirements]`: requirement levels
+
+When requirements are written at several levels (what stakeholders need,
+what the system must do, what each piece of software must do; or
+DO-178C's high- and low-level requirements), declare each level as a
+type and list them, highest first:
+
+```toml
+[requirements]
+levels = ["stakeholder", "system", "software"]
+trace = "refines"
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `levels` | one level: the type named `requirement` | The requirement types, highest level first. Each must be a declared type, listed once. |
+| `trace` | `"refines"` | The link role a requirement uses to point at the level above. With more than one level it must be declared, and its `from` and `to` must let each level point at the one above (else K002, naming the pair). |
+
+What changes with levels:
+
+- K201 and K202 check every level that `verifies` and `implements` can
+  point at. K210 asks that each level above the lowest is refined by the
+  level below; K208 that each level below the top refines the one above,
+  or says `derived = true` ([Item files](Item-files#derived)); K209 that
+  a trace link points at the level directly above ([Checking](Checking#k208)).
+- `kiln trace --levels` and the `levels` export report follow the levels
+  down as chains ([Command reference](Command-reference#kiln-trace),
+  [Templates and exports](Templates-and-exports#reports)).
+- `kiln trace` and the `traceability` report without a type trace the
+  highest level; give `--type system` or `type="system"` for another.
+
+A three-level V-model, ready to paste below what `kiln init` wrote (the
+`[links.*]` tables replace the ones of the same name; delete
+`[types.requirement]` once no item uses it):
+
+<!-- tested: levels -->
+```toml
+[types.stakeholder]
+prefix = "STK"
+title = "Stakeholder requirement"
+statuses = ["draft", "approved", "verified", "obsolete"]
+done = ["verified"]
+closed = ["obsolete"]
+parents = ["stakeholder"]
+
+[types.system]
+prefix = "SYS"
+title = "System requirement"
+statuses = ["draft", "approved", "verified", "obsolete"]
+done = ["verified"]
+closed = ["obsolete"]
+parents = ["system"]
+
+[types.software]
+prefix = "SW"
+title = "Software requirement"
+statuses = ["draft", "approved", "implemented", "verified", "obsolete"]
+done = ["verified"]
+closed = ["obsolete"]
+parents = ["software"]
+
+[links.refines]
+from = ["system", "software"]
+to = ["stakeholder", "system"]
+inverse = "refined by"
+
+# Tests verify every level (acceptance, integration, unit); code and
+# tasks implement only the lowest.
+[links.verifies]
+from = ["test", "code"]
+to = ["stakeholder", "system", "software"]
+inverse = "verified by"
+
+[links.implements]
+from = ["design", "task", "code"]
+to = ["software"]
+inverse = "implemented by"
+
+[links.mitigates]
+from = ["stakeholder", "system", "software", "design", "task"]
+to = ["risk"]
+inverse = "mitigated by"
+
+[requirements]
+levels = ["stakeholder", "system", "software"]
+```
+
+For DO-178C, two levels do: `levels = ["high-level", "low-level"]`, with
+`derived = true` on the low-level requirements that answer no high-level
+one (the standard's derived requirements, which go to the safety
+assessment); the `levels` report lists them apart from the traced ones.
 
 ## `[render]`
 

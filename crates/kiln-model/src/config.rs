@@ -26,6 +26,12 @@ pub struct Config {
     pub links: Vec<LinkRole>,
     /// `[coverage] roles`.
     pub coverage_roles: Vec<String>,
+    /// `[requirements] levels`: the requirement types, highest level
+    /// first. Empty when not written; see [`Config::levels`].
+    pub levels: Vec<String>,
+    /// `[requirements] trace`: the role a requirement uses to point at
+    /// the level above (`refines`).
+    pub trace_role: String,
     /// `[render] link_bare_ids`.
     pub link_bare_ids: bool,
     /// `[jira] url`.
@@ -170,6 +176,32 @@ impl Config {
 
     pub fn export(&self, name: &str) -> Option<&ExportTarget> {
         self.exports.iter().find(|e| e.name == name)
+    }
+
+    /// The requirement levels, highest first: `[requirements] levels`, or
+    /// without it the one type named `requirement`, so a project that
+    /// never wrote `[requirements]` is checked as before.
+    pub fn levels(&self) -> Vec<&str> {
+        if !self.levels.is_empty() {
+            return self.levels.iter().map(String::as_str).collect();
+        }
+        self.type_named("requirement")
+            .map(|t| vec![t.name.as_str()])
+            .unwrap_or_default()
+    }
+
+    /// The level of a type, 0 for the highest; `None` for a type that
+    /// isn't a requirement level.
+    pub fn level_of(&self, type_name: &str) -> Option<usize> {
+        self.levels().iter().position(|t| *t == type_name)
+    }
+
+    /// The trace role, when there is more than one level and it is
+    /// declared: with one level, nothing traces anywhere.
+    pub fn trace(&self) -> Option<&LinkRole> {
+        (self.levels().len() > 1)
+            .then(|| self.role(&self.trace_role))
+            .flatten()
     }
 
     pub fn prefixes(&self) -> Vec<String> {
@@ -378,6 +410,8 @@ mod tests {
                 },
             ],
             coverage_roles: vec![],
+            levels: vec![],
+            trace_role: "refines".into(),
             link_bare_ids: true,
             jira_url: None,
             jira_sync: None,

@@ -15,7 +15,8 @@ use crate::toml_walk::{inside_quotes, Walk};
 
 /// The front-matter keys, in the order formatting writes them.
 pub(crate) const KEYS: &[&str] = &[
-    "id", "type", "title", "status", "parent", "tags", "jira", "owner", "due", "links", "extra",
+    "id", "type", "title", "status", "parent", "tags", "jira", "owner", "due", "derived", "links",
+    "extra",
 ];
 
 /// The longest title, in characters.
@@ -199,6 +200,14 @@ pub fn parse_item(path: &str, text: &str, options: &ItemOptions) -> (Option<Item
         })
     });
 
+    let derived = root.get("derived").and_then(|item| {
+        let span = w.item_span(item);
+        match w.boolean(item, Rule::K104, "`derived`") {
+            Some(true) => Some(span),
+            _ => None,
+        }
+    });
+
     let mut links = Vec::new();
     if let Some(table) = root
         .get("links")
@@ -247,6 +256,7 @@ pub fn parse_item(path: &str, text: &str, options: &ItemOptions) -> (Option<Item
         jira,
         owner,
         due,
+        derived,
         links,
         mentions,
         relative_links,
@@ -529,6 +539,25 @@ REQ-098 in code
         assert_eq!(item.diagrams.len(), 1);
         assert_eq!(item.diagrams[0].0, "flowchart TD\n  a --> b\n");
         assert_eq!(item.diagrams[0].1.line, 9);
+    }
+
+    #[test]
+    fn derived_is_a_boolean_kept_only_when_true() {
+        let item = |derived: &str| {
+            parse(&format!(
+                "+++\nid = \"REQ-001\"\ntype = \"requirement\"\ntitle = \"t\"\nstatus = \"draft\"\n{derived}\n+++\n"
+            ))
+        };
+        let (parsed, findings) = item("derived = true");
+        assert_eq!(findings, vec![]);
+        assert_eq!(
+            parsed.unwrap().derived.map(|s| (s.line, s.column)),
+            Some((6, 11))
+        );
+        assert_eq!(item("derived = false").0.unwrap().derived, None);
+        let (parsed, findings) = item("derived = \"yes\"");
+        assert_eq!(parsed.unwrap().derived, None);
+        assert_eq!(codes(&findings), ["K104@6:11"]);
     }
 
     #[test]

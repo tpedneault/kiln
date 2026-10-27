@@ -19,6 +19,7 @@ named like a token or password is an error (K004).
 | `[types.<name>]` | each type: `prefix`, `statuses`, `initial`, `done`, `closed`, `parents`, `title`, `plural`, `template` | the seven of `kiln init`: requirement, design, decision, milestone, task, test, risk |
 | `[links.<role>]` | each link role: `from`, `to`, `inverse` | implements, verifies, part-of, supersedes, mitigates, depends-on |
 | `[coverage]` `roles` | which roles count toward coverage | `["implements", "verifies"]` |
+| `[requirements]` `levels`, `trace` | the requirement types, highest level first, and the role tracing each level to the one above (FORMAT.md, "Requirement levels") | one level, `requirement`; `trace = "refines"` |
 | `[render]` `link_bare_ids` | whether a bare `REQ-014` in prose is a reference | `true` |
 | `[jira]` `url` | where `jira` keys point, and the Jira the mirror reads (`kiln list --jira`, K207, the GUI); Server or Data Center | none |
 | `[jira]` `project`, `parent`, `parent_type`, `subtask_type`, `types`, `[jira.status]` | `kiln jira sync`: the Jira project, the project issue (written by the first sync), the issue types, the Kiln types synced (`task`), Kiln status → Jira status name — INTEGRATION.md, "Jira" | none (no sync) |

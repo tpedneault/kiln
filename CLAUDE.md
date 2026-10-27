@@ -21,12 +21,15 @@ sync` and `pull`: a sub-task per task kept in step, ADR-014) and K11
 (presets: `kiln preset add arc42|srs|design-doc` adds a template, its
 types and an export, nothing twice, ADR-015; `qualify_titles` for spaces several projects share) and K12
 (Home, the GUI's projects dashboard after Fenix's: opened outside a
-project, it adds, removes and switches projects, REQ-017) are done.
+project, it adds, removes and switches projects, REQ-017) and K13
+(requirement levels: `[requirements] levels` and `trace`, `derived =
+true`, K208–K210, `kiln trace --levels` and the `levels` report,
+ADR-016) are done.
 
 ## Read first, in this order
 
 1. `docs/DESIGN.md` — goals, non-goals, architecture, crates, CLI,
-   budgets and milestones K0–K12.
+   budgets and milestones K0–K13.
 2. `docs/FORMAT.md` — the item file format and `kiln.toml`; the contract.
    `kiln-model`/`kiln-parse` implement exactly this; change both together.
 3. `docs/EXPORT.md` — export targets, the three layouts (one document is

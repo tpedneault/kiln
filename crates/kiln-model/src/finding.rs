@@ -112,6 +112,9 @@ rules! {
     K205 Warning "K1" "status verified but no passing verifies source",
     K206 Warning "K1" "a milestone past its due date and not done",
     K207 Off "K8" "a done work item whose Jira ticket isn't resolved, or the reverse",
+    K208 Warning "K13" "a requirement below the top level that traces to nothing above it",
+    K209 Warning "K13" "a trace link that doesn't point at the level directly above",
+    K210 Warning "K13" "a requirement above the lowest level that nothing below refines",
 }
 
 impl Rule {

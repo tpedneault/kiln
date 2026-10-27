@@ -158,7 +158,11 @@ impl<'a> State<'a> {
             .unwrap_or_default();
             nodes.push(Node::Section(Section {
                 number: String::new(),
-                title: vec![Inline::text(capitalised(&name))],
+                title: vec![Inline::text(if name == "levels" {
+                    "Requirement levels".to_owned()
+                } else {
+                    capitalised(&name)
+                })],
                 depth: 1,
                 kind: SectionKind::Report(name),
                 own_page: false,
@@ -479,6 +483,15 @@ impl<'a> State<'a> {
                 label: "Parent".into(),
                 lead: "under".into(),
                 values: vec![r(parent)],
+            });
+        }
+        // What an auditor looks for in a derived requirement: that it
+        // says so, beside its rationale in the body.
+        if item.derived.is_some() {
+            entries.push(PropEntry {
+                label: "Derived".into(),
+                lead: "derived,".into(),
+                values: vec![vec![Inline::text("traces to no higher level")]],
             });
         }
         let mut roles: Vec<&str> = Vec::new();

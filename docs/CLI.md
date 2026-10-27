@@ -151,14 +151,53 @@ verified by     crates/kiln-parse/src/edit.rs:173, crates/kiln-parse/src/edit.rs
 coverage        implements: yes, verifies: yes
 ```
 
-### `kiln trace [--type TYPE] [--format text|json|csv]`
+### `kiln trace [--type TYPE | --levels] [--format text|json|csv]`
 
-Coverage of every non-closed item of `TYPE` (default `requirement`): for
+Coverage of every non-closed item of `TYPE` (default: the highest
+requirement level, `requirement` without `[requirements]`): for
 each coverage role, the open items and code locations that link to it,
 and the gaps. An item covered only because all its open children are says
 "(through its children)". The text and JSON forms name the commit
 (`HEAD`) when the project is in a git repository. CSV has one row per
 item, lists joined with `; `.
+
+`--levels` follows the requirement levels down instead (FORMAT.md,
+"Requirement levels"): each top-level requirement with what refines it,
+level by level, each with its own coverage and gaps; then the derived
+requirements; then those that trace to nothing above them. A project
+with one level is a usage error (exit 2) naming `[requirements]`.
+
+```
+$ kiln trace --levels
+Requirement levels at 1a2b3c4d5e6f: Stakeholder requirement → System requirement → Software requirement
+
+STK-001  Operators see a fault within 1 s  (approved)
+    verified by: TEST-001
+  SYS-004  Fault telemetry at 10 Hz  (approved)
+      verified by: TEST-007
+    SW-010  Poll the fault register every 100 ms  (implemented)
+        implemented by: src/faults.c:41
+        verified by: — gap
+
+Derived (traced to no level above, on purpose)
+  SW-012  Watchdog resets a stalled poller  (approved, derived)
+      implemented by: src/watchdog.c:12
+      verified by: TEST-020
+
+Not traced to the level above
+  SYS-009  Logs rotate daily  (approved)
+      verified by: — gap
+      refined by: — gap
+
+1 stakeholder requirements, 2 system requirements, 2 software requirements; 1 derived, 1 not traced, 3 gaps
+```
+
+JSON nests each requirement's `below` under it, in `chains`, `derived`
+and `untraced`, each with `level` (1 the highest), `derived`,
+`coverage` and `gaps`. CSV is the traceability matrix: one row per
+chain, a column per level (`derived` above a derived requirement), then
+what covers the row's last requirement, and its gaps (`untraced` for one
+that traces to nothing above).
 
 ### `kiln impact ID [--format text|json]`
 

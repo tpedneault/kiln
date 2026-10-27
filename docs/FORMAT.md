@@ -108,6 +108,13 @@ inverse = "blocks"
 [coverage]
 roles = ["implements", "verifies"]
 
+# Requirement levels, highest first, and the role that traces each level
+# to the one above (see "Requirement levels"). Without this table the one
+# level is `requirement`.
+# [requirements]
+# levels = ["stakeholder", "system", "software"]
+# trace = "refines"              # default
+
 [render]
 link_bare_ids = true             # REQ-014 in prose is a reference, not only [[REQ-014]]
 
@@ -154,6 +161,11 @@ Rules:
   unique across types.
 - Paths (`paths`, `code.paths`, `template`) are relative and stay inside
   the project: an absolute path or any `..` is K002.
+- `[requirements] levels` names declared types, each once; with more
+  than one level, `trace` (default `refines`) must be a declared role
+  whose `from` and `to` let each level point at the one above. Otherwise
+  K002, naming the level or the pair; the levels that are types still
+  apply.
 - `[check]` keys are rule codes; an unknown code or a severity other than
   `error`, `warning`, `off` is K002. K001 can't be turned off: nothing
   else can be read without the file.
@@ -221,6 +233,7 @@ the rest of the suite; and because it has no implicit typing surprises.
 | `jira` | string or array | no | Jira issue keys |
 | `owner` | string | no | a name or handle, informational only (no assignment semantics) |
 | `due` | date | no | TOML local date; meaningful for milestones and tasks |
+| `derived` | boolean | no | `true` on a requirement below the top level that deliberately traces to nothing above it; the body says why (see "Requirement levels") |
 | `[links]` | table of role → array of IDs | no | outgoing links; roles must allow this item's type as `from` |
 | `[extra]` | table | no | anything a project wants; Kiln preserves and shows it, never interprets it |
 
@@ -321,6 +334,67 @@ for files holding code references on purpose, such as test fixtures.
   any link or parent edge (a child reaches its parent), with the path,
   breadth first.
 
+## Requirement levels
+
+Requirements are often written at several levels: what stakeholders
+need, what the system must do, what each piece of software must do
+(ISO/IEC/IEEE 29148, the V-model), or DO-178C's high- and low-level
+requirements. Each level is a type of its own, with its own prefix and
+statuses; `[requirements] levels` lists them, highest first, and names
+the role that traces a level to the one above:
+
+```toml
+[types.stakeholder]
+prefix = "STK"
+title = "Stakeholder requirement"
+statuses = ["draft", "approved", "obsolete"]
+closed = ["obsolete"]
+parents = ["stakeholder"]
+
+[types.system]
+prefix = "SYS"
+title = "System requirement"
+statuses = ["draft", "approved", "implemented", "verified", "obsolete"]
+closed = ["obsolete"]
+parents = ["system"]
+
+# … [types.software] likewise, with prefix "SW"
+
+[links.refines]
+from = ["system", "software"]
+to = ["stakeholder", "system"]
+inverse = "refined by"
+
+[requirements]
+levels = ["stakeholder", "system", "software"]
+```
+
+- **`parent` decomposes within a level; the trace role crosses levels.**
+  A system requirement `refines` the stakeholder requirement it answers,
+  written once on the lower side like every link. A requirement with no
+  trace link of its own traces through its parent: a decomposed system
+  requirement links upward once, at the top of its subtree.
+- **Derived requirements say so.** A requirement below the top level that
+  answers no requirement above it (a watchdog the design calls for, a
+  safety mechanism) has `derived = true` and explains why in its body.
+  One that traces nowhere without saying so is K208, so the difference
+  between "on purpose" and "forgotten" is visible and reviewed.
+- **Each level is covered by the roles that can point at it.** `verifies`
+  and `implements` apply to every level their `to` lists (K201, K202):
+  in a V-model, tests verify each level, and code implements only the
+  lowest. Above the lowest level, a requirement is also covered when the
+  level below refines it (K210), counted like any coverage: directly, or
+  through all its open children. A link that skips a level or points
+  sideways is K209; it still counts where it points, so one wrong link is
+  one finding.
+- Without `[requirements]`, the one level is the type named
+  `requirement`, so K201 and K202 behave as they always have; a project
+  that names its requirements differently lists that type alone.
+
+`kiln trace --levels` and the `levels` report (EXPORT.md, "Reports")
+follow the levels down from the top: each chain, then the derived
+requirements, then those that trace to nothing.
+
 ## Baselines
 
 A **baseline** is a git revision (a tag such as `v1.0`, a branch, a
@@ -338,7 +412,7 @@ included) or at a second revision, item by item:
 - An item is **added** or **removed** when its ID exists on one side
   only, and **changed** when any of these differ: `status`, `title`,
   `type`, `parent`, `[links]` (each role and target added or removed),
-  `tags` and `jira` (as sets), `owner`, `due`, the body (ignoring leading
+  `tags` and `jira` (as sets), `owner`, `due`, `derived`, the body (ignoring leading
   and trailing blank lines), the file it lives in.
 - Revisions are passed to git as revisions, never as options: one
   starting with `-` is refused.
@@ -368,13 +442,16 @@ Severities: `error` (exit 1), `warning`, `off`, overridable in `[check]`.
 | K110 | error | relative link or image to a file that doesn't exist |
 | K111 | error | a Mermaid block fails to parse (the diagram's own line and message) |
 | K112 | error | an export template is invalid: unknown directive or attribute, unknown type, status or ID, a template file that doesn't exist; a Word target's `reference` document that doesn't exist or isn't a `.docx` |
-| K201 | warning | a requirement past its type's `initial` status (non-draft, by default) and not closed, with no `verifies` coverage |
+| K201 | warning | a requirement (of any level, see "Requirement levels") past its type's `initial` status (non-draft, by default) and not closed, with no `verifies` coverage, when `verifies` can point at its type |
 | K202 | warning | the same with no `implements` coverage |
 | K203 | warning | a non-closed item links to a closed one (e.g. implements an obsolete requirement) |
 | K204 | warning | a decision with status `superseded` that nothing `supersedes` |
 | K205 | warning | status `verified` but no passing `verifies` source (a test item with status `passing`, or a code reference) |
 | K206 | warning | a milestone past its `due` date (compared with today, UTC) and neither done nor closed |
 | K207 | off | an item with `jira` keys whose type has `done` statuses (a task, a milestone…) is done while one of its tickets isn't resolved (in Jira's Done category), or every ticket is resolved while the item is neither done nor closed; read from the Jira mirror (INTEGRATION.md, "Jira") |
+| K208 | warning | a requirement below the top level, past its `initial` status and not closed, that traces to no requirement above it (itself or through its parent) and isn't `derived`; also `derived` on a type that isn't a level below the top, and `derived` with a trace link |
+| K209 | warning | a trace link that doesn't point at the level directly above (it skips a level, or points sideways or down) |
+| K210 | warning | a requirement above the lowest level, past its `initial` status and not closed, that no requirement of the level below refines |
 
 K207 reads the Jira mirror, so it needs `[jira] url` and a token
 (`KILN_JIRA_TOKEN` or `kiln auth jira`); when Jira can't be read, `kiln
@@ -412,7 +489,7 @@ edits, which apply to the open buffer (and undo there). The writers:
 Formatting (`kiln lsp`, `textDocument/formatting`) is the one edit that
 touches keys it isn't "about": it puts the top-level keys in the order of
 the table in "Front matter" (`id`, `type`, `title`, `status`, `parent`,
-`tags`, `jira`, `owner`, `due`, then unknown keys, then `[links]` and
+`tags`, `jira`, `owner`, `due`, `derived`, then unknown keys, then `[links]` and
 `[extra]`) and writes every string as `"…"`. Comments move with their
 key; spacing, the body and everything else stay.
 

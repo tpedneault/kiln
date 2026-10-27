@@ -452,3 +452,100 @@ fn diff_names_added_removed_and_changed_items() {
     let same = crate::diff(&Project::load(&old).unwrap(), &Project::load(&old).unwrap());
     assert!(same.is_empty());
 }
+
+#[test]
+fn requirement_levels_form_a_tree_with_derived_and_untraced_apart() {
+    let config = format!(
+        "{}
+[types.system]
+prefix = \"SYS\"
+statuses = [\"draft\", \"approved\", \"obsolete\"]
+closed = [\"obsolete\"]
+
+[types.software]
+prefix = \"SW\"
+statuses = [\"draft\", \"approved\"]
+parents = [\"software\"]
+
+[links.refines]
+from = [\"system\", \"software\"]
+to = [\"requirement\", \"system\"]
+inverse = \"refined by\"
+
+[requirements]
+levels = [\"requirement\", \"system\", \"software\"]
+",
+        kiln_model::default_config("Test")
+    );
+    let refines = |id: &str| format!("[links]\nrefines = [\"{id}\"]\n");
+    let source = MemorySource::new()
+        .with("kiln.toml", config)
+        .with(
+            "design/REQ-001.md",
+            item("REQ-001", "requirement", "approved", ""),
+        )
+        .with(
+            "design/REQ-002.md",
+            item("REQ-002", "requirement", "approved", ""),
+        )
+        .with(
+            "design/SYS-001.md",
+            item("SYS-001", "system", "approved", &refines("REQ-001")),
+        )
+        .with(
+            "design/SYS-002.md",
+            item("SYS-002", "system", "obsolete", &refines("REQ-002")),
+        )
+        .with("design/SYS-003.md", item("SYS-003", "system", "draft", ""))
+        .with(
+            "design/SW-001.md",
+            item("SW-001", "software", "approved", &refines("SYS-001")),
+        )
+        .with(
+            "design/SW-002.md",
+            item("SW-002", "software", "approved", "parent = \"SW-001\"\n"),
+        )
+        .with(
+            "design/SW-003.md",
+            item("SW-003", "software", "approved", "derived = true\n"),
+        )
+        .with(
+            "design/SW-004.md",
+            item("SW-004", "software", "draft", &refines("REQ-001")),
+        )
+        .with(
+            "design/SW-005.md",
+            item("SW-005", "software", "draft", &refines("SYS-002")),
+        );
+    let p = Project::load(&source).unwrap();
+    let trace = p.level_trace();
+    assert_eq!(trace.levels, ["requirement", "system", "software"]);
+
+    let paths = |nodes: &[crate::LevelNode]| -> Vec<String> {
+        nodes
+            .iter()
+            .flat_map(|n| n.paths())
+            .map(|path| {
+                path.iter()
+                    .map(|i| i.id.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" > ")
+            })
+            .collect()
+    };
+    // SW-002 traces through its parent; SW-004 skips a level and stays
+    // under its target; the obsolete SYS-002 refines nothing open.
+    assert_eq!(
+        paths(&trace.roots),
+        [
+            "REQ-001 > SYS-001 > SW-001",
+            "REQ-001 > SYS-001 > SW-002",
+            "REQ-001 > SW-004",
+            "REQ-002"
+        ]
+    );
+    assert_eq!(trace.roots[0].below[1].level, 2);
+    assert_eq!(paths(&trace.derived), ["SW-003"]);
+    // SW-005's only target is closed, so it is untraced too.
+    assert_eq!(paths(&trace.untraced), ["SYS-003", "SW-005"]);
+}

@@ -12,7 +12,7 @@ All examples on this page come from one small scratch project, made with `kiln i
 | [`kiln new`](#kiln-new) | creates an item with the next free ID |
 | [`kiln list`](#kiln-list) | lists items, filtered |
 | [`kiln show`](#kiln-show) | one item with its links in both directions, coverage and progress |
-| [`kiln trace`](#kiln-trace) | coverage of every item of a type, and the gaps |
+| [`kiln trace`](#kiln-trace) | coverage of every item of a type, and the gaps; or the requirement levels as chains |
 | [`kiln impact`](#kiln-impact) | everything that depends on an item, transitively |
 | [`kiln diff`](#kiln-diff) | items added, changed and removed between two revisions |
 | [`kiln check`](#kiln-check) | checks the project against the rules |
@@ -285,14 +285,15 @@ Notes:
 ### kiln trace
 
 ```text
-kiln trace [--type TYPE] [--format text|json|csv]
+kiln trace [--type TYPE | --levels] [--format text|json|csv]
 ```
 
 Shows the coverage of every item of `TYPE` that isn't closed: for each coverage role (by default `implements` and `verifies`), the open items and code locations that link to it, and the gaps.
 
 | Option | Does |
 |---|---|
-| `--type TYPE` | the type to trace. Default: `requirement` |
+| `--type TYPE` | the type to trace. Default: the highest requirement level (`requirement` unless `[requirements] levels` says otherwise) |
+| `--levels` | follow the requirement levels down instead: each chain from a top-level requirement, then the derived requirements, then those that trace to nothing above |
 | `--format text\|json\|csv` | output format. Default: `text` |
 
 ```console
@@ -325,6 +326,36 @@ Notes:
 - An item covered only because all its open children are covered says `(through its children)`.
 - CSV has one row per item; lists inside a cell are joined with `; `.
 - `kiln trace` always exits 0, even with gaps. To fail a build on gaps, raise K201 or K202 to `error` and run `kiln check` ([Checking](Checking)).
+
+With several requirement levels ([Configuration](Configuration#requirements-requirement-levels)):
+
+```console
+$ kiln trace --levels
+Requirement levels at b5550a2aaaeb: Stakeholder requirement → System requirement → Software requirement
+
+STK-001  Operators see a fault within 1 s  (approved)
+    verified by: TEST-001
+  SYS-001  Fault telemetry at 10 Hz  (approved)
+      verified by: TEST-002
+    SW-001  Poll the fault register every 100 ms  (implemented)
+        implemented by: src/faults.c:41
+        verified by: — gap
+
+Derived (traced to no level above, on purpose)
+  SW-002  A watchdog resets a stalled poller  (approved, derived)
+      implemented by: src/watchdog.c:12
+      verified by: TEST-003
+
+1 stakeholder requirements, 1 system requirements, 2 software requirements; 1 derived, 0 not traced, 1 gaps
+$ kiln trace --levels --format csv
+Stakeholder requirement,System requirement,Software requirement,implemented by,verified by,gaps
+STK-001,SYS-001,SW-001,src/faults.c:41,,verifies
+derived,derived,SW-002,src/watchdog.c:12,TEST-003,
+```
+
+- Each requirement shows what covers it for the roles that can point at its type, and "refined by: — gap" when nothing of the level below refines it.
+- CSV is the traceability matrix: a row per chain and a column per level; the coverage columns are those of the row's last requirement. A requirement that traces to nothing above has `untraced` in its gaps.
+- With one level, `--levels` is a usage error (exit 2).
 
 ### kiln impact
 
@@ -864,6 +895,13 @@ One object. `id`, `type`, `title`, `status`, `path` and `line` are always there.
 | `commit` | the full `HEAD` commit, when in a git repository |
 | `roles` | the coverage roles, in order |
 | `items` | per item: `id`, `title`, `status`, `coverage` (an object from role to the IDs and code locations covering it), `gaps` (the roles with no coverage) |
+
+With `--levels`: `commit`, `levels` (the level types, highest first),
+`trace` (the role), and `chains`, `derived` and `untraced`, each a list
+of requirements with `id`, `type`, `title`, `status`, `level` (1 the
+highest), `derived`, `coverage`, `gaps` (the trace role among them when
+nothing below refines it) and `below` (the requirements of lower levels
+tracing to it, the same shape).
 
 ```json
 {

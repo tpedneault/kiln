@@ -30,6 +30,7 @@ const TOP_KEYS: &[&str] = &[
     "types",
     "links",
     "coverage",
+    "requirements",
     "render",
     "jira",
     "check",
@@ -160,6 +161,7 @@ pub fn parse_config(text: &str) -> (Option<Config>, Vec<Finding>) {
     };
 
     let coverage_roles = coverage(&mut w, root.get("coverage"), &links);
+    let (levels, trace_role) = requirements(&mut w, root.get("requirements"), &types, &links);
 
     let mut link_bare_ids = true;
     if let Some(table) = root
@@ -227,6 +229,8 @@ pub fn parse_config(text: &str) -> (Option<Config>, Vec<Finding>) {
         types,
         links,
         coverage_roles,
+        levels,
+        trace_role,
         link_bare_ids,
         jira_url,
         severities,
@@ -651,6 +655,84 @@ fn coverage(w: &mut Walk, item: Option<&Item>, links: &[LinkRole]) -> Vec<String
     out
 }
 
+/// `[requirements]`: the level types, highest first, and the role that
+/// traces a level to the one above (FORMAT.md, "Requirement levels"). A
+/// level that isn't a type is reported and left out; a trace role that
+/// doesn't allow each level to point at the one above is reported, and
+/// the trace rules then check what the role does allow.
+fn requirements(
+    w: &mut Walk,
+    item: Option<&Item>,
+    types: &[TypeDef],
+    links: &[LinkRole],
+) -> (Vec<String>, String) {
+    let mut levels: Vec<String> = Vec::new();
+    let mut trace = ("refines".to_owned(), None);
+    let Some(table) = item.and_then(|i| w.table(i, Rule::K002, "`[requirements]`")) else {
+        return (levels, trace.0);
+    };
+    w.unknown_keys(table, &["levels", "trace"], Rule::K003, "in [requirements]");
+    if let Some(item) = table.get("trace") {
+        if let Some((role, span)) = w.string(item, Rule::K002, "`requirements.trace`") {
+            trace = (role, Some(span));
+        }
+    }
+    let levels_span = w.span_of_key(table, "levels");
+    match table.get("levels") {
+        None => w.report(
+            Rule::K002,
+            levels_span,
+            "`[requirements]` needs `levels`: the requirement types, highest first",
+        ),
+        Some(item) => {
+            for (name, span) in w
+                .strings(item, Rule::K002, "`requirements.levels`")
+                .unwrap_or_default()
+            {
+                if !types.iter().any(|t| t.name == name) {
+                    w.report(
+                        Rule::K002,
+                        span,
+                        format!("requirements: level `{name}` isn't a type"),
+                    );
+                } else if levels.contains(&name) {
+                    w.report(
+                        Rule::K002,
+                        span,
+                        format!("requirements: `{name}` is listed twice"),
+                    );
+                } else {
+                    levels.push(name);
+                }
+            }
+        }
+    }
+    if levels.len() > 1 {
+        let (role, span) = &trace;
+        let span = span.unwrap_or(levels_span);
+        match links.iter().find(|l| &l.name == role) {
+            None => w.report(
+                Rule::K002,
+                span,
+                format!("requirements: the trace role `{role}` isn't a link role; declare [links.{role}] from each level to the one above"),
+            ),
+            Some(link) => {
+                for pair in levels.windows(2) {
+                    let (above, below) = (&pair[0], &pair[1]);
+                    if !link.allows_from(below) || !link.allows_to(above) {
+                        w.report(
+                            Rule::K002,
+                            span,
+                            format!("requirements: `{role}` must allow from `{below}` to `{above}`, the level above it"),
+                        );
+                    }
+                }
+            }
+        }
+    }
+    (levels, trace.0)
+}
+
 /// `[jira] project` and the keys that go with it; `None` without
 /// `project`, which leaves Jira to links and the mirror. A type or status
 /// the configuration doesn't declare is a K002 and left out.
@@ -837,6 +919,75 @@ url = \"https://jira.example.com\"
 "
         ));
         assert_eq!(config.unwrap().jira_sync, None);
+    }
+
+    #[test]
+    fn requirement_levels_are_read_and_their_trace_role_checked() {
+        let base = kiln_model::default_config("Demo");
+        let levels = |extra: &str| {
+            parse_config(&format!(
+                "{base}
+[types.system]
+prefix = \"SYS\"
+statuses = [\"draft\", \"approved\"]
+
+[types.software]
+prefix = \"SW\"
+statuses = [\"draft\", \"approved\"]
+
+{extra}"
+            ))
+        };
+
+        let (config, findings) = levels(
+            "[links.refines]
+from = [\"system\", \"software\"]
+to = [\"requirement\", \"system\"]
+inverse = \"refined by\"
+
+[requirements]
+levels = [\"requirement\", \"system\", \"software\"]
+",
+        );
+        assert_eq!(findings, vec![]);
+        let config = config.unwrap();
+        assert_eq!(config.levels(), ["requirement", "system", "software"]);
+        assert_eq!(config.level_of("software"), Some(2));
+        assert_eq!(config.level_of("test"), None);
+        assert_eq!(config.trace().map(|r| r.name.as_str()), Some("refines"));
+
+        // A role that can't trace software to system, a level that isn't
+        // a type and a level listed twice: each reported, the rest kept.
+        let (config, findings) = levels(
+            "[links.derives]
+from = [\"system\"]
+to = [\"requirement\"]
+inverse = \"derived into\"
+
+[requirements]
+levels = [\"requirement\", \"system\", \"hardware\", \"software\", \"system\"]
+trace = \"derives\"
+",
+        );
+        let messages: Vec<&str> = findings.iter().map(|f| f.message.as_str()).collect();
+        assert_eq!(
+            messages,
+            [
+                "requirements: level `hardware` isn't a type",
+                "requirements: `system` is listed twice",
+                "requirements: `derives` must allow from `software` to `system`, the level above it",
+            ]
+        );
+        assert_eq!(
+            config.unwrap().levels(),
+            ["requirement", "system", "software"]
+        );
+
+        // Without [requirements], the one level is `requirement`.
+        let (config, _) = parse_config(&base);
+        let config = config.unwrap();
+        assert_eq!(config.levels(), ["requirement"]);
+        assert_eq!(config.trace(), None);
     }
 
     #[test]

@@ -570,7 +570,8 @@ repository, see [Links to repository files](#links-to-repository-files-and-which
 
 | Report | Content |
 |---|---|
-| `traceability` | for each non-closed item of the traced type (default `requirement`, or `type="…"`): what implements it, what verifies it, gaps marked. An item covered only through its children says "through its children". |
+| `traceability` | for each non-closed item of the traced type (default: the highest requirement level, `requirement` unless `[requirements]` says otherwise; or `type="…"`): what implements it, what verifies it, gaps marked. An item covered only through its children says "through its children". |
+| `levels` | with several requirement levels ([Configuration](Configuration#requirements-requirement-levels)): the traceability matrix. One row per chain from a top-level requirement down, a column per level, then what implements and verifies the row's last requirement (`—` where the role can't point at its type). A requirement spanning several rows is shown on the first; a level with nothing below is a red "gap". Derived requirements come after, with "derived" in the levels above them, then requirements that trace to nothing, with "gap" there. Titled "Requirement levels" when listed in `reports`. |
 | `findings` | the `kiln check` warnings and errors, by rule, with the file and line |
 | `roadmap` | milestones in `due` order: due date, status, progress, the items they include |
 | `risks` | open risks and what mitigates them |
