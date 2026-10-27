@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0–K12 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the Jira mirror with K207 and `kiln auth jira`, `kiln jira sync` and `pull` keeping a sub-task per task in step (K10), presets such as arc42 with `kiln preset add` (K11), Home, the GUI's projects dashboard, to open, add, remove and switch projects (K12), this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
+Status: K0–K13 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the Jira mirror with K207 and `kiln auth jira`, `kiln jira sync` and `pull` keeping a sub-task per task in step (K10), presets such as arc42 with `kiln preset add` (K11), Home, the GUI's projects dashboard, to open, add, remove and switch projects (K12), requirement levels with derived requirements, `kiln trace --levels` and the `levels` report (K13), this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -80,6 +80,11 @@ decisions are shaped here before the work is fired. It sits beside Fenix
 - **Type**: declared per project in `kiln.toml`: ID prefix, allowed
   statuses, allowed parent types. The default set is requirement, design,
   decision, milestone, task, test and risk.
+- **Requirement level**: when requirements are written at several levels
+  (stakeholder, system, software; DO-178C's high and low level), each
+  level is a type, `[requirements] levels` orders them, and a link
+  (`refines`) traces each to the one above; a requirement that
+  deliberately traces to nothing above is **derived** (ADR-016).
 - **Link**: a named, typed, directed relation (`verifies`, `implements`,
   `part-of`, `supersedes`, `mitigates`). Written **once**, on its source
   side; the inverse ("verified by") is computed. One fact, one place.
@@ -196,7 +201,7 @@ nearest `kiln.toml` (`--project <dir>` overrides).
 | `kiln check [--format text\|json\|gitlab\|github]` | the rules; exit 1 on any error | K1 |
 | `kiln set <ID> status=<S>` (also `title`, `parent`, `owner`, `due`) / `link <ID> <role> <ID>` / `unlink …` | comment-preserving front-matter edits | K1 |
 | `kiln renumber <ID> --to <ID> [--file PATH]` | moves an ID and rewrites every reference (the cure for two branches allocating the same number; `--file` picks which copy of a duplicate moves) | K1 |
-| `kiln trace [--type requirement] [--format text\|json\|csv]` | coverage: what implements and verifies each item, and the gaps | K1 |
+| `kiln trace [--type requirement \| --levels] [--format text\|json\|csv]` | coverage: what implements and verifies each item, and the gaps; `--levels`: the requirement levels as chains, derived and untraced apart | K1, K13 |
 | `kiln impact <ID>` | everything that links to it, transitively, by path | K1 |
 | `kiln export [NAME…] --dry-run` / `--check` | renders every (or the named) export target and shows what would change; `--check` exits 1 if anything would; Confluence targets plan against the live space or `--snapshot FILE` | K2 |
 | `kiln export [NAME…]` | writes file targets (K2) and publishes Confluence targets (K3); all flags in EXPORT.md and CONFLUENCE.md | K2 / K3 |
@@ -355,8 +360,9 @@ changelog line.
 | K10 | `kiln jira sync`: a project issue and a sub-task per task, created and kept in step (summary, due date, status by transition), keys written back into the files; `kiln jira pull`; the Jira target in the GUI (ADR-014) | — (G6 for Jira Cloud, G9 for Jira behind a proxy) |
 | K11 | Presets: `kiln preset list`/`add`, `kiln init --preset`, with `arc42`, `srs` and `design-doc`, each adding its types, roles and export to `kiln.toml` without duplicates, options on the wiki (ADR-015); `style="compact"` items; a template's own HTML comments left out of exports; Confluence titles that don't depend on who published first (`qualify_titles`), a refused plan instead of a failed create when a title is taken, and `children = "list"` | — |
 | K12 | Home, the projects dashboard (REQ-017): `kiln` outside a project opens on the projects opened before, with a preview of each (items, types, next milestone, `kiln check`'s findings), adding a folder, removing one from the list, switching with `SPC h`; the list in the state folder | — |
+| K13 | Requirement levels (REQ-018, ADR-016): `[requirements] levels` and `trace`, `derived = true`; K201 and K202 on every level, K208 (traces to nothing above), K209 (skips a level), K210 (nothing below refines it); `kiln trace --levels`; the `levels` report; "Derived" in item properties, `kiln show` and `kiln diff` | — |
 
-Everything through K12 needs nothing new from Fenix or Flint to work. INTEGRATION.md
+Everything through K13 needs nothing new from Fenix or Flint to work. INTEGRATION.md
 lists the changes (G1–G9) that make the integration better and which
 milestone notices their absence.
 

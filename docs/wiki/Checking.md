@@ -218,6 +218,9 @@ edit) and in exports with the `findings` report, at the same severities.
 | K205 | warning | status `verified` with no passing `verifies` source |
 | K206 | warning | a milestone past its due date, neither done nor closed |
 | K207 | off | a done item whose Jira ticket isn't resolved, or the reverse |
+| K208 | warning | a requirement below the top level that traces to nothing above it and isn't `derived` |
+| K209 | warning | a trace link that doesn't point at the level directly above |
+| K210 | warning | a requirement above the lowest level that nothing below refines |
 
 ## Configuration rules (K001–K005)
 
@@ -529,7 +532,7 @@ design/templates/doc.md:9:1: K112 error: style `table` isn't full, row or compac
 names the preset's types; if you rename or remove one of them, change the
 template's directives too ([Presets](Presets#renaming-a-type-a-template-uses)).
 
-## Design rules (K201–K207)
+## Design rules (K201–K210)
 
 These look at the design as a whole: what is covered, what is overdue,
 what is inconsistent. They are warnings by default (K207 is off), because
@@ -539,7 +542,9 @@ don't fire (see [Configuration](Configuration#what-to-watch-for)).
 
 ### K201 and K202: coverage of requirements
 
-**Triggers:** an item of the type named `requirement` that
+**Triggers:** a requirement (an item of the type named `requirement`,
+or with `[requirements] levels`, of any level whose type the role's `to`
+includes; [Configuration](Configuration#requirements-requirement-levels)) that
 
 - has a status other than its type's `initial` status (`draft` by
   default), and
@@ -698,6 +703,67 @@ been tested against a simulated Jira, not yet a live instance. See
 **Fix:** update whichever side is behind: set the item's status
 (`kiln set TASK-021 status=done`), or resolve or reopen the ticket in
 Jira.
+
+### K208
+
+Only with several requirement levels
+([Configuration](Configuration#requirements-requirement-levels)).
+
+**Triggers:**
+
+- a requirement below the top level, past its type's `initial` status
+  and not closed, that has no trace link (`refines` by default) to an
+  open requirement, itself or through a parent of its own type, and
+  isn't `derived = true`;
+- `derived = true` on an item that isn't a requirement below the top
+  level;
+- `derived = true` on a requirement that also has a trace link.
+
+```text
+design/system/SYS-002-logs.md:2:7: K208 warning: SYS-002 is approved but refines no stakeholder requirement; link it with `kiln link SYS-002 refines <ID>`, or set `derived = true` and say why in its body
+```
+
+A requirement that answers nothing above it is either forgotten or
+deliberate; `derived = true` says which, and reviewers see it in the
+merge request and the export.
+
+**Fix:** link it (`kiln link SYS-002 refines STK-001`), or add `derived =
+true` and a paragraph on why it exists. Decomposed requirements need the
+link only at the top of their subtree: children trace through their
+parent.
+
+### K209
+
+**Triggers:** a trace link whose target isn't of the level directly
+above: it skips a level (software refining a stakeholder requirement),
+or points at the same level or lower.
+
+```text
+design/software/SW-004-poll.md:7:13: K209 warning: SW-004 refines STK-001, a stakeholder requirement; `refines` points at the level directly above, a system requirement
+```
+
+The link still counts where it points, so the requirement above isn't
+also reported by K210: one wrong link, one finding.
+
+**Fix:** point it at the system requirement that the software
+requirement refines (`kiln unlink SW-004 refines STK-001`, then `kiln
+link SW-004 refines SYS-001`); if no system requirement covers it yet,
+that is the gap to fill.
+
+### K210
+
+**Triggers:** a requirement above the lowest level, past its type's
+`initial` status and not closed, that no open requirement of the level
+below refines, directly or through all its open children (the same
+"covered" as K201).
+
+```text
+design/stakeholder/STK-002-audit.md:2:7: K210 warning: STK-002 is approved but no system requirement refines it
+```
+
+**Fix:** write the requirement of the level below that answers it, and
+link it upward; or, if it needs no further refinement, close it or
+reconsider whether it belongs at this level.
 
 ## Recommended settings for a team
 

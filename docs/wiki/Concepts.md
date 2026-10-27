@@ -169,6 +169,17 @@ closed, that lack coverage:
 `kiln trace` and the traceability report show coverage for every
 requirement, with the gaps.
 
+## Requirement level
+
+Requirements written at several levels (stakeholder, system, software;
+or high- and low-level) are a type per level, listed highest first in
+`[requirements] levels`. `parent` decomposes within a level; a link
+(`refines` by default) crosses from each level to the one above. A
+requirement that deliberately answers nothing above it is **derived**
+(`derived = true`). `kiln check` asks that every level traces up and is
+refined down (K208–K210), and `kiln trace --levels` shows the chains. See
+[Configuration](Configuration#requirements-requirement-levels).
+
 ## Progress
 
 A milestone's **progress** is its done items out of all its items,

@@ -668,6 +668,16 @@ impl Project {
         push("jira", item.jira.clone());
         push("owner", item.owner.iter().cloned().collect());
         push("due", item.due.iter().map(ToString::to_string).collect());
+        let levels = p.config.levels();
+        if levels.len() > 1 {
+            if let Some(level) = p.config.level_of(&item.type_name) {
+                let mut text = format!("{} of {}", level + 1, levels.len());
+                if item.derived.is_some() {
+                    text.push_str(", derived");
+                }
+                push("level", vec![text]);
+            }
+        }
 
         let mut roles: Vec<&str> = item.links.iter().map(|l| l.role.as_str()).collect();
         roles.dedup();

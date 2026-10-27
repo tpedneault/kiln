@@ -1,6 +1,6 @@
-//! The report builders (EXPORT.md, "Reports"): traceability, findings,
-//! roadmap, risks and (with `kiln export --since`) changes, as the same
-//! document tree bodies render to.
+//! The report builders (EXPORT.md, "Reports"): traceability, the
+//! requirement levels, findings, roadmap, risks and (with `kiln export
+//! --since`) changes, as the same document tree bodies render to.
 //!
 //! Some reports name FORMAT.md's default types on purpose (`milestone`,
 //! `risk`, `part-of`, `mitigates`): that is what they report on, and a
@@ -15,7 +15,8 @@ use crate::doc::{Align, Block, Inline, Table, Target, Tone};
 /// export has one.
 #[derive(Debug, Clone, Default)]
 pub struct ReportOptions<'a> {
-    /// `traceability`: the type to trace (default `requirement`).
+    /// `traceability`: the type to trace (default: the highest
+    /// requirement level, `requirement` without `[requirements]`).
     pub type_name: Option<String>,
     /// `--since`: what the `changes` report lists.
     pub since: Option<&'a Since>,
@@ -67,6 +68,7 @@ pub fn report(
 ) -> Option<Vec<Block>> {
     match name {
         "traceability" => Some(traceability(project, options)),
+        "levels" => Some(levels(project)),
         "findings" => Some(findings_report(findings)),
         "roadmap" => Some(roadmap(project)),
         "risks" => Some(risks(project)),
@@ -145,6 +147,7 @@ fn traceability(project: &Project, options: &ReportOptions) -> Vec<Block> {
     let type_name = options
         .type_name
         .clone()
+        .or_else(|| config.levels().first().map(|t| (*t).to_owned()))
         .unwrap_or_else(|| "requirement".to_owned());
     let Some(ty) = config.type_named(&type_name) else {
         return vec![Block::Paragraph(vec![Inline::text(format!(
@@ -216,6 +219,139 @@ fn traceability(project: &Project, options: &ReportOptions) -> Vec<Block> {
             items.len(),
             ty.plural.to_lowercase(),
             covered.join(", ")
+        ))]),
+        table(&header, rows),
+    ]
+}
+
+/// The requirement levels as a matrix: a row per chain from the top level
+/// down, a column per level, then what covers the row's last
+/// requirement. A requirement spanning several rows is shown on the
+/// first. Derived requirements follow, then those tracing to nothing.
+// implements: REQ-018
+fn levels(project: &Project) -> Vec<Block> {
+    let config = &project.config;
+    let Some(trace_role) = config.trace() else {
+        return vec![Block::Paragraph(vec![Inline::text(
+            "This project has one requirement level; [requirements] levels lists more.",
+        )])];
+    };
+    let trace = project.level_trace();
+    let lowest = trace.levels.len() - 1;
+    let roles: Vec<&kiln_model::LinkRole> = config
+        .coverage_roles
+        .iter()
+        .filter(|r| **r != trace_role.name)
+        .filter_map(|r| config.role(r))
+        .filter(|r| trace.levels.iter().any(|l| r.allows_to(l)))
+        .collect();
+    let mut header: Vec<String> = trace
+        .levels
+        .iter()
+        .map(|l| {
+            config
+                .type_named(l)
+                .map_or(l.to_string(), |t| t.title.clone())
+        })
+        .collect();
+    header.extend(roles.iter().map(|r| capitalised(&r.inverse)));
+    let marker = |text: &str, tone: Tone| {
+        vec![Inline::Status {
+            text: text.into(),
+            tone,
+        }]
+    };
+
+    let mut rows = Vec::new();
+    let mut chains = 0;
+    let mut gaps = 0;
+    let sections = [
+        (&trace.roots, None),
+        (&trace.derived, Some(("derived", Tone::Grey))),
+        (&trace.untraced, Some(("gap", Tone::Red))),
+    ];
+    for (nodes, above) in sections {
+        for node in nodes.iter() {
+            let mut previous: Vec<Option<&Item>> = vec![None; trace.levels.len()];
+            for path in node.paths() {
+                let mut row = vec![Vec::new(); header.len()];
+                let first = config.level_of(&path[0].type_name).unwrap_or(0);
+                if let Some((text, tone)) = above {
+                    for cell in row.iter_mut().take(first) {
+                        *cell = marker(text, tone);
+                    }
+                    if tone == Tone::Red {
+                        gaps += 1;
+                    }
+                }
+                let mut shown: Vec<Option<&Item>> = vec![None; trace.levels.len()];
+                for item in &path {
+                    if let Some(level) = config.level_of(&item.type_name) {
+                        shown[level] = Some(item);
+                    }
+                }
+                // Blank only a prefix of the previous row: a requirement
+                // under two parents is shown under each.
+                let same = |a: Option<&Item>, b: Option<&Item>| match (a, b) {
+                    (Some(a), Some(b)) => a.id == b.id,
+                    (None, None) => true,
+                    _ => false,
+                };
+                let mut repeating = true;
+                for (level, item) in shown.iter().enumerate() {
+                    repeating = repeating && same(*item, previous[level]);
+                    if let (Some(item), false) = (item, repeating) {
+                        row[level] = id_cell(item);
+                    }
+                }
+                let leaf = path[path.len() - 1];
+                let level = config.level_of(&leaf.type_name).unwrap_or(0);
+                if level < lowest && !project.covered(&leaf.id, &trace_role.name) {
+                    row[level + 1] = marker("gap", Tone::Red);
+                    gaps += 1;
+                }
+                for (n, role) in roles.iter().enumerate() {
+                    let cell = &mut row[trace.levels.len() + n];
+                    if !role.allows_to(&leaf.type_name) {
+                        *cell = vec![Inline::text("—")];
+                        continue;
+                    }
+                    let sources: Vec<Source> = project
+                        .inbound(&leaf.id)
+                        .iter()
+                        .filter(|l| l.role == role.name && project.source_is_open(l.source))
+                        .map(|l| l.source)
+                        .collect();
+                    *cell = if !sources.is_empty() {
+                        source_cell(project, &sources)
+                    } else if project.covered(&leaf.id, &role.name) {
+                        vec![Inline::text("through its children")]
+                    } else {
+                        gaps += 1;
+                        marker("gap", Tone::Red)
+                    };
+                }
+                previous = shown;
+                chains += usize::from(above.is_none());
+                rows.push(row);
+            }
+        }
+    }
+    if rows.is_empty() {
+        return vec![Block::Paragraph(vec![Inline::text(
+            "No open requirements to trace.",
+        )])];
+    }
+    let header: Vec<&str> = header.iter().map(String::as_str).collect();
+    vec![
+        Block::Paragraph(vec![Inline::text(format!(
+            "{chains} chains from {} {}; {} derived, {} not traced to the level above; {gaps} gaps.",
+            trace.roots.len(),
+            config
+                .type_named(trace.levels[0])
+                .map_or(trace.levels[0].to_string(), |t| t.plural.to_lowercase()),
+            trace.derived.len(),
+            trace.untraced.len(),
         ))]),
         table(&header, rows),
     ]

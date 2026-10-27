@@ -24,6 +24,7 @@ pub fn findings(project: &Project, files: &dyn FileSource, today: Date) -> Vec<F
     parent_cycles(project, &mut out);
     code_rules(project, &mut out);
     coverage_rules(project, &mut out);
+    level_rules(project, &mut out);
     status_rules(project, today, &mut out);
     diagram_rules(project, &mut out);
     template_rules(project, files, &mut out);
@@ -480,31 +481,172 @@ fn code_rules(project: &Project, out: &mut Vec<Finding>) {
     }
 }
 
-/// K201, K202: requirements past their initial status that nothing
-/// verifies or implements.
+/// K201, K202 and K210: requirements past their initial status that
+/// nothing verifies, implements, or (above the lowest level) refines.
+/// Every requirement level is checked, each against the roles that can
+/// point at it: a stakeholder requirement that only tests may verify is
+/// never "unimplemented".
 fn coverage_rules(project: &Project, out: &mut Vec<Finding>) {
-    let Some(ty) = project.config.type_named("requirement") else {
-        return;
-    };
-    for item in project.items.iter().filter(|i| i.type_name == ty.name) {
-        if item.status == ty.initial || ty.is_closed(&item.status) || item.status.is_empty() {
+    let config = &project.config;
+    let levels = config.levels();
+    for (level, type_name) in levels.iter().enumerate() {
+        let Some(ty) = config.type_named(type_name) else {
             continue;
+        };
+        let mut checks = vec![(Rule::K201, "verifies"), (Rule::K202, "implements")];
+        if level + 1 < levels.len() {
+            if let Some(trace) = config.trace() {
+                checks.push((Rule::K210, trace.name.as_str()));
+            }
         }
-        for (rule, role, verb) in [
-            (Rule::K201, "verifies", "verifies"),
-            (Rule::K202, "implements", "implements"),
-        ] {
-            if project.config.role(role).is_some() && !project.covered(&item.id, role) {
-                report(
-                    out,
-                    rule,
-                    &item.path,
-                    item.id_span,
-                    format!("{} is {} but nothing {verb} it", item.id, item.status),
-                );
+        for item in project.items.iter().filter(|i| i.type_name == ty.name) {
+            if item.status == ty.initial || ty.is_closed(&item.status) || item.status.is_empty() {
+                continue;
+            }
+            for &(rule, role) in &checks {
+                let applies = config.role(role).is_some_and(|r| r.allows_to(&ty.name));
+                if applies && !project.covered(&item.id, role) {
+                    let message = if rule == Rule::K210 {
+                        format!(
+                            "{} is {} but no {} {role} it",
+                            item.id,
+                            item.status,
+                            config
+                                .type_named(levels[level + 1])
+                                .map_or(levels[level + 1], |t| t.title.as_str())
+                                .to_lowercase()
+                        )
+                    } else {
+                        format!("{} is {} but nothing {role} it", item.id, item.status)
+                    };
+                    report(out, rule, &item.path, item.id_span, message);
+                }
             }
         }
     }
+}
+
+/// K208 and K209: each requirement below the top level traces to the
+/// level directly above, or says it is `derived`. A child traces through
+/// its parent: decomposing within a level shouldn't mean repeating the
+/// link on every child.
+// implements: REQ-018
+fn level_rules(project: &Project, out: &mut Vec<Finding>) {
+    let config = &project.config;
+    let levels = config.levels();
+    let trace = config.trace();
+    let title = |name: &str| {
+        config
+            .type_named(name)
+            .map_or(name.to_owned(), |t| t.title.to_lowercase())
+    };
+    for item in &project.items {
+        let level = config.level_of(&item.type_name);
+        if let Some(span) = item.derived {
+            if !level.is_some_and(|l| l > 0) {
+                report(
+                    out,
+                    Rule::K208,
+                    &item.path,
+                    span,
+                    format!(
+                        "`derived` only applies to a requirement below the top level, and {} is a {}",
+                        item.id,
+                        title(&item.type_name)
+                    ),
+                );
+                continue;
+            }
+        }
+        let (Some(level), Some(trace)) = (level, trace) else {
+            continue;
+        };
+        if level == 0 {
+            continue;
+        }
+        let above = levels[level - 1];
+        let traces: Vec<_> = item.links.iter().filter(|l| l.role == trace.name).collect();
+        if let Some(span) = item.derived {
+            if let Some(link) = traces.first() {
+                report(
+                    out,
+                    Rule::K208,
+                    &item.path,
+                    span,
+                    format!(
+                        "{} is derived but {} {}; a derived requirement traces to nothing above it, so drop one",
+                        item.id, trace.name, link.target.raw
+                    ),
+                );
+            }
+        }
+        for link in &traces {
+            let Some(target) = link.target.id.as_ref().ok().and_then(|id| project.item(id)) else {
+                continue;
+            };
+            if target.type_name != above {
+                report(
+                    out,
+                    Rule::K209,
+                    &item.path,
+                    link.target.span,
+                    format!(
+                        "{} {} {}, a {}; `{}` points at the level directly above, a {}",
+                        item.id,
+                        trace.name,
+                        target.id,
+                        title(&target.type_name),
+                        trace.name,
+                        title(above)
+                    ),
+                );
+            }
+        }
+        let Some(ty) = config.type_named(&item.type_name) else {
+            continue;
+        };
+        if item.status == ty.initial || ty.is_closed(&item.status) || item.status.is_empty() {
+            continue;
+        }
+        if !traced_up(project, item, &trace.name) {
+            report(
+                out,
+                Rule::K208,
+                &item.path,
+                item.id_span,
+                format!(
+                    "{} is {} but {} no {}; link it with `kiln link {} {} <ID>`, or set `derived = true` and say why in its body",
+                    item.id,
+                    item.status,
+                    trace.name,
+                    title(above),
+                    item.id,
+                    trace.name
+                ),
+            );
+        }
+    }
+}
+
+/// Whether `item`, or an ancestor of the same type, has a trace link or
+/// is derived.
+fn traced_up(project: &Project, item: &Item, trace: &str) -> bool {
+    let mut seen = HashSet::new();
+    let mut current = Some(item);
+    while let Some(i) = current {
+        if !seen.insert(i.id.clone()) || i.type_name != item.type_name {
+            return false;
+        }
+        if i.derived.is_some() || i.links.iter().any(|l| l.role == trace) {
+            return true;
+        }
+        current = i
+            .parent
+            .as_ref()
+            .and_then(|p| p.id.as_ref().ok())
+            .and_then(|id| project.item(id));
+    }
+    false
 }
 
 fn status_rules(project: &Project, today: Date, out: &mut Vec<Finding>) {

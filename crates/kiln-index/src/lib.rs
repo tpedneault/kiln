@@ -22,6 +22,7 @@
 
 mod diff;
 mod edit;
+mod levels;
 mod new_item;
 mod project;
 mod renumber;
@@ -33,6 +34,7 @@ pub use edit::{
     apply_config_key, apply_jira_key, apply_link, apply_renumber, apply_set, check_link,
     create_item, parse_date, plan_set, unique, EditError, Renumbered, SetChange, SETTABLE,
 };
+pub use levels::{LevelNode, LevelTrace};
 pub use new_item::{plan_new_item, toml_string, NewItem, NewItemSpec};
 pub use project::{labelled, Impact, Inbound, LoadError, Progress, Project, Source, Step};
 pub use renumber::{plan_renumber, FileEdits, RenumberPlan};

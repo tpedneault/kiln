@@ -127,6 +127,9 @@ pub struct Item {
     pub jira: Vec<String>,
     pub owner: Option<String>,
     pub due: Option<Date>,
+    /// `derived = true`: a requirement that deliberately traces to no
+    /// requirement of the level above; the span of `derived`'s value.
+    pub derived: Option<Span>,
     pub links: Vec<LinkEntry>,
     pub mentions: Vec<Mention>,
     pub relative_links: Vec<RelativeLink>,

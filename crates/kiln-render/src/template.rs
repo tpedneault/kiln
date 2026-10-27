@@ -16,7 +16,14 @@ pub struct TemplateProblem {
     pub message: String,
 }
 
-const REPORT_NAMES: &[&str] = &["traceability", "findings", "roadmap", "risks", "changes"];
+const REPORT_NAMES: &[&str] = &[
+    "traceability",
+    "levels",
+    "findings",
+    "roadmap",
+    "risks",
+    "changes",
+];
 const VALUES: &[&str] = &["name", "commit", "date", "since"];
 
 /// Problems in a template's text, with lines counted from 1.

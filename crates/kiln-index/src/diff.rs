@@ -77,6 +77,10 @@ pub enum Detail {
         from: Vec<String>,
         to: Vec<String>,
     },
+    /// `derived` set or cleared.
+    Derived {
+        to: bool,
+    },
     Body,
     Moved {
         from: String,
@@ -106,6 +110,8 @@ impl Detail {
             Detail::Owner { from, to } => format!("owner {} → {}", opt(from), opt(to)),
             Detail::Due { from, to } => format!("due {} → {}", opt(from), opt(to)),
             Detail::Jira { from, to } => format!("jira {} → {}", list(from), list(to)),
+            Detail::Derived { to: true } => "now derived".into(),
+            Detail::Derived { to: false } => "no longer derived".into(),
             Detail::Body => "body".into(),
             Detail::Moved { from, to } => format!("moved {from} → {to}"),
         }
@@ -220,6 +226,11 @@ fn details(a: &Item, b: &Item) -> Vec<Detail> {
         out.push(Detail::Jira {
             from: sorted(&a.jira),
             to: sorted(&b.jira),
+        });
+    }
+    if a.derived.is_some() != b.derived.is_some() {
+        out.push(Detail::Derived {
+            to: b.derived.is_some(),
         });
     }
     if a.body.trim() != b.body.trim() {

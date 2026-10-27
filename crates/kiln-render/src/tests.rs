@@ -168,3 +168,93 @@ fn template_problems_name_their_line() {
         ]
     );
 }
+
+#[test]
+// verifies: REQ-018
+fn levels_is_a_matrix_of_chains_then_derived_then_untraced() {
+    let refines = |id: &str| format!("[links]\nrefines = [\"{id}\"]\n");
+    let source = MemorySource::new()
+        .with(
+            "kiln.toml",
+            format!(
+                "{}
+[types.system]
+prefix = \"SYS\"
+title = \"System requirement\"
+statuses = [\"draft\", \"approved\"]
+
+[types.software]
+prefix = \"SW\"
+title = \"Software requirement\"
+statuses = [\"draft\", \"approved\"]
+
+[links.refines]
+from = [\"system\", \"software\"]
+to = [\"requirement\", \"system\"]
+inverse = \"refined by\"
+
+[requirements]
+levels = [\"requirement\", \"system\", \"software\"]
+",
+                kiln_model::default_config("T")
+            ),
+        )
+        .with(
+            "design/REQ-001.md",
+            item("REQ-001", "requirement", "approved", ""),
+        )
+        .with(
+            "design/REQ-002.md",
+            item("REQ-002", "requirement", "approved", ""),
+        )
+        .with(
+            "design/SYS-001.md",
+            item("SYS-001", "system", "approved", &refines("REQ-001")),
+        )
+        .with(
+            "design/SYS-002.md",
+            item("SYS-002", "system", "approved", ""),
+        )
+        .with(
+            "design/SW-001.md",
+            item("SW-001", "software", "approved", &refines("SYS-001")),
+        )
+        .with(
+            "design/SW-002.md",
+            item("SW-002", "software", "approved", &refines("SYS-001")),
+        )
+        .with(
+            "design/SW-003.md",
+            item("SW-003", "software", "approved", "derived = true\n"),
+        )
+        .with(
+            "design/TEST-001.md",
+            item(
+                "TEST-001",
+                "test",
+                "passing",
+                "[links]\nverifies = [\"REQ-001\"]\n",
+            ),
+        );
+    let p = Project::load(&source).unwrap();
+    let blocks = report("levels", &p, &[], &ReportOptions::default()).unwrap();
+    assert_eq!(
+        plain(match &blocks[0] {
+            Block::Paragraph(i) => i,
+            _ => panic!(),
+        }),
+        "3 chains from 2 requirements; 1 derived, 1 not traced to the level above; 5 gaps."
+    );
+    // Verifies and implements point only at `requirement` here, so the
+    // software rows have nothing to show; a repeated parent is blank.
+    assert_eq!(
+        rows(&blocks),
+        [
+            "REQ-001 | SYS-001 | SW-001 | — | —",
+            " |  | SW-002 | — | —",
+            "REQ-002 | gap |  | gap | gap",
+            "derived | derived | SW-003 | — | —",
+            "gap | SYS-002 | gap | — | —",
+        ]
+    );
+}

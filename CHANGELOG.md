@@ -196,9 +196,25 @@ All notable changes to Kiln are recorded here. The format follows
   completion), `d` takes one off the list, and `SPC h` or `gh` on any page
   goes back to switch; the list is `projects.toml` in the state folder
   ([docs/GUI.md](docs/GUI.md), "Home").
+- K13: requirement levels (REQ-018, ADR-016). `[requirements] levels`
+  lists the requirement types highest first and `trace` (default
+  `refines`) the role from each level to the one above; `derived = true`
+  marks a requirement that deliberately traces to nothing above it. K201
+  and K202 check every level their role can point at; K208 reports a
+  requirement that traces to nothing above and isn't derived, K209 a
+  trace link that skips a level, K210 a requirement nothing below
+  refines. `kiln trace --levels` (text, JSON, and CSV as a traceability
+  matrix) and the `levels` report follow the chains down, derived and
+  untraced requirements apart; exports show "Derived" in an item's
+  properties, `kiln show` its level, `kiln diff` a change to `derived`.
+  Without `[requirements]` nothing changes
+  ([docs/FORMAT.md](docs/FORMAT.md), "Requirement levels").
 
 ### Changed
 
+- Check: K201 and K202 fire only when `verifies` or `implements` can
+  point at the requirement's type; a project whose roles never allowed
+  it got a warning it couldn't fix.
 - Confluence (Data Center): pages below the published root are found by
   walking `child/page`, not `descendant/page`, which a live Data Center
   answers with HTTP 500 once the page exists, so a dry run or publish of

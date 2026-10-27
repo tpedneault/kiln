@@ -209,6 +209,32 @@ it raise a warning (K203) instead of an error. Deleting the file frees
 the number: if it was the highest, the next `kiln new` hands it out
 again, and old references would silently point at the new item.
 
+### Requirements at several levels
+
+One `requirement` type with a shallow tree suits most projects. When the
+organisation writes requirements at several levels (a customer's
+stakeholder requirements, the system specification, a software
+specification per component; or DO-178C's high- and low-level
+requirements), make each level a type and list them in `[requirements]`
+([Configuration](Configuration#requirements-requirement-levels)) rather
+than tagging one type:
+
+- Each level gets its own prefix, statuses and section in the document,
+  and its own reviewers.
+- Lower levels `refines` the level above, written once on the lower
+  side; `parent` stays for decomposition within a level.
+- `kiln check` finds the requirement nobody refined (K210) and the one
+  that refines nothing (K208); a requirement that is there because the
+  design needs it, not because a level above asked, says `derived = true`
+  and why.
+- `kiln trace --levels` and the `levels` report show the chains, which is
+  the matrix an assessor asks for.
+
+Levels are cheap to add early and costly to retrofit: moving existing
+requirements to a level means a new `type` and a new ID for each
+(`kiln renumber`, which rewrites every reference). Decide before the
+first review.
+
 ## Step 3: design notes and decisions
 
 ### Design notes explain how
