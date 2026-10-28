@@ -72,7 +72,11 @@ pub fn run(project: Option<&Path>, args: Args) -> Result<u8, Fail> {
     }
     if args.open {
         // The item exists whether or not this works.
-        match kiln_fenix::open(&loaded.source.path(&new.path), new.title_line as usize) {
+        match kiln_fenix::open_from(
+            &loaded.source.path(&new.path),
+            new.title_line as usize,
+            kiln_fenix::Attach::Terminal,
+        ) {
             Ok(how) => eprintln!("kiln: {} {}", new.id, how.describe()),
             Err(e) => eprintln!("kiln: created {} but couldn't open it: {e}", new.id),
         }

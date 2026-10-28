@@ -2,7 +2,7 @@
 id = "TASK-009"
 type = "task"
 title = "kiln list refuses unknown statuses and takes comma lists"
-status = "todo"
+status = "done"
 
 [links]
 part-of = ["MS-017"]

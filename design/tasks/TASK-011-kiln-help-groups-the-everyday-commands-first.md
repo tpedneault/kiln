@@ -2,7 +2,7 @@
 id = "TASK-011"
 type = "task"
 title = "kiln --help groups the everyday commands first"
-status = "todo"
+status = "done"
 
 [links]
 part-of = ["MS-017"]

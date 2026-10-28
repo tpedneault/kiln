@@ -113,8 +113,10 @@ Through Fenix's control channel, `crates/fenix-control` (landed in Fenix
 #58/#59; documented in Fenix's `docs/CONTROL.md`). Kiln uses
 `fenix_control::Client`: `connect(&Endpoint)`, `hello`, then `open` with a
 path, line and column. Fenix not running: start `fenix <path>:<line>` (the
-same `file:line` handling); Fenix not installed: the OS default editor via
-the file, and the message says so.
+same `file:line` handling); Fenix not installed: `VISUAL` or `EDITOR`,
+else the OS default editor via the file, and the message says so. Since
+K16, `KILN_EDITOR` comes before all of that: a person who names an editor
+for Kiln gets it, Fenix or not (ADR-019).
 
 ### Diagrams: `fenix-diagram` (K2)
 

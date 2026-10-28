@@ -2,7 +2,7 @@
 id = "TASK-007"
 type = "task"
 title = "Body templates for the default types"
-status = "todo"
+status = "done"
 
 [links]
 part-of = ["MS-017"]

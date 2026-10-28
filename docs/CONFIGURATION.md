@@ -49,6 +49,8 @@ K201 = "error"
 | `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, `NO_PROXY` | the proxy for Confluence calls, honouring `NO_PROXY` (CONFLUENCE.md, "The API, by flavour"). Jira calls don't use a proxy yet (INTEGRATION.md, G9) |
 | `KILN_HOME` | puts Kiln's own folders (settings, state, logs) in one folder |
 | `FENIX_HOME` | which Fenix `kiln new --open` talks to (the one started with the same `FENIX_HOME`) |
+| `KILN_EDITOR` | the editor `kiln new --open` and the GUI use before Fenix: a command, `{path}` and `{line}` replaced, the path appended when there's no `{path}` (CLI.md, `kiln new`) |
+| `VISUAL`, `EDITOR` | the same, when `KILN_EDITOR` is unset and Fenix isn't installed, before the OS default editor |
 
 ## Kiln's own folders
 

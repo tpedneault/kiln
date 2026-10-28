@@ -200,9 +200,28 @@ Two places open an item in Fenix at its title line:
 
 Both try, in order:
 
-1. the running Fenix, through its control channel;
-2. starting Fenix as `fenix <path>:<line>`;
-3. when Fenix isn't installed, the operating system's default editor for the file.
+1. the command in `KILN_EDITOR`, when it is set;
+2. the running Fenix, through its control channel;
+3. starting Fenix as `fenix <path>:<line>`;
+4. when Fenix isn't installed, the command in `VISUAL`, then in `EDITOR`;
+5. the operating system's default editor for the file.
+
+An editor command is split on spaces, with quotes keeping a path with
+spaces in one piece, and is never run through a shell. `{path}` and
+`{line}` in it are replaced; without `{path}`, the path comes last:
+
+```console
+$ export KILN_EDITOR='code -g {path}:{line}'
+$ kiln new task --title "Write the docs" --open
+design/tasks/TASK-004-write-the-docs.md
+kiln: TASK-004 opened with KILN_EDITOR
+```
+
+On Windows, set it once for your account: `setx KILN_EDITOR "notepad++
+-n{line} {path}"` (quote a program path that has spaces: `"\"C:\Program
+Files\Notepad++\notepad++.exe\" -n{line}"`). `kiln new --open` gives a
+variable's editor the terminal and waits for it, so `vim` works there;
+the GUI starts it in the background, so give it a windowed editor.
 
 stderr says which happened. With `kiln new --open` the item is created either way. If you run more than one Fenix, `FENIX_HOME` picks the one Kiln talks to: the one started with the same `FENIX_HOME`.
 

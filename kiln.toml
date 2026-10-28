@@ -15,6 +15,7 @@ web = "https://github.com/tpedneault/kiln/blob/{commit}/{path}#L{line}"
 
 [types.requirement]
 prefix = "REQ"
+template = "design/templates/requirement.md"
 statuses = ["draft", "proposed", "approved", "implemented", "verified", "obsolete"]
 initial = "draft"
 done = ["verified"]
@@ -23,23 +24,27 @@ parents = ["requirement"]
 
 [types.design]
 prefix = "DES"
+template = "design/templates/design.md"
 statuses = ["draft", "accepted", "obsolete"]
 closed = ["obsolete"]
 parents = ["design"]
 
 [types.decision]
 prefix = "ADR"
+template = "design/templates/decision.md"
 statuses = ["proposed", "accepted", "rejected", "superseded"]
 closed = ["rejected", "superseded"]
 
 [types.milestone]
 prefix = "MS"
+template = "design/templates/milestone.md"
 statuses = ["planned", "active", "done", "dropped"]
 done = ["done"]
 closed = ["dropped"]
 
 [types.task]
 prefix = "TASK"
+template = "design/templates/task.md"
 statuses = ["todo", "doing", "blocked", "done", "dropped"]
 done = ["done"]
 closed = ["dropped"]
@@ -47,11 +52,13 @@ parents = ["task"]
 
 [types.test]
 prefix = "TEST"
+template = "design/templates/test.md"
 statuses = ["draft", "ready", "passing", "failing", "obsolete"]
 closed = ["obsolete"]
 
 [types.risk]
 prefix = "RISK"
+template = "design/templates/risk.md"
 statuses = ["open", "mitigated", "accepted", "closed"]
 closed = ["closed"]
 

@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::error::ErrorKind;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
 
 /// Findings, or a change refused.
 pub const EXIT_FINDINGS: u8 = 1;
@@ -90,7 +90,7 @@ pub enum TraceFormat {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Write a kiln.toml with the default types and a design/ folder; never overwrites.
+    /// Start a project: kiln.toml, design/ with body templates, the agent guide and a design-doc export.
     Init {
         /// The project's name in reports (default: the folder's name).
         #[arg(long)]
@@ -98,7 +98,7 @@ enum Command {
         /// Also register `kiln lsp` for Markdown in .fenix/tools.json (merged, never replaced).
         #[arg(long)]
         fenix: bool,
-        /// Also add a preset's template (`kiln preset list`): arc42, srs, design-doc.
+        /// The preset to add (`kiln preset list`): design-doc (the default), arc42, srs, or none.
         #[arg(long, value_name = "NAME")]
         preset: Option<String>,
     },
@@ -136,11 +136,14 @@ enum Command {
     },
     /// List items, filtered.
     List {
+        /// Only these types, comma-separated (`requirement,design`).
         #[arg(long = "type", value_name = "TYPE")]
         type_name: Option<String>,
-        #[arg(long)]
+        /// Only these statuses, comma-separated (`todo,doing`); one no type has is an error.
+        #[arg(long, value_name = "STATUS")]
         status: Option<String>,
-        #[arg(long)]
+        /// Only items with any of these tags, comma-separated.
+        #[arg(long, value_name = "TAG")]
         tag: Option<String>,
         /// Each linked Jira ticket's status and assignee (read-only, cached 10 minutes).
         #[arg(long)]
@@ -359,8 +362,63 @@ enum AuthService {
     },
 }
 
+/// `kiln --help` lists the commands in these groups, in this order, so a
+/// newcomer sees the eight everyday ones before the plan, review, editors
+/// and integrations (REQ-021). Each line's text is the command's own
+/// `about`, so the groups can't say something the command doesn't; a test
+/// keeps every command in exactly one group.
+const COMMAND_GROUPS: &[(&str, &[&str])] = &[
+    (
+        "Everyday",
+        &[
+            "init", "new", "list", "show", "set", "link", "check", "export",
+        ],
+    ),
+    (
+        "The plan and its coverage",
+        &["next", "status", "trace", "impact"],
+    ),
+    (
+        "Changing the design",
+        &["unlink", "renumber", "preset", "agents"],
+    ),
+    ("Reviewing", &["diff", "confluence"]),
+    ("The window and editors", &["gui", "lsp", "provider"]),
+    ("Integrations", &["jira", "auth"]),
+];
+
+/// The root command with its help grouped by [`COMMAND_GROUPS`].
+fn command() -> clap::Command {
+    let root = Cli::command();
+    let width = COMMAND_GROUPS
+        .iter()
+        .flat_map(|(_, names)| names.iter().map(|n| n.len()))
+        .max()
+        .unwrap_or(0);
+    let mut groups = String::new();
+    for (title, names) in COMMAND_GROUPS {
+        groups.push_str(&format!("{title}:\n"));
+        for name in *names {
+            let about = root
+                .find_subcommand(name)
+                .and_then(|c| c.get_about())
+                .map(|a| a.to_string())
+                .unwrap_or_default();
+            groups.push_str(&format!("  {name:width$}  {about}\n"));
+        }
+        groups.push('\n');
+    }
+    groups.push_str("`kiln help COMMAND` or `kiln COMMAND --help` for one command's options; `kiln` alone opens the window.\n");
+    root.help_template(format!(
+        "{{about-with-newline}}\n{{usage-heading}} {{usage}}\n\n{groups}\nOptions:\n{{options}}"
+    ))
+}
+
 fn main() -> ExitCode {
-    let cli = match Cli::try_parse() {
+    let cli = match command()
+        .try_get_matches()
+        .and_then(|m| Cli::from_arg_matches(&m))
+    {
         Ok(cli) => cli,
         Err(err) => return report(&err),
     };
@@ -553,6 +611,30 @@ fn first_line(err: &clap::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    // verifies: REQ-021
+    fn every_command_is_in_one_help_group() {
+        let root = Cli::command();
+        let mut grouped: Vec<&str> = COMMAND_GROUPS
+            .iter()
+            .flat_map(|(_, names)| names.iter().copied())
+            .collect();
+        let mut commands: Vec<&str> = root
+            .get_subcommands()
+            .map(|c| c.get_name())
+            .filter(|n| *n != "help")
+            .collect();
+        grouped.sort_unstable();
+        commands.sort_unstable();
+        let before = grouped.len();
+        grouped.dedup();
+        assert_eq!(grouped.len(), before, "a command is in two groups");
+        assert_eq!(grouped, commands);
+        let help = command().render_help().to_string();
+        assert!(help.contains("Everyday:\n  init "), "{help}");
+        assert!(help.contains("--project <DIR>"), "{help}");
+    }
     use clap::CommandFactory;
 
     #[test]

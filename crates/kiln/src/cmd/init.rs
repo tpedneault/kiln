@@ -1,7 +1,9 @@
 //! `kiln init`: a `kiln.toml` with FORMAT.md's default types, a
-//! `design/` folder and the agent guide in it (`design/AGENTS.md`, `kiln
-//! agents`). Never overwrites anything. `--preset` then adds a preset's
-//! template, as `kiln preset add` would, which refreshes the guide.
+//! `design/` folder, a body template for each type (K16) and the agent
+//! guide (`design/AGENTS.md`, `kiln agents`). Never overwrites anything.
+//! It then adds a preset, as `kiln preset add` would (which refreshes
+//! the guide): `design-doc` unless `--preset` names another or `none`, so
+//! `kiln export` writes a document from the first day (REQ-021).
 //!
 //! `--fenix` also registers `kiln lsp` as an additional language server in
 //! the project's `.fenix/tools.json` (INTEGRATION.md, "Editing items"), for
@@ -16,12 +18,18 @@ use crate::Fail;
 
 const DESIGN_README: &str = "# Design\n\nKiln items live here: Markdown files that start with a `+++` front\nmatter block. `kiln new requirement --title \"…\"` creates one; `kiln check`\nchecks them. Files without front matter, like this one, are ignored.\n";
 
+/// The preset `kiln init` adds when `--preset` names none.
+pub const DEFAULT_PRESET: &str = "design-doc";
+
 pub fn run(
     project: Option<&Path>,
     name: Option<String>,
     fenix: bool,
     preset: Option<&str>,
 ) -> Result<u8, Fail> {
+    // `--preset none`: no preset at all; no `--preset`: the default one.
+    let bare = preset == Some("none");
+    let preset = preset.filter(|p| *p != "none");
     // An unknown preset stops before anything is written.
     if let Some(p) = preset {
         super::preset::find(p)?;
@@ -56,7 +64,7 @@ pub fn run(
                 .and_then(|d| d.file_name().map(|n| n.to_string_lossy().into_owned()))
         })
         .unwrap_or_else(|| "Project".to_owned());
-    let text = kiln_model::default_config(&name);
+    let text = kiln_model::init_config(&name, "design");
     fenix_storage::atomic_write_new(&config, |w| w.write_all(text.as_bytes()))
         .map_err(|e| Fail::usage(format!("{}: can't write it: {e}", config.display())))?;
     let design = dir.join("design");
@@ -69,6 +77,18 @@ pub fn run(
     }
     println!("kiln.toml");
     println!("design/");
+    for (type_name, body) in kiln_model::ITEM_TEMPLATES {
+        let rel = kiln_model::item_template_path("design", type_name);
+        let path = dir.join(&rel);
+        if path.exists() {
+            continue;
+        }
+        path.parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| fenix_storage::atomic_write_new(&path, |w| w.write_all(body.as_bytes())))
+            .map_err(|e| Fail::usage(format!("{rel}: can't write it: {e}")))?;
+        println!("{rel}");
+    }
     let source = kiln_index::DiskSource::new(&dir);
     let mut hint = None;
     if let Ok(project) = kiln_index::Project::load(&source) {
@@ -77,15 +97,21 @@ pub fn run(
             hint = Some(super::agents::pointer_hint(&project.config));
         }
     }
-    eprintln!("kiln: started project \"{name}\"; `kiln new requirement --title \"…\"` adds the first item");
-    if let Some(hint) = hint {
-        eprintln!("{hint}");
-    }
-    if let Some(p) = preset {
-        super::preset::add_at(&dir, p, false)?;
+    match preset {
+        Some(p) => {
+            super::preset::add_at(&dir, p, false, true)?;
+        }
+        None if !bare => {
+            super::preset::add_at(&dir, DEFAULT_PRESET, false, true)?;
+        }
+        None => {}
     }
     if fenix {
         register_lsp(&dir)?;
+    }
+    eprintln!("kiln: started project \"{name}\"; `kiln new requirement --title \"…\"` adds the first item");
+    if let Some(hint) = hint {
+        eprintln!("{hint}");
     }
     Ok(0)
 }

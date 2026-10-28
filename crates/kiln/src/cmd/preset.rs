@@ -29,7 +29,7 @@ pub fn list() -> Result<u8, Fail> {
 
 pub fn add(project: Option<&Path>, name: &str, dry_run: bool) -> Result<u8, Fail> {
     let root = root(project)?;
-    add_at(&root, name, dry_run)
+    add_at(&root, name, dry_run, false)
 }
 
 /// The preset called `name`, or an error listing the ones there are.
@@ -82,7 +82,10 @@ fn export_errors(files: &dyn FileSource) -> Vec<String> {
         .collect()
 }
 
-pub fn add_at(root: &Path, name: &str, dry_run: bool) -> Result<u8, Fail> {
+/// Adds preset `name` to the project at `root`. `from_init` is `kiln
+/// init` adding it: `kiln.toml` and the guide are listed by init already,
+/// so only the preset's own files are, and the summary is one short line.
+pub fn add_at(root: &Path, name: &str, dry_run: bool, from_init: bool) -> Result<u8, Fail> {
     let preset = find(name)?;
     let config_path = root.join(kiln_parse::CONFIG_FILE);
     let read = kiln_index::read_for_edit(&config_path)
@@ -175,15 +178,26 @@ pub fn add_at(root: &Path, name: &str, dry_run: bool) -> Result<u8, Fail> {
         undo(&written);
         return Err(crate::project::edit_fail(e.into()));
     }
-    println!("{}", kiln_parse::CONFIG_FILE);
+    if !from_init {
+        println!("{}", kiln_parse::CONFIG_FILE);
+    }
     for (path, _) in &plan.files {
         println!("{path}");
     }
     // The agent guide describes the types just added (K113 otherwise).
     if let Ok(project) = Project::load(&disk) {
         if let Some((path, true)) = super::agents::refresh(root, &project.config, false)? {
-            println!("{path}");
+            if !from_init {
+                println!("{path}");
+            }
         }
+    }
+    if from_init {
+        eprintln!(
+            "kiln: added the {name} preset; `kiln export {}` writes its document",
+            plan.export
+        );
+        return Ok(0);
     }
     eprintln!(
         "kiln: added the {name} preset ({}); `kiln export {}` writes it",

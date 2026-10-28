@@ -671,6 +671,8 @@ under one heading per status, in the order you list them.
 | `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, `NO_PROXY` | The proxy for Confluence calls (lowercase names work too). `HTTPS_PROXY` for `https://` URLs, `HTTP_PROXY` for `http://`, else `ALL_PROXY`; no proxy for hosts listed in `NO_PROXY` (names, `.domain` suffixes, IPv4 ranges such as `10.0.0.0/8`, or `*`). **Jira calls don't use a proxy yet**, so a Jira reachable only through a proxy can't be read. |
 | `KILN_HOME` | Puts all of Kiln's own folders (settings, state, logs) in this one folder. |
 | `FENIX_HOME` | Which running Fenix editor `kiln new --open` talks to: the one started with the same `FENIX_HOME`. |
+| `KILN_EDITOR` | The editor `kiln new --open` and the GUI open items with, before Fenix: a command, with `{path}` and `{line}` replaced (`code -g {path}:{line}`); without `{path}`, the path is added at the end. |
+| `VISUAL`, `EDITOR` | Used the same way when `KILN_EDITOR` is unset and Fenix isn't installed, before the operating system's default editor. |
 | `KILN_BLESS` | Only for developing Kiln itself: `KILN_BLESS=1 cargo test` rewrites the golden files. Not read by the `kiln` program. |
 
 ## Kiln's own folders

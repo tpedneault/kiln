@@ -70,6 +70,8 @@ Items are the `.md` files under `design/` that start with `+++`. `kiln new` file
 | test (Test) | `TEST-001` | `design/tests/` | draft (new), ready, passing, failing, obsolete (closed) | — |
 | risk (Risk) | `RISK-001` | `design/risks/` | open (new), mitigated, accepted, closed (closed) | — |
 
+`kiln new` starts the body of requirement from `design/templates/requirement.md`, design from `design/templates/design.md`, decision from `design/templates/decision.md`, milestone from `design/templates/milestone.md`, task from `design/templates/task.md`, test from `design/templates/test.md`, risk from `design/templates/risk.md`.
+
 "new" is the status `kiln new` writes; "done" counts toward progress; "closed" items are left out of coverage and progress (prefer closing an item to deleting its file).
 
 ### Links

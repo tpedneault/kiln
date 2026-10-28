@@ -2,7 +2,7 @@
 id = "TASK-010"
 type = "task"
 title = "KILN_EDITOR, VISUAL and EDITOR open items outside Fenix"
-status = "todo"
+status = "done"
 
 [links]
 part-of = ["MS-017"]

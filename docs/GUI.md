@@ -192,7 +192,7 @@ Normal mode, as in Fenix's pages:
 | `j` `k`, `↓` `↑` | next / previous row |
 | `C-d` `C-u`, `PgDn` `PgUp` | half a page down / up |
 | `gg` `G`, `Home` `End` | first / last row |
-| `Enter` | open the item (or code location, or finding) in Fenix at its line (`kiln new --open`'s path: the running Fenix, else a new one, else the default editor); on a comment, open it in the browser |
+| `Enter` | open the item (or code location, or finding) in Fenix at its line (`kiln new --open`'s path: `KILN_EDITOR`, else the running Fenix, else a new one, else `VISUAL` or `EDITOR`, else the default editor); on a comment, open it in the browser |
 | `i` | Impact of the item under the cursor |
 | `v` | Item: the item under the cursor, as `kiln show` shows it |
 | `C-o` `C-i` (Item) | the item viewed before / after |

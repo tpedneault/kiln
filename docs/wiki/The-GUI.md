@@ -356,7 +356,7 @@ Normal mode, as in Fenix's pages:
 
 ## Opening items
 
-`Enter` (or a double click) opens the item under the cursor in Fenix at its title line, a code location or a finding at its line, and a comment in the browser. It tries the running Fenix first, then starts Fenix, then, when Fenix isn't installed, the operating system's default editor for the file. On a heading, the footer says `Nothing to open here`. See [Editors and Flint](Editors-and-Flint#opening-items-in-fenix).
+`Enter` (or a double click) opens the item under the cursor in Fenix at its title line, a code location or a finding at its line, and a comment in the browser. It uses `KILN_EDITOR` when it is set; otherwise it tries the running Fenix, then starts Fenix, then, when Fenix isn't installed, `VISUAL` or `EDITOR`, then the operating system's default editor for the file ([Editors and Flint](Editors-and-Flint#opening-items-in-fenix)). On a heading, the footer says `Nothing to open here`. See [Editors and Flint](Editors-and-Flint#opening-items-in-fenix).
 
 ## Filtering
 
@@ -443,7 +443,7 @@ Every key is optional. An unknown key, an unknown theme or a size out of range i
 | Home says `no kiln.toml in … any more` | the project moved or its `kiln.toml` was removed. `d` takes it off the list; `a` adds it where it is now |
 | Changes page says "No baseline" | the repository has no tag. Tag a release, or start with `kiln gui --since <commit>` |
 | `--since` fails | the revision doesn't exist in this clone. Fetch tags (`git fetch --tags`) |
-| `Enter` doesn't open Fenix | Fenix isn't installed or not on `PATH`; the default editor opens instead. If several Fenix instances run, set `FENIX_HOME` to choose one |
+| `Enter` doesn't open Fenix | `KILN_EDITOR` is set, which comes first; or Fenix isn't installed or not on `PATH`, and `VISUAL`, `EDITOR` or the default editor opens instead. If several Fenix instances run, set `FENIX_HOME` to choose one |
 | Footer says the theme isn't known | check the spelling against the list above |
 | An edit says the file "changed on disk since Kiln read it" | your editor saved the file at the same moment. Press the key again: the window has reloaded |
 | Exports says "no token for …" | run `kiln auth confluence` in a terminal, or set `KILN_CONFLUENCE_TOKEN`, then press `R` |

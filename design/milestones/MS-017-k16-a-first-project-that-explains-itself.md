@@ -2,7 +2,7 @@
 id = "MS-017"
 type = "milestone"
 title = "K16: a first project that explains itself"
-status = "planned"
+status = "done"
 
 [links]
 depends-on = ["MS-016"]

@@ -70,7 +70,17 @@ fn ok(l: &Live, dir: &Path, args: &[&str]) -> String {
 /// A project with four requirements (one a child) and a decision, publishing as
 /// `layout` under the scratch parent.
 fn project(l: &Live, dir: &Path, stamp: &str, layout: &str) {
-    ok(l, dir, &["init", "--name", &format!("Kiln live {stamp}")]);
+    ok(
+        l,
+        dir,
+        &[
+            "init",
+            "--preset",
+            "none",
+            "--name",
+            &format!("Kiln live {stamp}"),
+        ],
+    );
     write_config(l, dir, stamp, layout);
     for title in ["Fast start", "Small binary", "Works offline"] {
         ok(
