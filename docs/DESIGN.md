@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0–K16 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the Jira mirror with K207 and `kiln auth jira`, `kiln jira sync` and `pull` keeping a sub-task per task in step (K10), presets such as arc42 with `kiln preset add` (K11), Home, the GUI's projects dashboard, to open, add, remove and switch projects (K12), requirement levels with derived requirements, `kiln trace --levels` and the `levels` report (K13), the agent guide `design/AGENTS.md` with `kiln agents` (K14), the plan from the command line with `kiln next` and `kiln status` (K15), body templates, a first export from `kiln init`, `KILN_EDITOR` and a grouped `--help` (K16), this repository's own `design/` and generated design document); every planned milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
+Status: K0–K17 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the Jira mirror with K207 and `kiln auth jira`, `kiln jira sync` and `pull` keeping a sub-task per task in step (K10), presets such as arc42 with `kiln preset add` (K11), Home, the GUI's projects dashboard, to open, add, remove and switch projects (K12), requirement levels with derived requirements, `kiln trace --levels` and the `levels` report (K13), the agent guide `design/AGENTS.md` with `kiln agents` (K14), the plan from the command line with `kiln next` and `kiln status` (K15), body templates, a first export from `kiln init`, `KILN_EDITOR` and a grouped `--help` (K16), one progress everywhere, the plan in the GUI, claimed work, K215 and versioned JSON (K17), this repository's own `design/` and generated design document); every planned milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -199,7 +199,7 @@ nearest `kiln.toml` (`--project <dir>` overrides).
 | `kiln new <type> [--parent ID] [--title T] [--link ROLE=ID]… [--tag X]… [--body-file F]` | allocates the next ID, writes the file whole (links, tags, the body given or the type's template), prints its path (`--format json`: its ID too); `--open` opens it in Fenix at the title | K1, K15 |
 | `kiln list [--type T] [--status S] [--tag X] [--jira] [--body] [--format text\|json]` | items, filtered (each filter a comma list; an unknown type or status is an error); `--jira` adds each linked ticket's status from the Jira mirror; JSON carries each item's links, and with `--body` its body | K1, K8, K15 |
 | `kiln show <ID> [--format text\|json]` | one item with its computed links and its body; JSON with every reference as `{id, title, status}` | K1, K15 |
-| `kiln next [--milestone ID]` | the work ready to start, earliest milestone first (see "The plan") | K15 |
+| `kiln next [--milestone ID] [--unowned]` | the work ready to start, earliest milestone first, who has claimed it; `--unowned` leaves claimed work out (see "The plan") | K15, K17 |
 | `kiln status` | the plan by milestone: progress, ready and waiting work, what `kiln check` finds | K15 |
 | `kiln check [--format text\|json\|gitlab\|github]` | the rules; exit 1 on any error | K1 |
 | `kiln set <ID> status=<S>` (also `title`, `parent`, `owner`, `due`, `tags`, `jira`) / `link <ID> <role> <ID>` / `unlink …` | comment-preserving front-matter edits | K1, K15 |
@@ -318,9 +318,19 @@ person does on the GUI's Board and Roadmap:
   own dependencies are: teams overlap milestones, and a gate would hide
   what could be picked up. A project that wants a gate writes it as a
   `depends-on` between tasks.
-- **`kiln status`** shows each open milestone with its own progress (not
-  its dependencies', unlike the roadmap's), ready and waiting work, and
-  what `kiln check` finds.
+- **`kiln status`** shows each open milestone with its progress, ready
+  and waiting work, who has claimed what, and what `kiln check` finds.
+- **One progress everywhere** (K17, ADR-020): a milestone's own work,
+  directly or through a task's parent, in `kiln show`, `kiln status`, the
+  roadmap report and the GUI alike. Counting the work of the milestones
+  it depends on too made later milestones report the whole project.
+- **Claiming** (K17): whoever takes work sets its `owner`; `kiln next
+  --unowned` leaves claimed work out, and `next`, `status` and the GUI's
+  Board show who has it, so two agents, or an agent and a colleague,
+  don't take the same task. `owner` stays a claim, not an assignment
+  workflow (non-goals).
+- **The GUI shows the plan** (K17): Board and Roadmap rows of open work
+  say `ready` or `waits on …`, from the same plan module.
 - **The plan checks** (K211–K214) report a status moved ahead of the work
   it stands for: a done milestone with open work, done work whose
   dependencies aren't, open work in no milestone, a requirement
@@ -432,8 +442,9 @@ changelog line.
 | K14 | The agent guide (REQ-019, ADR-017): `kiln agents` writes `design/AGENTS.md`, rules written once and a section generated from `kiln.toml` between markers; `kiln init` writes it, `kiln preset add` refreshes it, K113 reports it stale; this repository's own guide | — |
 | K15 | The plan from the command line, for coding agents (REQ-020, ADR-018): `kiln show` prints the body and its JSON is structured; `kiln list --format json` carries links (and `--body`); `kiln next` (ready work) and `kiln status` (the plan by milestone); K211–K214, the plan contradicting itself; `kiln new --link/--tag/--body-file/--format json`, `kiln set tags=/jira=`; the agent guide's "Planning" part and the line for the repository's own guide; this repository's milestones carry their tasks | — |
 | K16 | A first project that explains itself, for people without an agent (REQ-021): body templates for the default types; `kiln init` adds the `design-doc` export; `kiln list` takes comma lists and refuses unknown statuses; `KILN_EDITOR`, `VISUAL` and `EDITOR` for `--open` and the GUI; `kiln --help` grouped, the everyday commands first | — |
+| K17 | The plan everywhere, and claimed (REQ-022, ADR-020): one milestone progress (its own work) in `kiln show`, `kiln status`, the roadmap report and the GUI; the GUI's Board and Roadmap mark open work `ready` or `waits on …` and show its owner; `kiln next --unowned` and the owner in `next` and `status`, the guide's rule to claim work; K215 (template text left in an item past its first status); the `design-doc` template places tasks and tests; `kiln_json` in every JSON object | — |
 
-Everything through K16 needs nothing new from Fenix or Flint to work. INTEGRATION.md
+Everything through K17 needs nothing new from Fenix or Flint to work. INTEGRATION.md
 lists the changes (G1–G9) that make the integration better and which
 milestone notices their absence.
 

@@ -165,6 +165,9 @@ enum Command {
         /// Only this milestone's work.
         #[arg(long, value_name = "ID")]
         milestone: Option<String>,
+        /// Leave out work someone has claimed (an `owner` is set).
+        #[arg(long)]
+        unowned: bool,
         #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
         format: TextOrJson,
     },
@@ -494,9 +497,11 @@ fn main() -> ExitCode {
             format,
         ),
         Command::Show { id, format } => cmd::show::run(project, &id, format),
-        Command::Next { milestone, format } => {
-            cmd::plan::next(project, milestone.as_deref(), format)
-        }
+        Command::Next {
+            milestone,
+            unowned,
+            format,
+        } => cmd::plan::next(project, milestone.as_deref(), unowned, format),
         Command::Status { format } => cmd::plan::status(project, format),
         Command::Check { format } => cmd::check::run(project, format),
         Command::Set { id, assignments } => cmd::edit::set(project, &id, &assignments),

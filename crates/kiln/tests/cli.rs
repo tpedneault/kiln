@@ -124,7 +124,9 @@ fn a_project_from_init_to_check() {
     let check = kiln_in(d, &["check"]);
     assert_eq!(check.status.code(), Some(0), "warnings don't fail");
     assert!(stdout(&check).contains("K201 warning: REQ-001 is approved but nothing verifies it"));
-    assert_eq!(stderr(&check).trim(), "kiln: 2 warnings");
+    // Approved with the template's prompts still in it (K17).
+    assert!(stdout(&check).contains("K215 warning: REQ-001 is approved but still has"));
+    assert_eq!(stderr(&check).trim(), "kiln: 3 warnings");
 
     ok(d, &["link", "TEST-001", "verifies", "REQ-001"]);
     let wrong = kiln_in(d, &["link", "REQ-001", "verifies", "REQ-002"]);
@@ -1485,6 +1487,11 @@ fn a_first_project_explains_itself() {
     let export = kiln_in(d, &["export"]);
     assert_eq!(export.status.code(), Some(0), "{}", stderr(&export));
     assert!(d.join("docs/DESIGN-DOCUMENT.md").exists());
+    // It places the plan and the tests, so a first export leaves nothing out (K17).
+    ok(d, &["new", "task", "--title", "Placed"]);
+    ok(d, &["new", "test", "--title", "Placed too"]);
+    let dry = kiln_in(d, &["export", "--dry-run"]);
+    assert!(!stdout(&dry).contains("leaves out"), "{}", stdout(&dry));
     // Filters take lists, and a status nothing has is said aloud.
     ok(d, &["new", "task", "--title", "One"]);
     ok(d, &["set", "TASK-001", "status=doing"]);
@@ -1512,4 +1519,59 @@ fn a_first_project_explains_itself() {
     assert!(!std::fs::read_to_string(bare.path().join("kiln.toml"))
         .unwrap()
         .contains("[[export]]"));
+}
+
+#[test]
+// verifies: REQ-022
+fn claimed_work_versioned_json_and_template_text() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["new", "milestone", "--title", "First"]);
+    ok(
+        d,
+        &["new", "task", "--title", "One", "--link", "part-of=MS-001"],
+    );
+    ok(
+        d,
+        &["new", "task", "--title", "Two", "--link", "part-of=MS-001"],
+    );
+
+    // Claiming: the owner shows, and --unowned leaves claimed work out.
+    ok(d, &["set", "TASK-001", "owner=ana", "status=doing"]);
+    let next = ok(d, &["next"]);
+    assert!(
+        next.contains("TASK-001  doing  One  (MS-001)  · ana"),
+        "{next}"
+    );
+    assert_eq!(
+        ok(d, &["next", "--unowned"]),
+        "TASK-002  todo  Two  (MS-001)\n"
+    );
+    let status = ok(d, &["status"]);
+    assert!(
+        status.contains("MS-001 First · planned · 0 of 2 done"),
+        "{status}"
+    );
+    assert!(status.contains("One  · ana"), "{status}");
+
+    // Every JSON object says which shape it is.
+    let show: serde_json::Value =
+        serde_json::from_str(&ok(d, &["show", "TASK-001", "--format", "json"])).unwrap();
+    assert_eq!(show["kiln_json"], 1);
+    let status: serde_json::Value =
+        serde_json::from_str(&ok(d, &["status", "--format", "json"])).unwrap();
+    assert_eq!(status["kiln_json"], 1);
+    assert_eq!(status["milestones"][0]["ready"][0]["owner"], "ana");
+
+    // TASK-001 is past its first status with the template's prompts in it.
+    let check = ok(d, &["check"]);
+    assert!(
+        check.contains("K215 warning: TASK-001 is doing but still has design/templates/task.md's text \"**What:** the change, in a sentence or two.\" and 1 more of its lines"),
+        "{check}"
+    );
+    assert!(
+        !check.contains("TASK-002 is"),
+        "a todo task may keep them: {check}"
+    );
 }

@@ -683,3 +683,40 @@ fn k211_to_k214_the_plan_contradicting_itself() {
         );
     }
 }
+
+#[test]
+// verifies: REQ-022
+fn k215_template_text_left_in_an_item_past_its_first_status() {
+    let config = "\n[types.note]\nprefix = \"NOTE\"\nstatuses = [\"draft\", \"done\", \"gone\"]\nclosed = [\"gone\"]\ntemplate = \"design/templates/note.md\"\n";
+    let template = "## Context\n\n**What:** say it.\n\n**Why:** say why.\n";
+    let note = |id: &str, status: &str, body: &str| {
+        (
+            format!("design/{id}.md"),
+            format!("+++\nid = \"{id}\"\ntype = \"note\"\ntitle = \"T\"\nstatus = \"{status}\"\n+++\n{body}"),
+        )
+    };
+    let mut f = files(vec![
+        // Past its first status, two prompts left: one finding, on the
+        // first of them (line 10: the body starts on line 7).
+        note(
+            "NOTE-001",
+            "done",
+            "\n## Context\n\n**What:** say it.\n\n**Why:** say why.\n",
+        ),
+        // Written: the heading stays, the prompts are gone.
+        note(
+            "NOTE-002",
+            "done",
+            "\n## Context\n\n**What:** a real answer.\n",
+        ),
+        // A draft may still carry them, and a closed item is left alone.
+        note("NOTE-003", "draft", "\n**What:** say it.\n"),
+        note("NOTE-004", "gone", "\n**What:** say it.\n"),
+    ]);
+    f.push(("design/templates/note.md", template.to_owned()));
+    let found: Vec<String> = run(config, &f)
+        .into_iter()
+        .filter(|x| x.contains("K215"))
+        .collect();
+    assert_eq!(found, ["design/NOTE-001.md:10:1 K215"]);
+}

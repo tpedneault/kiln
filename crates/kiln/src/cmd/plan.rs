@@ -28,11 +28,28 @@ fn plan(p: &Project) -> Result<Vec<Group<'_>>, Fail> {
     Ok(p.plan())
 }
 
-/// `kiln next [--milestone ID]`.
+/// `  · ana` after an item someone has claimed (`owner`), so two workers
+/// see who took what (K17).
+fn claimed(item: &Item) -> String {
+    item.owner
+        .as_ref()
+        .map(|o| format!("  · {o}"))
+        .unwrap_or_default()
+}
+
+/// An item as JSON with its owner: what `next` and `status` list.
+fn with_owner(item: &Item) -> Value {
+    let mut v = item_summary(item);
+    v["owner"] = json!(item.owner);
+    v
+}
+
+/// `kiln next [--milestone ID] [--unowned]`.
 // implements: REQ-020
 pub fn next(
     project: Option<&Path>,
     milestone: Option<&str>,
+    unowned: bool,
     format: TextOrJson,
 ) -> Result<u8, Fail> {
     let loaded = load(project)?;
@@ -43,17 +60,25 @@ pub fn next(
         let item = existing(p, &id)?;
         groups.retain(|g| g.milestone.is_some_and(|g| g.id == item.id));
     }
-    let ready: Vec<(&Item, Option<&Item>)> = groups
+    let all: Vec<(&Item, Option<&Item>)> = groups
         .iter()
         .flat_map(|g| g.ready.iter().map(move |i| (*i, g.milestone)))
         .collect();
+    // `--unowned`: what nobody has claimed yet, so a second agent doesn't
+    // take the task the first one is on (REQ-022).
+    let ready: Vec<(&Item, Option<&Item>)> = all
+        .iter()
+        .copied()
+        .filter(|(i, _)| !unowned || i.owner.is_none())
+        .collect();
+    let claimed_count = all.len() - ready.len();
     let waiting: usize = groups.iter().map(|g| g.waiting.len()).sum();
     match format {
         TextOrJson::Json => {
             let rows: Vec<Value> = ready
                 .iter()
                 .map(|(i, m)| {
-                    let mut v = item_summary(i);
+                    let mut v = with_owner(i);
                     v["type"] = json!(i.type_name);
                     v["path"] = json!(i.path);
                     v["line"] = json!(i.id_span.line);
@@ -69,20 +94,29 @@ pub fn next(
             for (i, m) in &ready {
                 let place = m.map(|m| format!("  ({})", m.id)).unwrap_or_default();
                 println!(
-                    "{:id_w$}  {:st_w$}  {}{place}",
+                    "{:id_w$}  {:st_w$}  {}{place}{}",
                     i.id.to_string(),
                     i.status,
-                    i.title
+                    i.title,
+                    claimed(i)
                 );
             }
         }
     }
     if ready.is_empty() {
+        let mut why = Vec::new();
+        if claimed_count > 0 {
+            why.push(format!("{claimed_count} ready but claimed"));
+        }
+        if waiting > 0 {
+            why.push(format!("{waiting} waiting (`kiln status` shows on what)"));
+        }
         eprintln!(
             "kiln: no work is ready{}",
-            match waiting {
-                0 => String::new(),
-                n => format!("; {n} waiting (`kiln status` shows on what)"),
+            if why.is_empty() {
+                String::new()
+            } else {
+                format!("; {}", why.join(", "))
             }
         );
     }
@@ -110,9 +144,9 @@ pub fn status(project: Option<&Path>, format: TextOrJson) -> Result<u8, Fail> {
                         }),
                         "done": g.progress.done,
                         "total": g.progress.total,
-                        "ready": g.ready.iter().map(|i| item_summary(i)).collect::<Vec<_>>(),
+                        "ready": g.ready.iter().map(|i| with_owner(i)).collect::<Vec<_>>(),
                         "waiting": g.waiting.iter().map(|w| {
-                            let mut v = item_summary(w.item);
+                            let mut v = with_owner(w.item);
                             v["waits_on"] = json!(w.on.iter().map(|i| item_summary(i)).collect::<Vec<_>>());
                             v["blocked"] = json!(w.blocked);
                             v
@@ -159,10 +193,11 @@ pub fn status(project: Option<&Path>, format: TextOrJson) -> Result<u8, Fail> {
                 for (k, i) in g.ready.iter().enumerate() {
                     let label = if k == 0 { "ready  " } else { "       " };
                     println!(
-                        "  {label}  {:id_w$}  {:st_w$}  {}",
+                        "  {label}  {:id_w$}  {:st_w$}  {}{}",
                         i.id.to_string(),
                         i.status,
-                        i.title
+                        i.title,
+                        claimed(i)
                     );
                 }
                 for (k, w) in g.waiting.iter().enumerate() {
@@ -174,10 +209,11 @@ pub fn status(project: Option<&Path>, format: TextOrJson) -> Result<u8, Fail> {
                         _ => format!("on {}", on.join(", ")),
                     };
                     println!(
-                        "  {label}  {:id_w$}  {:st_w$}  {}  ({why})",
+                        "  {label}  {:id_w$}  {:st_w$}  {}  ({why}){}",
                         w.item.id.to_string(),
                         w.item.status,
                         w.item.title,
+                        claimed(w.item)
                     );
                 }
             }

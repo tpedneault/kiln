@@ -378,13 +378,17 @@ marked done with open tasks (K211), a task done before what it depends
 on (K212), an open task in no milestone (K213), a requirement marked
 implemented while its tasks are open (K214).
 
-> [!NOTE]
-> A milestone's progress also counts the items of every milestone it
-> `depends-on`, transitively. That is right when "MS-003 depends on
-> MS-002" means "MS-003 isn't finished until MS-002 is". It is confusing
-> when you only meant the order: the last milestone then reports the
-> whole project's tasks. If the order is all you need, the IDs already
-> give it; leave `depends-on` out.
+A milestone's progress counts its own tasks only. `depends-on` between
+milestones orders them; it neither adds the earlier milestone's tasks to
+the later one's progress nor holds the later one's tasks back. To make a
+task wait for another, link the tasks.
+
+Several people, or several coding agents, share one plan by claiming
+work: whoever takes a task sets its `owner` in the same command that
+moves it on (`kiln set TASK-004 owner=ana status=doing`). `kiln next
+--unowned` then leaves it out, and `kiln status` and the Board show who
+has it. Kiln has no assignment beyond that: `owner` is a claim, not a
+workflow.
 
 **If your team uses Jira**, keep tasks in Jira and put the issue keys on
 items (`jira = ["PROJ-123"]`), or keep Kiln tasks and link them to Jira.
@@ -652,7 +656,7 @@ seconds.
 | An ID from another project in prose, such as `ADR-010` | K102 if your project has an `ADR` prefix | Put it in a code span (`` `ADR-010` ``) or write it out in words |
 | Forgetting `[code] paths` | code comments are ignored | Uncomment `[code]` in `kiln.toml` and list your source folders |
 | `tag="!performance"` in a template | selects nothing | Rely on the appears-once rule or tag the rest |
-| `depends-on` between milestones just for order | late milestones show the whole project's progress | Leave it out; IDs give the order |
+| `kiln new` without `--body-file`, then never writing the body | K215 once the item moves on; the template's prompts reach the document | Replace each prompt with what the item says |
 | Deleting an obsolete item | K102 everywhere it was linked | Set its status to `obsolete` |
 | Editing the generated document | overwritten by the next export | Edit the items or the template |
 

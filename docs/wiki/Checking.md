@@ -226,6 +226,7 @@ edit) and in exports with the `findings` report, at the same severities.
 | K212 | warning | a done item that depends on one that isn't |
 | K213 | warning | open work in no milestone |
 | K214 | warning | a requirement implemented or verified while work implementing it is open |
+| K215 | warning | an item past its first status still has its template's text |
 
 ## Configuration rules (K001–K005)
 
@@ -557,7 +558,7 @@ statuses.
 changes. Without a guide, or with the section deleted, there is nothing
 to check.
 
-## Design rules (K201–K214)
+## Design rules (K201–K215)
 
 These look at the design as a whole: what is covered, what is overdue,
 what is inconsistent. They are warnings by default (K207 is off), because
@@ -843,7 +844,23 @@ design/requirements/REQ-003-export-csv.md:5:10: K214 warning: REQ-003 is impleme
 **Fix:** finish the work, or set the requirement back to `approved`
 until it is.
 
-All four come from the same idea as `kiln next`: work is *open* while
+### K215
+
+**Triggers:** an item past its type's `initial` status, and not closed,
+whose body still has a line of its type's `template` exactly as the
+template has it: a prompt nobody replaced. Headings and blank lines
+don't count, so a decision keeps its `## Context`. One finding per item,
+on the first such line, saying how many more there are.
+
+```text
+design/tasks/TASK-004-write-the-csv-writer.md:12:1: K215 warning: TASK-004 is doing but still has design/templates/task.md's text "**What:** the change, in a sentence or two." and 1 more of its lines; write what it says, or delete the line
+```
+
+**Fix:** replace each prompt with what the item says, or delete the
+line. A draft (or a task still `todo`) may carry prompts while it is
+written; past that they would reach the exported document.
+
+K211–K214 come from the same idea as `kiln next`: work is *open* while
 neither done nor closed. They catch a status moved ahead of the work it
 stands for, the mistake that is easiest to make quietly, by a person or
 a coding agent.

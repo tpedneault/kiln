@@ -188,14 +188,16 @@ fn coverage_counts_open_sources_and_complete_children() {
 }
 
 #[test]
-fn progress_follows_depends_on_and_skips_closed() {
+// verifies: REQ-022
+fn progress_counts_a_milestones_own_work_and_skips_closed() {
     let p = project();
     let ms1 = p.progress(&id("MS-001")).unwrap();
     assert_eq!(
         (ms1.done, ms1.total),
-        (1, 2),
-        "TASK-001 done, TASK-002 via MS-002, TASK-003 dropped"
+        (1, 1),
+        "TASK-001 done, TASK-003 dropped; TASK-002 is MS-002's though MS-001 depends on it (ADR-020)"
     );
+    assert_eq!(p.progress(&id("MS-002")).map(|g| g.total), Some(1));
     assert_eq!(p.progress(&id("TASK-001")), None);
 }
 

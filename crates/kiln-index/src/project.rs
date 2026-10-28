@@ -542,37 +542,29 @@ impl Project {
                 .all(|c| self.covered_inner(&c.id, role, seen))
     }
 
-    /// For a milestone: done ÷ (all − closed) over items `part-of` it or
-    /// any milestone it `depends-on`, transitively. `None` when nothing
-    /// counts.
+    /// For a milestone: done ÷ (all − closed) over its own work, the items
+    /// `part-of` it directly or through their parent (a sub-task counts
+    /// where its task does; see [`Project::milestones_of`]). `None` when
+    /// nothing counts.
+    ///
+    /// Only its own (ADR-020): counting the work of the milestones it
+    /// `depends-on` too made a later milestone report the earlier ones'
+    /// tasks whenever `depends-on` only meant the order, and made the GUI
+    /// and `kiln status` disagree. Every view calls this one function.
+    // implements: REQ-022
     pub fn progress(&self, id: &ItemId) -> Option<Progress> {
-        let mut milestones = HashSet::from([id.clone()]);
-        let mut queue = VecDeque::from([id.clone()]);
-        while let Some(m) = queue.pop_front() {
-            for item in self.indices(&m).iter().map(|&i| &self.items[i]) {
-                for link in item.links.iter().filter(|l| l.role == "depends-on") {
-                    if let Ok(dep) = &link.target.id {
-                        let is_milestone =
-                            self.item(dep).is_some_and(|d| d.type_name == "milestone");
-                        if is_milestone && milestones.insert(dep.clone()) {
-                            queue.push_back(dep.clone());
-                        }
-                    }
-                }
-            }
-        }
-        let mut seen = HashSet::new();
         let mut progress = Progress { done: 0, total: 0 };
-        for m in &milestones {
-            for link in self.inbound(m).iter().filter(|l| l.role == "part-of") {
-                if let Source::Item(i) = link.source {
-                    let item = &self.items[i];
-                    if seen.insert(i) && !self.is_closed(item) {
-                        progress.total += 1;
-                        progress.done += usize::from(self.is_done(item));
-                    }
-                }
+        let work = self.work_types();
+        for item in self
+            .items
+            .iter()
+            .filter(|i| work.contains(&i.type_name.as_str()))
+        {
+            if self.is_closed(item) || !self.milestones_of(item).iter().any(|m| m.id == *id) {
+                continue;
             }
+            progress.total += 1;
+            progress.done += usize::from(self.is_done(item));
         }
         (progress.total > 0).then_some(progress)
     }

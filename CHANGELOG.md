@@ -249,9 +249,26 @@ All notable changes to Kiln are recorded here. The format follows
   --help` lists the commands in groups, the everyday ones first. Kiln's
   own types use the same templates
   ([docs/CLI.md](docs/CLI.md), "`kiln init`", "`kiln new`").
+- K17: the plan everywhere, and claimed (REQ-022, ADR-020). The GUI's
+  Board and Roadmap mark open work `ready` or `waits on …`, as `kiln
+  next` does, and show who has claimed it. `kiln next --unowned` leaves
+  out work whose `owner` is set, `next` and `status` show owners, and the
+  agent guide's rules say to claim work in the command that takes it.
+  K215 warns when an item past its first status still has its
+  template's prompts. The `design-doc` template places tasks and tests,
+  so a first export leaves nothing out. Every JSON object Kiln prints
+  carries `"kiln_json": 1` ([docs/CLI.md](docs/CLI.md), "JSON output").
 
 ### Changed
 
+- A milestone's progress counts its own work only (K17, ADR-020), in
+  `kiln show`, the roadmap report and the GUI as in `kiln status`: the
+  milestones it `depends-on` no longer add theirs. Committed exports with
+  a roadmap may change once.
+- The agent guide's generated "Planning" section mentions claiming (K17):
+  guides see K113 until `kiln agents` runs once. The rules `kiln init`
+  writes say to claim work; a guide's existing rules are its own and
+  stay as they are.
 - `kiln list` filters take comma lists (`--status todo,doing`), and a
   status that no type in scope has is an error (exit 2) instead of an
   empty list (K16).

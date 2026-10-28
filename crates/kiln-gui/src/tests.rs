@@ -87,7 +87,7 @@ fn source() -> MemorySource {
                 "task",
                 "Measure it",
                 "todo",
-                "\n[links]\npart-of = [\"MS-001\"]\n",
+                "owner = \"ana\"\n\n[links]\npart-of = [\"MS-001\"]\n",
             ),
         )
         .with(
@@ -245,6 +245,7 @@ fn trace_marks_gaps_and_impact_follows_the_cursor() {
 }
 
 #[test]
+// verifies: REQ-022
 fn board_roadmap_and_decisions() {
     let mut a = app();
     press(&mut a, " b");
@@ -252,7 +253,7 @@ fn board_roadmap_and_decisions() {
         squash(a.text()),
         [
             "todo (1)",
-            "TASK-002 Measure it todo under",
+            "TASK-002 Measure it todo under ready · ana",
             "doing (0)",
             "blocked (0)",
             "done (1)",
@@ -267,7 +268,7 @@ fn board_roadmap_and_decisions() {
             "Milestones",
             "MS-001 First release active due 2026-11-30 1/2 █████░░░░░",
             "TASK-001 Write the loader done",
-            "TASK-002 Measure it todo",
+            "TASK-002 Measure it todo ready · ana",
             "MS-002 Later planned undated",
         ]
     );
