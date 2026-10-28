@@ -83,8 +83,10 @@ date.
 ```
 
 In `tree`, an item page has the banner (naming the item's source file and
-the last commit that changed it), the full properties table
-(`item_style = "table"`), the body, and its coverage.
+the last commit that changed it), the properties table with the item's
+type and source file, the body, and its coverage. With requirement
+levels, a requirement's page is under the requirement it refines
+(EXPORT.md, "The requirements tree").
 
 ## Configuration
 
@@ -465,7 +467,7 @@ raw HTML through.
 | headings, paragraphs, emphasis, strong, strikethrough, inline code | `h1`–`h6`, `p`, `em`, `strong`, `del`, `code`; numbering as text in the heading |
 | item heading | the heading, with the `anchor` macro named by the ID at its start, inside the heading element (`<h2><ac:structured-macro ac:name="anchor"><ac:parameter ac:name="">REQ-014</ac:parameter></ac:structured-macro>2.1 REQ-014 …</h2>`; **verify** the default-parameter form, and that `…#REQ-014` scrolls to it, on both flavours) |
 | item in a `style="row"` table, or a report row | the `anchor` macro at the start of the row's first cell |
-| properties line / table | a `p` of status lozenge and links / a two-column `table` |
+| properties table / lines | a two-column `table data-layout="default"` with a `colgroup` giving the label column 160 px, `th` labels and `td` values (**verify** both flavours keep the width and the text-width layout) / a `p` of status lozenge and links |
 | "Changed" / "New" markers (`--since`) | `status` macro, Yellow / Green, inside the heading after its text; the page title and anchor don't change |
 | lists, GitHub task lists | `ul`/`ol`; task items as text `☐`/`☑` (Confluence task lists are interactive, which invites edits) |
 | tables, `style="row"` item tables | `table`/`tbody`/`tr`/`th`/`td` |
@@ -479,7 +481,7 @@ raw HTML through.
 | relative links to repo files, code locations | `a href` to the repository web URL (EXPORT.md, "Which commit a link names") |
 | relative images | attached as `image-<sha256 of the bytes, 12 hex>.<ext>` and shown with `ac:image` |
 | status | `status` macro, `colour` by group: initial Grey, done Green, closed Grey, others Blue; gaps Red |
-| table of contents (`kiln:toc`) | the `toc` macro (`maxLevel` 3 by default; `[export.confluence] toc_levels`) |
+| table of contents (`kiln:toc`) | the `toc` macro, `maxLevel` the depth of the deepest item heading on the page (3 to 6; `[export.confluence] toc_levels` sets it) |
 | `sections`/`tree` root's list of child pages | the `children` macro with `all` = `true` (**verify** parameters, and the order it lists pages in on each flavour: the page tree's, which if alphabetical puts "10 …" between "1 …" and "2 …", as arc42's twelve sections would show); with `children = "list"`, a list of links to the child pages by title, in document order, which is certain but changes the parent page when a child's title does |
 
 Because cross-page links go by title, a title change re-renders every page

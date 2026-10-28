@@ -632,13 +632,8 @@ design/tasks/TASK-003-old-budget.md:8:16: K203 warning: TASK-003 links to REQ-00
 or close the source too (`kiln set TASK-003 status=dropped`). Closed
 items linking to closed items are fine.
 
-One expected case: with the default types, `superseded` is a closed
-status of decisions, so the `supersedes` link that K204 asks for also
-gets K203 on the new decision ("ADR-004 links to ADR-002, which is
-superseded"). Kiln has no per-role exception. If your project uses
-`supersedes`, either accept this warning, or remove `superseded` from the
-decision type's `closed` list (superseded decisions then stay visible in
-exports and lists), or set `K203 = "off"`.
+One exception: a `supersedes` link to a decision whose status is
+`superseded` is the link K204 asks for, so it is never K203.
 
 ### K204
 
@@ -823,7 +818,6 @@ Suggestions:
 - **K206 stays a warning**: dates slip, and a red CI over a date helps
   nobody. Review the warnings in planning instead.
 - **K105 off** only if you deliberately name files without IDs.
-- **K203**: if you use `supersedes`, read [K203](#k203) first.
 
 ## Warnings, errors and CI
 

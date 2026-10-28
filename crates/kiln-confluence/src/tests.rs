@@ -1324,3 +1324,103 @@ fn data_center_walks_child_pages_for_descendants() {
         "the endpoint that answers 500 on Data Center isn't asked: {log:?}"
     );
 }
+
+#[test]
+// verifies: REQ-020
+fn requirement_levels_publish_as_one_tree_on_one_page() {
+    let config = format!(
+        "{}
+[repository]
+web = \"https://git.example.com/pump/-/blob/{{commit}}/{{path}}#L{{line}}\"
+
+[types.system]
+prefix = \"SYS\"
+title = \"System requirement\"
+statuses = [\"draft\", \"approved\"]
+
+[types.software]
+prefix = \"SW\"
+title = \"Software requirement\"
+statuses = [\"draft\", \"approved\"]
+
+[links.refines]
+from = [\"system\", \"software\"]
+to = [\"requirement\", \"system\"]
+inverse = \"refined by\"
+
+[requirements]
+levels = [\"requirement\", \"system\", \"software\"]
+
+[confluence]
+url = \"https://confluence.example.com\"
+space = \"PUMP\"
+
+[[export]]
+name = \"spec\"
+format = \"confluence\"
+reports = [\"traceability\"]
+[export.confluence]
+parent = 100
+",
+        kiln_model::default_config("Pump")
+    );
+    let source = MemorySource::new()
+        .with("kiln.toml", config)
+        .with(
+            "design/REQ-001.md",
+            item(
+                "REQ-001",
+                "requirement",
+                "Alarms are quick",
+                "approved",
+                "+++\nWithin seconds.\n",
+            ),
+        )
+        .with(
+            "design/REQ-002.md",
+            item("REQ-002", "requirement", "Alarms are loud", "approved", ""),
+        )
+        .with(
+            "design/SYS-001.md",
+            item(
+                "SYS-001",
+                "system",
+                "Detect in 2 s",
+                "approved",
+                "[links]\nrefines = [\"REQ-001\", \"REQ-002\"]\n",
+            ),
+        )
+        .with(
+            "design/SW-001.md",
+            item(
+                "SW-001",
+                "software",
+                "Sample at 50 Hz",
+                "approved",
+                "[links]\nrefines = [\"SYS-001\"]\n",
+            ),
+        )
+        .with(
+            "design/SW-002.md",
+            item(
+                "SW-002",
+                "software",
+                "Watchdog",
+                "approved",
+                "derived = true\n",
+            ),
+        );
+    let project = Project::load(&source).unwrap();
+    assert!(project.findings.is_empty(), "{:?}", project.findings);
+    let pages = desired(&project, &source, "spec", &HashSet::new());
+    assert_eq!(pages.len(), 1, "one page");
+    let body = &pages[0].body;
+    normalise(body).unwrap();
+    // The table of contents reaches the software requirements, at h4.
+    assert!(body.contains("<ac:parameter ac:name=\"maxLevel\">4</ac:parameter>"));
+    assert!(
+        body.contains("1.1.1.1 SW-001 Sample at 50 Hz</h4>"),
+        "{body}"
+    );
+    golden("storage-levels.xml", &pretty(body));
+}

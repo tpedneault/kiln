@@ -186,7 +186,7 @@ fn directive(d: &Directive, project: &Project, out: &mut Vec<TemplateProblem>) {
                 unknown_attrs(&[], out);
             }
         }
-        "summary" | "toc" => {
+        "summary" | "toc" | "requirements" => {
             no_positional(out);
             unknown_attrs(&[], out);
         }
@@ -196,7 +196,7 @@ fn directive(d: &Directive, project: &Project, out: &mut Vec<TemplateProblem>) {
         )),
         other => out.push(problem(
             d.line,
-            format!("unknown directive kiln:{other} (items, item, report, summary, toc, value)"),
+            format!("unknown directive kiln:{other} (items, item, requirements, report, summary, toc, value)"),
         )),
     }
 }

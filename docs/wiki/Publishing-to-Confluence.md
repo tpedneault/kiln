@@ -143,7 +143,7 @@ without the keys it needs fails `kiln check` (K005), naming them.
 | `page` | — | Instead, write into this existing page (`document` layout only; see [Adopting an existing page](#adopting-an-existing-page)). |
 | `space` | `[confluence] space` | Publish this target into another space. |
 | `labels` | `[]` | Labels added to this target's pages, on top of `[confluence] labels`. |
-| `toc_levels` | `3` | How many heading levels the table of contents (`kiln:toc`) shows. |
+| `toc_levels` | deep enough for every item (3 to 6) | How many heading levels the table of contents (`kiln:toc`) shows. By default as deep as the deepest item heading on the page, so a requirements tree is listed down to its lowest level. |
 | `restrict_adopted` | `false` | With `restrict_edits`, also restrict an adopted page. |
 | `qualify_titles` | `taken` | `taken` or `always`: when section and item pages carry the target's title in parentheses (see [Several projects in one space](#several-projects-in-one-space)). |
 | `children` | `macro` | `macro` (Confluence's `children` macro) or `list` (links Kiln writes, in document order): how a `sections` or `tree` page lists its child pages. |

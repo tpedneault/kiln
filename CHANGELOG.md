@@ -220,9 +220,31 @@ All notable changes to Kiln are recorded here. The format follows
   preset add` refreshes it, and K113 warns when the section no longer
   matches `kiln.toml`. Kiln's own `design/AGENTS.md`
   ([docs/CLI.md](docs/CLI.md), "`kiln agents`").
+- K15: one-page documents read top-down (REQ-020, ADR-018). A document
+  without a template starts with the requirements; with several
+  requirement levels they are one "Requirements" section holding the
+  requirements tree, also placed by the new `<!-- kiln:requirements -->`:
+  each requirement with those of the level below that refine it as its
+  sub-sections, a requirement under several shown once and named under
+  the others, derived and untraced requirements under headings of their
+  own, and in `tree` on Confluence each requirement's page under the one
+  it refines. The `design-doc` preset's template is rewritten in that
+  order (introduction, requirements, design, decisions, verification,
+  plan, risks, traceability, findings), and with levels its
+  `requirement` stands for them. Tables of contents go as deep as the
+  deepest item (3 to 6; `toc_levels` still sets Confluence's)
+  ([docs/EXPORT.md](docs/EXPORT.md), "The requirements tree").
 
 ### Changed
 
+- Exports: an item's properties are a two-column table by default in
+  every layout (`item_style = "table"`), related items by ID, the status
+  row first (Markdown's header row) and, outside `tree`, no type or
+  source rows; `list` keeps the previous look. The summary lists the
+  requirement levels first. `traceability` without `type` is the chain
+  matrix when there are several levels.
+- Check: K203 no longer warns about a `supersedes` link to a superseded
+  decision, the link K204 asks for.
 - Check: K201 and K202 fire only when `verifies` or `implements` can
   point at the requirement's type; a project whose roles never allowed
   it got a warning it couldn't fix.

@@ -31,10 +31,12 @@ This document describes Flint.
 
 #### 2.1.1 REQ-002 Fast enough to be a reflex
 
-**approved**\
-**Parent:** [REQ-001 Flint is a launcher](#221-req-001-flint-is-a-launcher)\
-**Implemented by:** [src/launcher.rs:2](https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2)\
-**Verified by:** [TEST-001 Hotkey benchmark](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/TEST-001-bench.md)
+| Status | **approved** |
+| --- | --- |
+| Parent | [REQ-001](#221-req-001-flint-is-a-launcher) |
+| Implemented by | [src/launcher.rs:2](https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2) |
+| Verified by | [TEST-001](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/TEST-001-bench.md) |
+| Tags | performance |
 
 > [!NOTE]
 > Measured on the reference laptop.
@@ -50,8 +52,9 @@ flowchart TD
 
 #### 2.2.1 REQ-001 Flint is a launcher
 
-**approved**\
-**Jira:** [FLINT-12](https://jira.example.com/browse/FLINT-12)
+| Status | **approved** |
+| --- | --- |
+| Jira | [FLINT-12](https://jira.example.com/browse/FLINT-12) |
 
 Flint finds and opens things; see [ADR-002 TOML front matter](#3-decisions).
 
@@ -61,8 +64,9 @@ Windows and Linux.
 
 #### 2.2.2 REQ-003 Themes follow Fenix
 
-**draft**\
-**Parent:** [REQ-001 Flint is a launcher](#221-req-001-flint-is-a-launcher)
+| Status | **draft** |
+| --- | --- |
+| Parent | [REQ-001](#221-req-001-flint-is-a-launcher) |
 
 | Theme | Source |
 | --- | --- |

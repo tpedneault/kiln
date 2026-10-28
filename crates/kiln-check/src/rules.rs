@@ -382,7 +382,12 @@ fn item_rules(project: &Project, files: &dyn FileSource, item: &Item, out: &mut 
                     role.to.join(", ")
                 ),
             );
-        } else if !closed && project.is_closed(target) {
+        } else if !closed
+            && project.is_closed(target)
+            // `supersedes` to a superseded decision is the link K204 asks
+            // for: closing the target is what superseding means.
+            && !(role.name == "supersedes" && target.status == "superseded")
+        {
             report(
                 out,
                 Rule::K203,

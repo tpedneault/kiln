@@ -7,7 +7,7 @@ follows from those links: what is unverified, what a change affects, how
 far a milestone has got. It exports all of it, by default as one design document on one
 Confluence page, for the people who don't use Kiln.
 
-Status: K0–K14 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the Jira mirror with K207 and `kiln auth jira`, `kiln jira sync` and `pull` keeping a sub-task per task in step (K10), presets such as arc42 with `kiln preset add` (K11), Home, the GUI's projects dashboard, to open, add, remove and switch projects (K12), requirement levels with derived requirements, `kiln trace --levels` and the `levels` report (K13), the agent guide `design/AGENTS.md` with `kiln agents` (K14), this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
+Status: K0–K15 done (the format, `kiln check`, the editing commands, exports to Markdown, HTML and Word, publishing to Confluence on Cloud and Data Center with `kiln auth confluence`, `kiln lsp` for Fenix and other editors, `kiln provider` for Flint, `kiln diff` and `export --since` against a baseline, `kiln confluence comments`, the GUI (editing front matter and running exports since K9), the Jira mirror with K207 and `kiln auth jira`, `kiln jira sync` and `pull` keeping a sub-task per task in step (K10), presets such as arc42 with `kiln preset add` (K11), Home, the GUI's projects dashboard, to open, add, remove and switch projects (K12), requirement levels with derived requirements, `kiln trace --levels` and the `levels` report (K13), the agent guide `design/AGENTS.md` with `kiln agents` (K14), one-page documents that read top-down with the requirements as one tree and each item's facts as a table (K15), this repository's own `design/` and generated design document); every milestone is built. Every endpoint marked **verify** in CONFLUENCE.md still awaits a live instance. Pinned against Fenix
 `ce118a2af1a0b70733d0a2dd426f94365cf5eb1a` and Flint
 `eb23547eb5939a52b8de06c298271ce4c8604927` (2026-10-12).
 
@@ -228,7 +228,7 @@ project; `kiln init --preset arc42` starts a project with one.
 |---|---|---|---|
 | `arc42` | arc42 architecture documentation, its twelve sections | `sections`: a main page and a page per section | quality goal (QG), quality scenario (QS), constraint (CON), building block (BB), decision (ADR), risk (RISK), term (TERM); the role `addresses` |
 | `srs` | a software requirements specification after the outline of ISO/IEC/IEEE 29148 | `document` | requirement, constraint, test, term; `verifies` |
-| `design-doc` | a design document: goals, requirements, design, decisions, milestones, risks, traceability | `document` | the default types |
+| `design-doc` | a design document read top-down: introduction, requirements (one tree across levels), design, decisions, verification, plan, risks, traceability | `document` | the default types (with requirement levels, the levels stand for `requirement`) |
 
 How adding works, and why (ADR-015):
 
@@ -392,8 +392,9 @@ changelog line.
 | K12 | Home, the projects dashboard (REQ-017): `kiln` outside a project opens on the projects opened before, with a preview of each (items, types, next milestone, `kiln check`'s findings), adding a folder, removing one from the list, switching with `SPC h`; the list in the state folder | — |
 | K13 | Requirement levels (REQ-018, ADR-016): `[requirements] levels` and `trace`, `derived = true`; K201 and K202 on every level, K208 (traces to nothing above), K209 (skips a level), K210 (nothing below refines it); `kiln trace --levels`; the `levels` report; "Derived" in item properties, `kiln show` and `kiln diff` | — |
 | K14 | The agent guide (REQ-019, ADR-017): `kiln agents` writes `design/AGENTS.md`, rules written once and a section generated from `kiln.toml` between markers; `kiln init` writes it, `kiln preset add` refreshes it, K113 reports it stale; this repository's own guide | — |
+| K15 | One-page documents read top-down (REQ-020, ADR-018): `kiln:requirements` and, without a template, the requirements first, the levels as one tree (each requirement with those refining it beneath, derived and untraced apart); item properties as a table with IDs by default; tables of contents as deep as the deepest item; `traceability` the chain matrix with levels; the `design-doc` preset rewritten (and its `requirement` standing for the levels); K203 no longer fires on the `supersedes` link K204 asks for | — |
 
-Everything through K14 needs nothing new from Fenix or Flint to work. INTEGRATION.md
+Everything through K15 needs nothing new from Fenix or Flint to work. INTEGRATION.md
 lists the changes (G1–G9) that make the integration better and which
 milestone notices their absence.
 

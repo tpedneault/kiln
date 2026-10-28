@@ -26,12 +26,9 @@ Requirements: implemented by 1 of 3, verified by 1 of 3.
 <a id="REQ-001"></a>
 ### 1.1 REQ-001 Flint is a launcher
 
-| Property | Value |
-| --- | --- |
 | Status | **approved** |
-| Type | Requirement |
+| --- | --- |
 | Jira | [FLINT-12](https://jira.example.com/browse/FLINT-12) |
-| Source | [design/REQ-001-launcher.md](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/REQ-001-launcher.md) |
 
 Flint finds and opens things; see [ADR-002 TOML front matter](#ADR-002).
 
@@ -43,15 +40,12 @@ Windows and Linux.
 <a id="REQ-002"></a>
 ### 1.2 REQ-002 Fast enough to be a reflex
 
-| Property | Value |
-| --- | --- |
 | Status | **approved** |
-| Type | Requirement |
-| Parent | [REQ-001 Flint is a launcher](#REQ-001) |
+| --- | --- |
+| Parent | [REQ-001](#REQ-001) |
 | Implemented by | [src/launcher.rs:2](https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2) |
-| Verified by | [TEST-001 Hotkey benchmark](#TEST-001) |
+| Verified by | [TEST-001](#TEST-001) |
 | Tags | performance |
-| Source | [design/REQ-002-fast.md](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/REQ-002-fast.md) |
 
 > [!NOTE]
 > Measured on the reference laptop.
@@ -66,12 +60,9 @@ flowchart TD
 <a id="REQ-003"></a>
 ### 1.3 REQ-003 Themes follow Fenix
 
-| Property | Value |
-| --- | --- |
 | Status | **draft** |
-| Type | Requirement |
-| Parent | [REQ-001 Flint is a launcher](#REQ-001) |
-| Source | [design/REQ-003-themes.md](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/REQ-003-themes.md) |
+| --- | --- |
+| Parent | [REQ-001](#REQ-001) |
 
 | Theme | Source |
 | --- | --- |
@@ -83,12 +74,9 @@ flowchart TD
 <a id="ADR-002"></a>
 ### 2.1 ADR-002 TOML front matter
 
-| Property | Value |
-| --- | --- |
 | Status | **accepted** |
-| Type | Decision |
-| Supersedes | [ADR-001 YAML front matter](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/ADR-001-yaml.md) |
-| Source | [design/ADR-002-toml.md](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/ADR-002-toml.md) |
+| --- | --- |
+| Supersedes | [ADR-001](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/ADR-001-yaml.md) |
 
 Comments survive edits.
 
@@ -98,9 +86,6 @@ Comments survive edits.
 <a id="TEST-001"></a>
 ### 3.1 TEST-001 Hotkey benchmark
 
-| Property | Value |
-| --- | --- |
 | Status | **passing** |
-| Type | Test |
-| Verifies | [REQ-002 Fast enough to be a reflex](#REQ-002) |
-| Source | [design/TEST-001-bench.md](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/TEST-001-bench.md) |
+| --- | --- |
+| Verifies | [REQ-002](#REQ-002) |

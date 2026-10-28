@@ -764,7 +764,7 @@ fn diff_and_export_since_a_tag() {
     assert!(md.contains("REQ-001 Fast\n\n*Changed*\n"), "{md}");
     assert!(md.contains("REQ-004 Quiet\n\n*New*\n"), "{md}");
     assert!(
-        md.contains("REQ-002 Small\n\n**draft**"),
+        md.contains("REQ-002 Small\n\n| Status | **draft** |"),
         "unchanged items have no marker: {md}"
     );
     assert!(md.contains("Since v1 ("), "{md}");
@@ -1259,8 +1259,8 @@ fn presets_populate_kiln_toml_once_and_the_wiki_says_what_they_add() {
         blocks.contains("src/basket.rs"),
         "code implements a block: {blocks}"
     );
-    assert!(blocks.contains("**Used by:**"), "{blocks}");
-    assert!(read("quality-requirements.md").contains("**Verified by:**"));
+    assert!(blocks.contains("| Used by |"), "{blocks}");
+    assert!(read("quality-requirements.md").contains("| Verified by |"));
     assert!(
         !read("introduction-and-goals.md").contains("<!--"),
         "the template's notes stay out of the export"
