@@ -36,9 +36,17 @@ export.
 
 <!-- kiln:report roadmap -->
 
+## Tasks
+
+<!-- kiln:items type="task" style="row" -->
+
 # Risks
 
 <!-- kiln:report risks -->
+
+# Appendix: Tests
+
+<!-- kiln:items type="test" style="row" -->
 
 # Appendix: Traceability
 

@@ -497,15 +497,42 @@ fn board(p: &Project, o: &Options) -> Vec<Row> {
             };
             out.push(heading(name));
             for i in here {
-                let parent = i
+                let mut extra: Line = i
                     .parent
                     .as_ref()
                     .map(|r| span(format!("  under {}", r.raw), Role::Muted))
                     .into_iter()
                     .collect();
-                out.push(item_row(p, i, 0, parent));
+                extra.extend(plan_badge(p, i));
+                out.push(item_row(p, i, 0, extra));
             }
         }
+    }
+    out
+}
+
+/// Where open work stands in the plan, as `kiln next` and `kiln status`
+/// say it (ADR-018): `ready`, or what it waits on; and who has claimed it.
+/// Nothing for other items, done or closed work, or a `blocked` status,
+/// which the row's own pill already says.
+// implements: REQ-022
+fn plan_badge(p: &Project, item: &Item) -> Line {
+    let mut out = Vec::new();
+    if !p.is_work(item) || !p.is_open(item) {
+        return out;
+    }
+    let waits: Vec<String> = p
+        .open_dependencies(item)
+        .iter()
+        .map(|d| d.id.to_string())
+        .collect();
+    if !waits.is_empty() {
+        out.push(span(format!("  waits on {}", waits.join(", ")), Role::Warn));
+    } else if p.is_ready(item) {
+        out.push(span("  ready".to_owned(), Role::Good));
+    }
+    if let Some(owner) = &item.owner {
+        out.push(span(format!("  · {owner}"), Role::Muted));
     }
     out
 }
@@ -559,7 +586,7 @@ fn roadmap(p: &Project) -> Vec<Row> {
         parts.sort_by(|a, b| a.id.cmp(&b.id));
         parts.dedup_by(|a, b| a.id == b.id);
         for part in parts {
-            out.push(item_row(p, part, 1, Vec::new()));
+            out.push(item_row(p, part, 1, plan_badge(p, part)));
         }
     }
     out

@@ -13,10 +13,14 @@ This part is the project's to edit; the section below it is generated.
   --format json --body` loads every item at once; `kiln impact ID` shows
   everything that depends on one; `kiln trace` shows what is implemented
   and verified, and the gaps.
-- **Take work from the plan.** `kiln next` lists the work ready to
-  start, earliest milestone first, and `kiln status` the plan by
-  milestone. When you take an item, move it past its first status; when
-  it is finished and `kiln check` is clean, set it to a done status.
+- **Take work from the plan.** `kiln next --unowned` lists the work
+  ready to start that nobody has claimed, earliest milestone first, and
+  `kiln status` the plan by milestone. When you take an item, claim it
+  and move it past its first status in one command (`kiln set ID
+  owner=… status=…`), so another agent or person doesn't take it too;
+  when it is finished and `kiln check` is clean, set it to a done status.
+  Replace the template's prompts in a body with what the item says
+  (`kiln check` reports them, K215).
 - **Create and change front matter with Kiln, not by hand.** `kiln new
   TYPE --title "…" [--parent ID] [--link ROLE=ID]… [--tag TAG]…
   [--body-file FILE|-]` allocates the next free ID and writes the item
@@ -95,7 +99,7 @@ A requirement past its first status is expected to be covered by `implements` (t
 
 ### Planning
 
-Work is a task `part-of` a milestone, ordered by `depends-on`. `kiln next` lists the work ready to start: not done or closed, not `blocked`, and nothing it `depends-on` still open, earliest milestone first; `kiln status` shows the plan by milestone, with what waits on what.
+Work is a task `part-of` a milestone, ordered by `depends-on`. `kiln next` lists the work ready to start: not done or closed, not `blocked`, and nothing it `depends-on` still open, earliest milestone first; `kiln status` shows the plan by milestone, with what waits on what. Claim work by setting its `owner` when you take it; `kiln next --unowned` leaves claimed work out.
 
 Finished work has a done status (task done); `kiln check` warns when the plan contradicts itself: a done milestone with open work (K211), done work whose dependencies aren't (K212), open work in no milestone (K213), a requirement implemented or verified while work implementing it is open (K214).
 

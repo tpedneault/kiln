@@ -286,7 +286,7 @@ $ kiln show TASK-004 --format json
 }
 ```
 
-### `kiln next [--milestone ID] [--format text|json]`
+### `kiln next [--milestone ID] [--unowned] [--format text|json]`
 
 The work ready to start (DESIGN.md, "The plan"): items of a type the
 `part-of` role may link from (`task` by default) that are neither done
@@ -304,19 +304,24 @@ TASK-006  doing  Measure the export    (MS-001)
 TASK-009  todo   Draft the help page   (MS-002)
 ```
 
-`--milestone ID` keeps that milestone's work. JSON gives each item's
-`id`, `title`, `status`, `type`, `path`, `line` and `milestone` (`{id,
-title, status}`, or `null`). When nothing is ready it prints nothing
+`--milestone ID` keeps that milestone's work. An item someone has
+claimed (its `owner` is set) says so after a `·`; `--unowned` leaves
+those out, so a second agent doesn't take the task a first one is on.
+Claim work in the command that takes it: `kiln set TASK-004 owner=ana
+status=doing`. JSON gives each item's `id`, `title`, `status`, `owner`,
+`type`, `path`, `line` and `milestone` (`{id, title, status}`, or
+`null`). When nothing is ready it prints nothing
 and says on stderr how much is waiting. Without a `part-of` role in
 `kiln.toml` there is no work, and it stops (exit 2).
 
 ### `kiln status [--format text|json]`
 
 The plan by milestone: each milestone that is open or still has open
-work, with its status, due date and its own progress (done out of its
-non-closed work, not counting the milestones it depends on), the work
-ready to start and the work waiting, with what it waits on; then work in
-no milestone; then what `kiln check` finds.
+work, with its status, due date and progress (its own work, the same
+number `kiln show`, the roadmap report and the GUI give, ADR-020), the
+work ready to start and the work waiting, with what it waits on and who
+has claimed each; then work in no milestone; then what `kiln check`
+finds.
 
 ```
 $ kiln status
@@ -741,6 +746,17 @@ kiln: left alone: design/tests/TEST-004-x.md:7 (may mean either REQ-015)
 | `kiln --version` | `kiln <version>` |
 
 `kiln` with no arguments opens the GUI, as `kiln gui` does.
+
+## JSON output
+
+Every command with `--format json` prints pretty JSON on stdout, keys
+sorted. Each top-level object carries `"kiln_json": 1`, the shape's
+version: it is raised only when a key is removed, renamed or changes
+type, so a script checks it and stops instead of misreading. Arrays
+(`kiln list`, `kiln next`) can't carry it without being wrapped, which
+would itself break their readers, so their elements only ever gain
+fields. `kiln check --format json` is the findings format and has no
+version key.
 
 ## Errors and exit codes
 

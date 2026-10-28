@@ -473,8 +473,8 @@ tags = ["performance"]
 ## Design document (design-doc)
 
 The general design document: goals and non-goals, requirements, design,
-decisions, milestones, risks, traceability and open findings, in one
-document. It places the types `kiln init` writes, so on such a project
+decisions, milestones with their tasks, risks, tests, traceability and
+open findings, in one document. It places the types `kiln init` writes, so on such a project
 it adds only an export; `kiln init` adds it unless `--preset` names
 another preset or `none`:
 

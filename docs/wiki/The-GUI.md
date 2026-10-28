@@ -128,7 +128,7 @@ The work items grouped under a heading per status, in the type's status order, w
 
 ```text
 todo (1)
-TASK-002  Measure it  todo
+TASK-002  Measure it  todo  ready  · ana
 doing (0)
 blocked (0)
 done (1)
@@ -136,6 +136,8 @@ TASK-001  Write the loader  done
 ```
 
 The work items are the items of type `task`. A project without a `task` type gets every type that has `done` statuses, except milestones. Closed statuses (`dropped`) are hidden until `a`. With several types on the board, the headings name the type too (`tasks · todo (3)`), and child items say `under TASK-001`.
+
+Open work also says where it stands in the plan, as `kiln next` and `kiln status` do: `ready` when nothing it `depends-on` is open, else `waits on TASK-001`; and, after a `·`, its `owner` when someone has claimed it.
 
 Use it in a stand-up or a planning meeting to see what is in progress.
 
@@ -147,11 +149,11 @@ Milestones in `due` order (undated last), each with status, due date and progres
 Milestones
 MS-001  First release  active  due 2026-11-30  1/2 █████░░░░░
   TASK-001  Write the loader  done
-  TASK-002  Measure it  todo
+  TASK-002  Measure it  todo  ready  · ana
 MS-002  Later  planned  undated
 ```
 
-A milestone's progress also counts the items of milestones it `depends-on`, transitively.
+A milestone's progress counts its own work only, as `kiln status` does; the milestones it `depends-on` don't add theirs. Open work says `ready` or what it waits on, and who has claimed it, as on the Board.
 
 Use it to see whether a release date still holds.
 

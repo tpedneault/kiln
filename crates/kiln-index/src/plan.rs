@@ -42,8 +42,8 @@ pub struct Waiting<'p> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Group<'p> {
     pub milestone: Option<&'p Item>,
-    /// Done ÷ non-closed over the work placed here, this milestone's own
-    /// (unlike [`Project::progress`], not its dependencies').
+    /// Done ÷ non-closed over this milestone's own work
+    /// ([`Project::progress`]); for the work in no milestone, over it.
     pub progress: Progress,
     pub ready: Vec<&'p Item>,
     pub waiting: Vec<Waiting<'p>>,
@@ -169,6 +169,16 @@ impl Project {
                     on: self.open_dependencies(item),
                     blocked: item.status == BLOCKED,
                 });
+            }
+        }
+        // A milestone's count is [`Project::progress`], so it agrees with
+        // every other view even for work `part-of` several milestones,
+        // which is listed only under its first.
+        for g in &mut groups {
+            if let Some(m) = g.milestone {
+                g.progress = self
+                    .progress(&m.id)
+                    .unwrap_or(Progress { done: 0, total: 0 });
             }
         }
         groups.retain(|g| {

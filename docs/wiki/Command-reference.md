@@ -338,12 +338,12 @@ kiln: REQ-099 doesn't exist
 Notes:
 
 - `src/export.rs:1` is a *code reference*: a comment such as `// implements: REQ-001` in a scanned source file ([Concepts](Concepts)).
-- A milestone's progress counts the items `part-of` it, and also the items of the milestones it `depends-on`, transitively.
+- A milestone's progress counts its own work: the items `part-of` it, directly or through their parent. The milestones it `depends-on` don't add theirs (before K17 they did).
 
 ### kiln next
 
 ```text
-kiln next [--milestone ID] [--format text|json]
+kiln next [--milestone ID] [--unowned] [--format text|json]
 ```
 
 Lists the work ready to start. *Work* is an item of a type the `part-of` role may link from (`task` by default). It is ready when it is neither done nor closed, its status isn't `blocked`, and nothing it `depends-on` is still open. Earliest milestone first (open milestones in ID order, work in no milestone last), then by ID.
@@ -351,13 +351,18 @@ Lists the work ready to start. *Work* is an item of a type the `part-of` role ma
 | Option | Does |
 |---|---|
 | `--milestone ID` | only this milestone's work |
+| `--unowned` | leaves out work someone has claimed (its `owner` is set) |
 | `--format text\|json` | output format. Default: `text` |
 
 ```console
 $ kiln next
-TASK-001  doing  Sort every unordered list  (MS-001)
+TASK-001  doing  Sort every unordered list  (MS-001)  · thomas
 TASK-003  todo   Automate the comparison    (MS-001)
+$ kiln next --unowned
+TASK-003  todo  Automate the comparison  (MS-001)
 ```
+
+Claim work when you take it, so nobody else does: `kiln set TASK-003 owner=ana status=doing`. Who has claimed what shows after a `·` here, in `kiln status` and on the GUI's Board.
 
 Notes:
 
@@ -939,7 +944,7 @@ An error is one line on stderr, starting `kiln: `, naming what failed and why, w
 
 ## JSON output
 
-Commands with `--format json` print pretty-printed JSON on stdout. Keys are sorted alphabetically.
+Commands with `--format json` print pretty-printed JSON on stdout. Keys are sorted alphabetically. Every top-level object has `"kiln_json": 1`: the shape's version, raised only when a key is removed, renamed or changes type, so a script can check it and stop rather than misread. Arrays (`kiln list`, `kiln next`) can't carry it; their elements only ever gain fields. `kiln check --format json` is the findings format of [Checking](Checking) and has no version key.
 
 ### kiln list
 
@@ -1042,11 +1047,11 @@ Before K15 this was one array of strings per row of the text output, keyed by la
 
 ### kiln next
 
-An array of the ready items, each `{id, title, status, type, path, line, milestone}`, `milestone` being `{id, title, status}` or `null`.
+An array of the ready items, each `{id, title, status, owner, type, path, line, milestone}`, `owner` a string or `null`, `milestone` being `{id, title, status}` or `null`.
 
 ### kiln status
 
-`{project, milestones, findings}`: `milestones` is an array of `{milestone, done, total, ready, waiting}` (`milestone` is `{id, title, status, due}` or `null` for work in no milestone; `ready` is an array of items; each `waiting` item also has `waits_on`, an array of items, and `blocked`, a boolean); `findings` is `{errors, warnings}`.
+`{project, milestones, findings}`: `milestones` is an array of `{milestone, done, total, ready, waiting}` (`milestone` is `{id, title, status, due}` or `null` for work in no milestone; `ready` is an array of items with their `owner`; each `waiting` item also has `owner`, `waits_on`, an array of items, and `blocked`, a boolean); `findings` is `{errors, warnings}`. Like every object, it carries `kiln_json`.
 
 ### kiln trace
 

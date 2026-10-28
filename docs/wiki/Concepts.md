@@ -183,9 +183,10 @@ refined down (K208–K210), and `kiln trace --levels` shows the chains. See
 ## Progress
 
 A milestone's **progress** is its done items out of all its items,
-leaving closed ones out. Its items are those `part-of` it, plus those of
-every milestone it `depends-on`, transitively. Progress appears in
-`kiln show`, the roadmap report and the GUI's Roadmap page.
+leaving closed ones out. Its items are those `part-of` it, directly or
+through their parent; the milestones it `depends-on` don't add theirs.
+Progress appears in `kiln show`, `kiln status`, the roadmap report and
+the GUI's Roadmap page, the same number everywhere.
 
 ## Impact
 

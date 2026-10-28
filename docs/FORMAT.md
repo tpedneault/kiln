@@ -328,8 +328,10 @@ for files holding code references on purpose, such as test fixtures.
   `["implements", "verifies"]`): covered if at least one non-closed source
   links to it with that role. Children count: a requirement is covered
   when it is covered itself or all its non-closed children are.
-- **Progress** of a milestone: done ÷ (all − closed) over items that are
-  `part-of` it or any milestone it `depends-on`, transitively.
+- **Progress** of a milestone: done ÷ (all − closed) over its own work,
+  the items `part-of` it directly or through their parent (a sub-task
+  counts where its task does). The milestones it `depends-on` don't count
+  (K17; before, they did, transitively).
 - **Impact** of an item: every item and code location that reaches it by
   any link or parent edge (a child reaches its parent), with the path,
   breadth first.
@@ -457,6 +459,7 @@ Severities: `error` (exit 1), `warning`, `off`, overridable in `[check]`.
 | K212 | warning | an item whose status is done while something it `depends-on` is neither done nor closed |
 | K213 | warning | work (an item of a type `part-of` may link from, `task` by default) that is neither done nor closed and is `part-of` no milestone, itself or through its parent |
 | K214 | warning | a requirement with status `implemented` or `verified` while work that `implements` it is neither done nor closed |
+| K215 | warning | an item past its type's `initial` status, not closed, whose body still has a line of its type's `template` word for word (not a heading or a blank line): a prompt nobody replaced; once per item, on the first such line |
 
 K211–K214 are the plan contradicting itself (ADR-018 in Kiln's own
 design): a status moved ahead of the work it stands for. Like K204–K206

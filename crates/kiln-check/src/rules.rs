@@ -27,6 +27,7 @@ pub fn findings(project: &Project, files: &dyn FileSource, today: Date) -> Vec<F
     level_rules(project, &mut out);
     status_rules(project, today, &mut out);
     plan_rules(project, &mut out);
+    template_text_rules(project, files, &mut out);
     diagram_rules(project, &mut out);
     template_rules(project, files, &mut out);
     agents_rule(project, files, &mut out);
@@ -742,6 +743,79 @@ fn status_rules(project: &Project, today: Date, out: &mut Vec<Finding>) {
                 }
             }
         }
+    }
+}
+
+/// K215: an item past its type's first status (and not closed) whose
+/// body still has a line of its type's body template word for word, the
+/// prompt ("**What:** the change, in a sentence or two.") nobody replaced.
+/// Headings are left out: a decision keeps "## Context" on purpose. A
+/// draft may carry prompts while it is written; past that, they would
+/// reach the exported document. One finding per item, on the first such
+/// line, saying how many there are.
+// implements: REQ-022
+fn template_text_rules(project: &Project, files: &dyn FileSource, out: &mut Vec<Finding>) {
+    let mut prompts: std::collections::HashMap<&str, Vec<String>> = Default::default();
+    for item in &project.items {
+        let Some(ty) = project.type_of(item) else {
+            continue;
+        };
+        let Some(template) = &ty.template else {
+            continue;
+        };
+        if item.status == ty.initial
+            || ty.is_closed(&item.status)
+            || !ty.statuses.contains(&item.status)
+        {
+            continue;
+        }
+        let lines = prompts.entry(template.as_str()).or_insert_with(|| {
+            files
+                .read(template)
+                .ok()
+                .and_then(|b| kiln_parse::normalize(&b))
+                .map(|t| {
+                    t.lines()
+                        .map(str::trim)
+                        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+                        .map(str::to_owned)
+                        .collect()
+                })
+                .unwrap_or_default()
+        });
+        if lines.is_empty() {
+            continue;
+        }
+        let left: Vec<(usize, &str)> = item
+            .body
+            .lines()
+            .enumerate()
+            .filter(|(_, l)| lines.iter().any(|p| p == l.trim()))
+            .collect();
+        let Some(&(n, first)) = left.first() else {
+            continue;
+        };
+        let line = item.body_line + n as u32;
+        let shown: String = first.trim().chars().take(60).collect();
+        let more = match left.len() {
+            1 => String::new(),
+            k => format!(" and {} more of its lines", k - 1),
+        };
+        report(
+            out,
+            Rule::K215,
+            &item.path,
+            kiln_model::Span {
+                start: 0,
+                end: 0,
+                line,
+                column: 1,
+            },
+            format!(
+                "{} is {} but still has {template}'s text \"{shown}\"{more}; write what it says, or delete the line",
+                item.id, item.status
+            ),
+        );
     }
 }
 
