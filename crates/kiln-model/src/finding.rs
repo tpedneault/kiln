@@ -116,6 +116,10 @@ rules! {
     K208 Warning "K13" "a requirement below the top level that traces to nothing above it",
     K209 Warning "K13" "a trace link that doesn't point at the level directly above",
     K210 Warning "K13" "a requirement above the lowest level that nothing below refines",
+    K211 Warning "K15" "a done milestone with open work in it",
+    K212 Warning "K15" "a done item that depends on one that isn't",
+    K213 Warning "K15" "open work in no milestone",
+    K214 Warning "K15" "a requirement implemented or verified while work implementing it is open",
 }
 
 impl Rule {

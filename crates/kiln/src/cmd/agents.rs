@@ -32,11 +32,22 @@ pub fn run(project: Option<&Path>) -> Result<u8, Fail> {
             eprintln!(
                 "kiln: wrote the agent guide; everything above Kiln's section is yours to edit"
             );
+            eprintln!("{}", pointer_hint(&project.config));
         }
         Some((path, false)) => eprintln!("kiln: {path} is up to date"),
         None => {}
     }
     Ok(0)
+}
+
+/// What to tell a person who just got a guide: the line for the
+/// repository's own guide, since agents working on the code may never
+/// look in the design folder.
+pub fn pointer_hint(config: &Config) -> String {
+    format!(
+        "kiln: so agents working on the code find it, add this line to the repository's AGENTS.md or CLAUDE.md:\n  {}",
+        kiln_model::agents_pointer(config)
+    )
 }
 
 /// Brings the guide up to date: `Some((path, changed))`, or `None` when

@@ -145,6 +145,7 @@ pub fn actions(
             title: None,
             parent: parent.as_ref(),
             links: &links,
+            ..Default::default()
         };
         let Some(source) = world.source() else {
             continue;

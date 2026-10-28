@@ -1,5 +1,10 @@
 //! `kiln list`: items, filtered by type, status and tag; with `--jira`,
 //! each linked ticket's status and assignee from the Jira mirror.
+//!
+//! The JSON form carries each item's outgoing links, and with `--body`
+//! its body, so a program loads the whole plan in one call (REQ-020)
+//! rather than one `kiln show` per item. Inverse links aren't repeated:
+//! they are the same links read from the other end.
 
 use std::path::Path;
 
@@ -9,14 +14,27 @@ use super::json_out;
 use crate::project::load;
 use crate::{Fail, TextOrJson, EXIT_NETWORK};
 
+/// What `kiln list` keeps.
+#[derive(Debug, Default)]
+pub struct Filters {
+    pub type_name: Option<String>,
+    pub status: Option<String>,
+    pub tag: Option<String>,
+}
+
+// implements: REQ-020
 pub fn run(
     project: Option<&Path>,
-    type_name: Option<String>,
-    status: Option<String>,
-    tag: Option<String>,
+    filters: Filters,
     jira: bool,
+    body: bool,
     format: TextOrJson,
 ) -> Result<u8, Fail> {
+    let Filters {
+        type_name,
+        status,
+        tag,
+    } = filters;
     let loaded = load(project)?;
     let p = &loaded.project;
     if let Some(t) = &type_name {
@@ -75,6 +93,16 @@ pub fn run(
             format!("  [{}]", cells.join("; "))
         }
     };
+    let links = |i: &kiln_model::Item| -> serde_json::Map<String, serde_json::Value> {
+        let mut out = serde_json::Map::new();
+        for l in &i.links {
+            let entry = out.entry(l.role.clone()).or_insert_with(|| json!([]));
+            if let serde_json::Value::Array(a) = entry {
+                a.push(json!(l.target.raw));
+            }
+        }
+        out
+    };
     match format {
         TextOrJson::Json => {
             let array: Vec<_> = items
@@ -87,9 +115,18 @@ pub fn run(
                         "status": i.status,
                         "parent": i.parent.as_ref().map(|r| r.raw.clone()),
                         "tags": i.tags,
+                        "jira_keys": i.jira,
+                        "owner": i.owner,
+                        "due": i.due.map(|d| d.to_string()),
+                        "done": p.is_done(i),
+                        "closed": p.is_closed(i),
+                        "links": links(i),
                         "path": i.path,
                         "line": i.id_span.line,
                     });
+                    if body {
+                        v["body"] = json!(i.body);
+                    }
                     if mirror.is_some() {
                         v["jira"] = json!(tickets(&i.jira));
                     }

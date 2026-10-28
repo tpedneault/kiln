@@ -26,12 +26,14 @@ project, it adds, removes and switches projects, REQ-017) and K13
 true`, K208–K210, `kiln trace --levels` and the `levels` report,
 ADR-016) and K14 (the agent guide: `kiln agents` writes
 `design/AGENTS.md`, rules once and a section generated from `kiln.toml`,
-K113 when stale, ADR-017) are done.
+K113 when stale, ADR-017) and K15 (the plan from the command line:
+`kiln next`, `kiln status`, `show` with the body and structured JSON,
+`new --link/--tag/--body-file`, K211–K214, ADR-018) are done.
 
 ## Read first, in this order
 
 1. `docs/DESIGN.md` — goals, non-goals, architecture, crates, CLI,
-   budgets and milestones K0–K14.
+   budgets and milestones K0–K16.
 2. `docs/FORMAT.md` — the item file format and `kiln.toml`; the contract.
    `kiln-model`/`kiln-parse` implement exactly this; change both together.
 3. `docs/EXPORT.md` — export targets, the three layouts (one document is

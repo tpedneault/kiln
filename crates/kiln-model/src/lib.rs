@@ -27,7 +27,8 @@ mod item;
 mod preset;
 
 pub use agents::{
-    agents_current, agents_path, agents_section, write_agents, AgentsError, AGENTS_FILE,
+    agents_current, agents_path, agents_pointer, agents_section, write_agents, AgentsError,
+    AGENTS_FILE,
 };
 pub use config::{default_config, slug, CodeConfig, Config, JiraSync, LinkRole, TypeDef, CODE};
 pub use export::{

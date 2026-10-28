@@ -1,5 +1,6 @@
 //! A new item's file: the next free ID, the path from the type's folder
-//! and the title, front matter and the type's template as body. Shared by
+//! and the title, front matter (links and tags included) and the type's
+//! template as body, or the body given. Shared by
 //! `kiln new` and the language server's "New child …" and "Create test
 //! verifying this", so both write the same file. Computed, not written:
 //! creating it is the caller's.
@@ -22,6 +23,11 @@ pub struct NewItemSpec<'a> {
     pub parent: Option<&'a ItemId>,
     /// `[links]` to write: (role, target).
     pub links: &'a [(String, ItemId)],
+    /// `tags`, lowercase.
+    pub tags: &'a [String],
+    /// The body, in place of the type's template: what an agent writes
+    /// in the same command that creates the item (REQ-020).
+    pub body: Option<&'a str>,
 }
 
 /// A new item, ready to be written.
@@ -76,6 +82,11 @@ pub fn plan_new_item(
             ));
         }
     }
+    for tag in spec.tags {
+        if tag.is_empty() || tag.chars().any(|c| c.is_uppercase() || c.is_control()) {
+            return Err(format!("tag `{tag}` must be lowercase and not empty"));
+        }
+    }
     let default_title = format!("Untitled {}", ty.title.to_lowercase());
     let title = spec.title.unwrap_or(&default_title);
     if title.contains('\n') || title.chars().count() > MAX_TITLE {
@@ -83,9 +94,10 @@ pub fn plan_new_item(
             "a title is one line of at most {MAX_TITLE} characters"
         ));
     }
-    let body = match &ty.template {
-        None => String::new(),
-        Some(template) => {
+    let body = match (spec.body, &ty.template) {
+        (Some(body), _) => body.replace("\r\n", "\n"),
+        (None, None) => String::new(),
+        (None, Some(template)) => {
             let bytes = source
                 .read(template)
                 .map_err(|e| format!("template {template} for {}: {e}", ty.name))?;
@@ -114,10 +126,20 @@ pub fn plan_new_item(
     if let Some(parent) = spec.parent {
         text.push_str(&format!("parent = \"{parent}\"\n"));
     }
+    if !spec.tags.is_empty() {
+        let tags: Vec<String> = spec.tags.iter().map(|t| toml_string(t)).collect();
+        text.push_str(&format!("tags = [{}]\n", tags.join(", ")));
+    }
     if !spec.links.is_empty() {
         text.push_str("\n[links]\n");
-        let mut roles: Vec<&str> = spec.links.iter().map(|(r, _)| r.as_str()).collect();
-        roles.dedup();
+        // One line per role, in the order roles first appear: a role
+        // given twice apart must not become two keys.
+        let mut roles: Vec<&str> = Vec::new();
+        for (role, _) in spec.links {
+            if !roles.contains(&role.as_str()) {
+                roles.push(role);
+            }
+        }
         for role in roles {
             let targets: Vec<String> = spec
                 .links
@@ -129,9 +151,9 @@ pub fn plan_new_item(
         }
     }
     text.push_str("+++\n");
-    if !body.is_empty() {
+    if !body.trim().is_empty() {
         text.push('\n');
-        text.push_str(&body);
+        text.push_str(body.trim_start_matches('\n'));
         if !body.ends_with('\n') {
             text.push('\n');
         }
@@ -187,8 +209,8 @@ mod tests {
         let spec = NewItemSpec {
             type_name: "test",
             title: Some("Starts \"fast\""),
-            parent: None,
             links: &links,
+            ..Default::default()
         };
         let new = plan_new_item(&p, &source, &spec).unwrap();
         assert_eq!(new.path, "design/tests/TEST-001-starts-fast.md");
@@ -216,5 +238,50 @@ mod tests {
             plan_new_item(&p, &source, &bad).unwrap_err(),
             "a requirement can't `verifies` a requirement"
         );
+    }
+
+    #[test]
+    // verifies: REQ-020
+    fn a_new_item_takes_tags_a_body_and_a_role_given_twice() {
+        let source = MemorySource::new()
+            .with("kiln.toml", kiln_model::default_config("T"))
+            .with(
+                "design/MS-001.md",
+                item("MS-001", "milestone", "active", ""),
+            )
+            .with(
+                "design/REQ-001.md",
+                item("REQ-001", "requirement", "approved", ""),
+            )
+            .with("design/TASK-001.md", item("TASK-001", "task", "todo", ""));
+        let p = Project::load(&source).unwrap();
+        let links = [
+            ("depends-on".to_owned(), id("TASK-001")),
+            ("implements".to_owned(), id("REQ-001")),
+            ("depends-on".to_owned(), id("MS-001")),
+        ];
+        let tags = ["csv".to_owned()];
+        let spec = NewItemSpec {
+            type_name: "task",
+            title: Some("Write it"),
+            links: &links,
+            tags: &tags,
+            body: Some("\r\nThe writer.\r\n"),
+            ..Default::default()
+        };
+        let new = plan_new_item(&p, &source, &spec).unwrap();
+        assert_eq!(
+            new.text,
+            "+++\nid = \"TASK-002\"\ntype = \"task\"\ntitle = \"Write it\"\nstatus = \"todo\"\ntags = [\"csv\"]\n\n[links]\ndepends-on = [\"TASK-001\", \"MS-001\"]\nimplements = [\"REQ-001\"]\n+++\n\nThe writer.\n"
+        );
+        let shouting = ["CSV".to_owned()];
+        let bad = NewItemSpec {
+            type_name: "task",
+            tags: &shouting,
+            ..Default::default()
+        };
+        assert!(plan_new_item(&p, &source, &bad)
+            .unwrap_err()
+            .contains("must be lowercase"));
     }
 }

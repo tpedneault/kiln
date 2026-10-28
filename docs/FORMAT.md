@@ -453,6 +453,17 @@ Severities: `error` (exit 1), `warning`, `off`, overridable in `[check]`.
 | K208 | warning | a requirement below the top level, past its `initial` status and not closed, that traces to no requirement above it (itself or through its parent) and isn't `derived`; also `derived` on a type that isn't a level below the top, and `derived` with a trace link |
 | K209 | warning | a trace link that doesn't point at the level directly above (it skips a level, or points sideways or down) |
 | K210 | warning | a requirement above the lowest level, past its `initial` status and not closed, that no requirement of the level below refines |
+| K211 | warning | a milestone (an item of a type `part-of` may point at) whose status is done while work `part-of` it (directly, or through its parent) is neither done nor closed; once per such item, on the milestone's status |
+| K212 | warning | an item whose status is done while something it `depends-on` is neither done nor closed |
+| K213 | warning | work (an item of a type `part-of` may link from, `task` by default) that is neither done nor closed and is `part-of` no milestone, itself or through its parent |
+| K214 | warning | a requirement with status `implemented` or `verified` while work that `implements` it is neither done nor closed |
+
+K211–K214 are the plan contradicting itself (ADR-018 in Kiln's own
+design): a status moved ahead of the work it stands for. Like K204–K206
+they name the default roles (`part-of`, `depends-on`, `implements`) and
+statuses (`implemented`, `verified`); a project without a `part-of` role
+has no work and gets none of them. An item whose status its type doesn't
+have (K107) is left out of them.
 
 K207 reads the Jira mirror, so it needs `[jira] url` and a token
 (`KILN_JIRA_TOKEN` or `kiln auth jira`); when Jira can't be read, `kiln

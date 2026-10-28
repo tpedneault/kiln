@@ -616,3 +616,70 @@ fn k113_the_agent_guide_follows_kiln_toml() {
         [format!("design/AGENTS.md:{line}:1 K113")]
     );
 }
+
+#[test]
+// verifies: REQ-020
+fn k211_to_k214_the_plan_contradicting_itself() {
+    let task = |id: &str, status: &str, rest: &str| {
+        (format!("design/{id}.md"), item(id, "task", status, rest))
+    };
+    let f = files(vec![
+        (
+            "design/MS-001.md".into(),
+            item("MS-001", "milestone", "done", ""),
+        ),
+        (
+            "design/MS-002.md".into(),
+            item("MS-002", "milestone", "active", ""),
+        ),
+        req("REQ-001", "implemented", ""),
+        // Open work in a done milestone, implementing a requirement
+        // already marked implemented: K211 and K214.
+        task(
+            "TASK-001",
+            "doing",
+            "[links]\npart-of = [\"MS-001\"]\nimplements = [\"REQ-001\"]\n",
+        ),
+        // Done while what it depends on isn't: K212.
+        task(
+            "TASK-002",
+            "done",
+            "[links]\npart-of = [\"MS-002\"]\ndepends-on = [\"TASK-001\"]\n",
+        ),
+        // In no milestone: K213; its sub-task is placed through it.
+        task("TASK-003", "todo", ""),
+        task("TASK-004", "todo", "parent = \"TASK-003\"\n"),
+        // Closed work is never a contradiction.
+        task(
+            "TASK-005",
+            "dropped",
+            "[links]\npart-of = [\"MS-001\"]\nimplements = [\"REQ-001\"]\n",
+        ),
+    ]);
+    let found: Vec<String> = run("", &f)
+        .into_iter()
+        .filter(|f| f.contains("K21"))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            "design/MS-001.md:5:10 K211",
+            "design/REQ-001.md:5:10 K214",
+            "design/TASK-002.md:5:10 K212",
+            "design/TASK-003.md:2:7 K213",
+            "design/TASK-004.md:2:7 K213",
+        ]
+    );
+    let texts = messages(&f);
+    for expected in [
+        "MS-001 is done, but TASK-001 (doing) is part of it",
+        "TASK-002 is done, but it depends on TASK-001 (doing)",
+        "TASK-003 is open work in no milestone; `kiln link TASK-003 part-of MS-…` places it",
+        "REQ-001 is implemented, but TASK-001 (doing) implementing it isn't done",
+    ] {
+        assert!(
+            texts.iter().any(|t| t.contains(expected)),
+            "{expected}: {texts:#?}"
+        );
+    }
+}

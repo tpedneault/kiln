@@ -220,9 +220,34 @@ All notable changes to Kiln are recorded here. The format follows
   preset add` refreshes it, and K113 warns when the section no longer
   matches `kiln.toml`. Kiln's own `design/AGENTS.md`
   ([docs/CLI.md](docs/CLI.md), "`kiln agents`").
+- K15: the plan from the command line, for coding agents (REQ-020,
+  ADR-018). `kiln next` lists the work ready to start (open, not
+  `blocked`, nothing it `depends-on` open), earliest milestone first;
+  `kiln status` shows the plan by milestone with what waits on what and
+  what `kiln check` finds. `kiln show` prints the body; `kiln list
+  --format json` carries each item's links, owner, due date and
+  done/closed, and `--body` its body. `kiln new` takes `--link ROLE=ID`,
+  `--tag`, `--body-file PATH|-` and `--format json`; `kiln set` takes
+  `tags=` and `jira=`. New check rules for a plan that contradicts
+  itself: K211 (a done milestone with open work), K212 (done work whose
+  dependencies aren't), K213 (open work in no milestone), K214 (a
+  requirement implemented or verified while work implementing it is
+  open). The agent guide's generated section gains "Planning", its rules
+  say how to take work from the plan, and `kiln init` and `kiln agents`
+  print the line for the repository's own `AGENTS.md`. Kiln's own
+  milestones K15 and K16 carry their tasks
+  ([docs/CLI.md](docs/CLI.md), [docs/DESIGN.md](docs/DESIGN.md), "The plan").
 
 ### Changed
 
+- `kiln show --format json` is structured (K15): links, inbound links,
+  children and parent as `{id, title, status}` objects keyed by role,
+  coverage as booleans, progress as numbers, plus the body. It used to
+  hold one array of label strings per text row (`"verified by"`);
+  programs reading those keys need the new ones
+  ([docs/wiki/Command-reference.md](docs/wiki/Command-reference.md), "JSON output").
+- The agent guide's generated section gains "Planning" (K15): projects
+  with a guide see K113 until they run `kiln agents` once.
 - Check: K201 and K202 fire only when `verifies` or `implements` can
   point at the requirement's type; a project whose roles never allowed
   it got a warning it couldn't fix.

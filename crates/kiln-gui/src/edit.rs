@@ -95,6 +95,7 @@ pub fn apply(root: &Path, edit: &Edit) -> Result<Applied, String> {
                 title: title.as_deref(),
                 parent: parent.as_ref(),
                 links: &[],
+                ..Default::default()
             };
             let new = kiln_index::create_item(&project, &source, &spec).map_err(fail)?;
             Ok(Applied {

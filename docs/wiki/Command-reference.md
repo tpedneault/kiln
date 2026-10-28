@@ -12,7 +12,9 @@ All examples on this page come from one small scratch project, made with `kiln i
 | [`kiln agents`](#kiln-agents) | writes the agent guide, `design/AGENTS.md`, or brings it up to date |
 | [`kiln new`](#kiln-new) | creates an item with the next free ID |
 | [`kiln list`](#kiln-list) | lists items, filtered |
-| [`kiln show`](#kiln-show) | one item with its links in both directions, coverage and progress |
+| [`kiln show`](#kiln-show) | one item with its links in both directions, coverage, progress and body |
+| [`kiln next`](#kiln-next) | the work ready to start, earliest milestone first |
+| [`kiln status`](#kiln-status) | the plan by milestone: progress, ready and waiting work, findings |
 | [`kiln trace`](#kiln-trace) | coverage of every item of a type, and the gaps; or the requirement levels as chains |
 | [`kiln impact`](#kiln-impact) | everything that depends on an item, transitively |
 | [`kiln diff`](#kiln-diff) | items added, changed and removed between two revisions |
@@ -178,7 +180,7 @@ Notes:
 ### kiln new
 
 ```text
-kiln new TYPE [--title TEXT] [--parent ID] [--open]
+kiln new TYPE [--title TEXT] [--parent ID] [--link ROLE=ID]… [--tag TAG]… [--body-file PATH|-] [--open] [--format text|json]
 ```
 
 Creates an item of type `TYPE` with the next free ID and prints its path. The next free ID is one above the highest ID used for that type, closed items included, so an ID is never reused.
@@ -188,7 +190,11 @@ Creates an item of type `TYPE` with the next free ID and prints its path. The ne
 | `TYPE` | the type, as `kiln.toml` names it: `requirement`, `decision`, … |
 | `--title TEXT` | the item's title. Default: `Untitled <type>` |
 | `--parent ID` | sets `parent`. The parent must exist and be of a type `TYPE` allows as parent |
+| `--link ROLE=ID` | adds a link, checked like `kiln link`. Repeatable |
+| `--tag TAG` | adds a tag (lowercase). Repeatable |
+| `--body-file PATH` | the body, from that file, in place of the type's template. `-` reads stdin |
 | `--open` | opens the new file at its title line in the Fenix editor; see the notes |
+| `--format text\|json` | `json` prints `{"id", "path"}` instead of the path. Default: `text` |
 
 ```console
 $ kiln new requirement --title "Exports are deterministic"
@@ -205,6 +211,12 @@ title = "Same bytes on Windows and Linux"
 status = "draft"
 parent = "REQ-001"
 +++
+$ echo "Run the export twice and compare the bytes." | kiln new task --title "Automate the comparison" \
+    --link part-of=MS-001 --link implements=REQ-001 --tag ci --body-file - --format json
+{
+  "id": "TASK-003",
+  "path": "design/tasks/TASK-003-automate-the-comparison.md"
+}
 $ kiln new widget
 kiln: `widget` isn't a type (requirement, design, decision, milestone, task, test, risk)
 $ kiln new requirement --parent TEST-001
@@ -214,7 +226,7 @@ kiln: a requirement can't have a test as parent (allowed: requirement)
 Notes:
 
 - The file goes in `<first folder of paths>/<type plural>/`, named by the ID and up to 50 characters of the title. Retitling an item later does not rename its file; only the ID at the start of the name matters ([Item files](Item-files)).
-- The front matter has `id`, `type`, `title`, the type's initial status and `parent`. The body is the type's `template` file when `kiln.toml` sets one.
+- The front matter has `id`, `type`, `title`, the type's initial status, `parent`, `tags` and `[links]`. The body is the `--body-file` text, else the type's `template` file when `kiln.toml` sets one. Everything goes in one write, so nothing is left to edit by hand: what a coding agent needs.
 - `--open` tries, in order: the running Fenix (through its control channel), starting `fenix <path>:4`, and the operating system's default editor. stderr says which one it used. The item is created even when nothing can open it:
 
   ```console
@@ -230,7 +242,7 @@ Notes:
 ### kiln list
 
 ```text
-kiln list [--type TYPE] [--status STATUS] [--tag TAG] [--jira] [--format text|json]
+kiln list [--type TYPE] [--status STATUS] [--tag TAG] [--jira] [--body] [--format text|json]
 ```
 
 Lists items in type order (the order of `[types]` in `kiln.toml`), then by ID. The filters combine. Closed items are included.
@@ -241,6 +253,7 @@ Lists items in type order (the order of `[types]` in `kiln.toml`), then by ID. T
 | `--status STATUS` | only this status. Exact match; there is no negation (`!draft` matches nothing) |
 | `--tag TAG` | only items with this tag |
 | `--jira` | adds each linked Jira ticket's status and assignee; see the notes |
+| `--body` | with `--format json`, each item's body too: the whole design in one call |
 | `--format text\|json` | output format. Default: `text` |
 
 ```console
@@ -272,7 +285,7 @@ Notes:
 kiln show ID [--format text|json]
 ```
 
-Shows one item with everything Kiln computes about it: parent and children, tags, Jira keys, owner, due date, outgoing links by role, incoming links under their inverse names ("verified by", including code locations), items that mention it, coverage for each coverage role, and progress for a milestone.
+Shows one item with everything Kiln computes about it: parent and children, tags, Jira keys, owner, due date, outgoing links by role, incoming links under their inverse names ("verified by", including code locations), items that mention it, coverage for each coverage role, and progress for a milestone; then, after a blank line, its body.
 
 | Option | Does |
 |---|---|
@@ -289,6 +302,8 @@ mitigates       RISK-001 Fonts differ between machines
 implemented by  src/export.rs:1
 verified by     src/export.rs:5
 coverage        implements: yes, verifies: yes
+
+The same input gives the same bytes, on every machine.
 $ kiln show REQ-003
 REQ-003 Exports finish within 3 s
 requirement · approved · design/requirements/REQ-003-untitled-requirement.md:2
@@ -308,6 +323,51 @@ Notes:
 
 - `src/export.rs:1` is a *code reference*: a comment such as `// implements: REQ-001` in a scanned source file ([Concepts](Concepts)).
 - A milestone's progress counts the items `part-of` it, and also the items of the milestones it `depends-on`, transitively.
+
+### kiln next
+
+```text
+kiln next [--milestone ID] [--format text|json]
+```
+
+Lists the work ready to start. *Work* is an item of a type the `part-of` role may link from (`task` by default). It is ready when it is neither done nor closed, its status isn't `blocked`, and nothing it `depends-on` is still open. Earliest milestone first (open milestones in ID order, work in no milestone last), then by ID.
+
+| Option | Does |
+|---|---|
+| `--milestone ID` | only this milestone's work |
+| `--format text\|json` | output format. Default: `text` |
+
+```console
+$ kiln next
+TASK-001  doing  Sort every unordered list  (MS-001)
+TASK-003  todo   Automate the comparison    (MS-001)
+```
+
+Notes:
+
+- A sub-task (a task with a task `parent`) counts in its parent's milestone.
+- A milestone that `depends-on` another orders its work after it but doesn't hold it back: a task is ready when *its own* dependencies are done. To make a later task wait, link it: `kiln link TASK-009 depends-on TASK-003`.
+- When nothing is ready, it prints nothing and stderr says how many items wait. Without a `part-of` role in `kiln.toml` there is no work: exit 2.
+
+### kiln status
+
+```text
+kiln status [--format text|json]
+```
+
+The plan by milestone: each milestone that is open or still has open work, its status, its own progress (done out of its non-closed work, without the milestones it depends on) and due date, the work ready to start and the work waiting with what it waits on; then work in no milestone; then the summary of `kiln check`.
+
+```console
+$ kiln status
+MS-001 First release · planned · 1 of 4 done · due 2026-12-15
+  ready    TASK-001  doing  Sort every unordered list
+           TASK-003  todo   Automate the comparison
+  waiting  TASK-004  todo   Publish the notes  (on TASK-003)
+
+kiln check: 1 warning
+```
+
+It always exits 0; `kiln check` is the gate.
 
 ### kiln trace
 
@@ -589,7 +649,7 @@ The editing commands change only what they are about. They keep comments, layout
 kiln set ID KEY=VALUE…
 ```
 
-Sets `status`, `title`, `parent`, `owner` or `due` (a date, `YYYY-MM-DD`). An empty value removes `parent`, `owner` or `due`. Every value is checked before anything is written: a status of the item's type, an existing parent of an allowed type that doesn't make a cycle, a real date.
+Sets `status`, `title`, `parent`, `owner`, `due` (a date, `YYYY-MM-DD`), `tags` or `jira`. `tags` and `jira` take comma-separated lists and replace the whole list. An empty value removes `parent`, `owner`, `due`, `tags` or `jira`. Every value is checked before anything is written: a status of the item's type, an existing parent of an allowed type that doesn't make a cycle, a real date, lowercase tags, Jira keys like `PROJ-123`.
 
 ```console
 $ kiln set REQ-001 status=approved owner=thomas due=2026-11-30
@@ -600,15 +660,18 @@ $ kiln set REQ-003 title="Exports finish within 3 s"
 REQ-003: title Untitled requirement → Exports finish within 3 s
 $ kiln set REQ-001 owner=
 REQ-001: owner thomas → (none)
+$ kiln set REQ-001 tags=determinism,export jira=DEMO-12
+REQ-001: tags (none) → determinism,export
+REQ-001: jira (none) → DEMO-12
 $ kiln set REQ-001 status=done
 kiln: `done` isn't a requirement status (draft, proposed, approved, implemented, verified, obsolete)
 $ kiln set REQ-001 due=2026-02-30
 kiln: `2026-02-30` isn't a date (2026-11-30)
 $ kiln set REQ-001 color=red
-kiln: kiln set changes status, title, parent, owner or due, not `color`
+kiln: kiln set changes status, title, parent, owner, due, tags or jira, not `color`
 ```
 
-Notes: tags, Jira keys and links are not set with `kiln set`. Edit tags and `jira` in the file; use `kiln link` for links.
+Notes: links are not set with `kiln set`; use `kiln link`.
 
 ### kiln link and kiln unlink
 
@@ -874,15 +937,28 @@ An array, one object per item:
 | `status` | string | the status |
 | `parent` | string or null | the parent's ID |
 | `tags` | array of strings | tags |
+| `jira_keys` | array of strings | the item's Jira keys, as written |
+| `owner` | string or null | `owner` |
+| `due` | string or null | `due`, `YYYY-MM-DD` |
+| `done` | boolean | its status counts as done |
+| `closed` | boolean | its status is closed |
+| `links` | object | outgoing links: role → array of IDs as written. Incoming links aren't repeated; they are these, read from the other end |
 | `path` | string | the file, relative to the project |
 | `line` | number | the line of `id` in the file |
+| `body` | string | only with `--body`: the body, after the closing `+++` |
 | `jira` | array | only with `--jira`: `{key, summary, status, resolved, assignee}` per ticket, or `{key, missing: true}` for a key Jira doesn't know |
 
 ```json
 [
   {
+    "closed": false,
+    "done": false,
+    "due": "2026-11-30",
     "id": "REQ-001",
+    "jira_keys": [],
     "line": 2,
+    "links": { "mitigates": ["RISK-001"] },
+    "owner": null,
     "parent": null,
     "path": "design/requirements/REQ-001-exports-are-deterministic.md",
     "status": "approved",
@@ -895,24 +971,66 @@ An array, one object per item:
 
 ### kiln show
 
-One object. `id`, `type`, `title`, `status`, `path` and `line` are always there. Every other row of the text output becomes a key named like its label, holding an array of strings: `parent`, `children`, `tags`, `due`, outgoing roles (`mitigates`), incoming roles under their inverse names with spaces (`"implemented by"`, `"verified by"`, `includes`), `"mentioned by"`, `coverage`, `progress`. Keys appear only when they have a value.
+One object with every key always present (empty or `null` when there is nothing). Every item it names is `{id, title, status}`; a reference to an ID that doesn't exist is `{id, missing: true}`; a code location is `{path, line}`.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `id`, `type`, `title`, `status` | string | the item |
+| `done`, `closed` | boolean | whether its status counts as done, or closed |
+| `path`, `line` | string, number | where its `id` is |
+| `also_in` | array of strings | other files with the same ID (K101) |
+| `parent` | item or null | its parent |
+| `children` | array of items | items whose `parent` it is |
+| `tags`, `jira` | arrays of strings | tags and Jira keys |
+| `owner`, `due` | string or null | `owner`; `due` as `YYYY-MM-DD` |
+| `level`, `derived` | number or null, boolean | its requirement level (1 is the top), with `[requirements] levels` |
+| `links` | object | outgoing links: role → array of items |
+| `inbound` | object | incoming links: role (not its inverse name) → array of items and code locations |
+| `mentioned_by` | array of items | items whose body mentions it |
+| `coverage` | object | coverage role → `true` or `false`, for roles that can point at its type |
+| `progress` | object or null | `{done, total}` for a milestone |
+| `body` | string | the body, after the closing `+++` |
 
 ```json
 {
-  "children": ["REQ-002 Same bytes on Windows and Linux"],
-  "coverage": ["implements: yes", "verifies: yes"],
-  "due": ["2026-11-30"],
+  "also_in": [],
+  "body": "\nThe same input gives the same bytes, on every machine.\n",
+  "children": [{ "id": "REQ-002", "status": "verified", "title": "Same bytes on Windows and Linux" }],
+  "closed": false,
+  "coverage": { "implements": true, "verifies": true },
+  "derived": false,
+  "done": false,
+  "due": "2026-11-30",
   "id": "REQ-001",
-  "implemented by": ["src/export.rs:1"],
+  "inbound": {
+    "implements": [{ "line": 1, "path": "src/export.rs" }],
+    "verifies": [{ "line": 5, "path": "src/export.rs" }]
+  },
+  "jira": [],
+  "level": null,
   "line": 2,
-  "mitigates": ["RISK-001 Fonts differ between machines"],
+  "links": { "mitigates": [{ "id": "RISK-001", "status": "open", "title": "Fonts differ between machines" }] },
+  "mentioned_by": [],
+  "owner": null,
+  "parent": null,
   "path": "design/requirements/REQ-001-exports-are-deterministic.md",
+  "progress": null,
   "status": "approved",
+  "tags": [],
   "title": "Exports are deterministic",
-  "type": "requirement",
-  "verified by": ["src/export.rs:5"]
+  "type": "requirement"
 }
 ```
+
+Before K15 this was one array of strings per row of the text output, keyed by label; programs reading it need the keys above.
+
+### kiln next
+
+An array of the ready items, each `{id, title, status, type, path, line, milestone}`, `milestone` being `{id, title, status}` or `null`.
+
+### kiln status
+
+`{project, milestones, findings}`: `milestones` is an array of `{milestone, done, total, ready, waiting}` (`milestone` is `{id, title, status, due}` or `null` for work in no milestone; `ready` is an array of items; each `waiting` item also has `waits_on`, an array of items, and `blocked`, a boolean); `findings` is `{errors, warnings}`.
 
 ### kiln trace
 
