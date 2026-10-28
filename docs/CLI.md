@@ -37,7 +37,7 @@ In a project that already has a `kiln.toml`, `kiln init --fenix` does only
 that; run it again after adding `[code] paths` to add their languages. It
 needs a Fenix with additional servers (`471ed09` or later).
 
-### `kiln new TYPE [--parent ID] [--title TEXT] [--open]`
+### `kiln new TYPE [--parent ID] [--title TEXT] [--link ROLE=ID]… [--tag TAG]… [--body-file PATH|-] [--open] [--format text|json]`
 
 Creates an item with the next free ID for `TYPE` (one above the highest
 used, closed items included) and prints its path:
@@ -52,6 +52,27 @@ title (up to 50 characters of it). The front matter has `id`, `type`,
 `title`, the type's `initial` status and `parent`; the body is the type's
 `template` file when it has one. Without `--title` the title is
 "Untitled <type>". The parent must exist and be of an allowed type.
+
+Everything else an item starts with goes in the same command, so the
+file is written once and its front matter never edited by hand:
+
+- `--link ROLE=ID` adds a link (repeatable; a role given twice is one
+  line), checked as `kiln link` checks it;
+- `--tag TAG` adds a tag (repeatable, lowercase);
+- `--body-file PATH` writes that file's text as the body, in place of the
+  type's template; `-` reads it from stdin.
+
+```
+$ echo "One row per item, a header first." | kiln new task --title "Write the CSV writer" \
+    --link part-of=MS-001 --link implements=REQ-003 --tag csv --body-file - --format json
+{
+  "id": "TASK-004",
+  "path": "design/tasks/TASK-004-write-the-csv-writer.md"
+}
+```
+
+`--format json` prints the new item's `id` and `path` instead of the
+path alone.
 
 `--open` opens the file at its title: in the running Fenix (through its
 control channel), else by starting `fenix <path>:4`, else, when Fenix
@@ -128,8 +149,20 @@ has two parts:
   its prefix, folder, statuses (which is new, done, closed) and parents;
   each link role with what it links and how it reads back; how code
   references are written and where they are scanned; the requirement
-  levels; what coverage `kiln check` expects; each export and the file
-  it writes.
+  levels; what coverage `kiln check` expects; the plan (what is work,
+  which statuses finish it, `kiln next` and `kiln status`, K211–K214)
+  when `kiln.toml` has a `part-of` role; each export and the file it
+  writes.
+
+When it writes a new guide (and when `kiln init` does), it prints on
+stderr the line to add to the repository's own `AGENTS.md` or
+`CLAUDE.md`, since an agent working on the code may never look in
+`design/`:
+
+```
+kiln: so agents working on the code find it, add this line to the repository's AGENTS.md or CLAUDE.md:
+  The design (requirements, decisions, milestones and tasks) is in `design/`, kept with Kiln; read `design/AGENTS.md` before changing it or implementing what it describes, and `kiln next` lists the work ready to start.
+```
 
 Run again, it replaces only Kiln's section and prints the path, or says
 the guide is up to date and prints nothing. A file without the markers
@@ -146,7 +179,7 @@ kiln: brought Kiln's section of design/AGENTS.md up to date with kiln.toml
 
 ## Reading
 
-### `kiln list [--type TYPE] [--status STATUS] [--tag TAG] [--jira] [--format text|json]`
+### `kiln list [--type TYPE] [--status STATUS] [--tag TAG] [--jira] [--body] [--format text|json]`
 
 Items in type order (as `kiln.toml` lists types), then by ID; the filters
 combine.
@@ -158,7 +191,11 @@ REQ-002  approved  Readable without Kiln
 ```
 
 JSON gives each item's `id`, `type`, `title`, `status`, `parent`, `tags`,
-`path` and `line`.
+`jira_keys`, `owner`, `due`, `done` and `closed` (whether its status
+counts as done, or closed), `links` (role → the IDs as written, outgoing
+only: the inverses are the same links read from the other end), `path`
+and `line`. `--body` adds each item's `body`, so a program loads the whole
+plan in one call rather than one `kiln show` per item.
 
 `--jira` adds each linked ticket's status and assignee from the Jira
 mirror (read-only, cached ten minutes; INTEGRATION.md, "Jira"), and in
@@ -189,6 +226,82 @@ implemented by  crates/kiln-parse/src/edit.rs:58, crates/kiln/src/project.rs:85
 verified by     crates/kiln-parse/src/edit.rs:173, crates/kiln-parse/src/edit.rs:195, …
 coverage        implements: yes, verifies: yes
 ```
+
+The body follows the rows, after a blank line, as written.
+
+`--format json` gives the same as data, for programs: `id`, `type`,
+`title`, `status`, `done`, `closed`, `path`, `line`, `also_in` (other
+files with the ID), `parent`, `children`, `tags`, `jira`, `owner`, `due`,
+`level` (1-based, with requirement levels), `derived`, `links` (role →
+targets), `inbound` (role → sources, items and code locations),
+`mentioned_by`, `coverage` (role → `true`/`false`), `progress` (`{done,
+total}` for a milestone, else `null`) and `body`. Every item it names is
+`{id, title, status}`; a reference to an ID that doesn't exist is `{id,
+missing: true}`; a code location is `{path, line}`.
+
+```
+$ kiln show TASK-004 --format json
+{
+  "id": "TASK-004",
+  "links": {
+    "implements": [{"id": "REQ-003", "title": "Export as CSV", "status": "approved"}],
+    "part-of": [{"id": "MS-001", "title": "First release", "status": "active"}]
+  },
+  "coverage": {},
+  "body": "\nOne row per item, a header first.\n",
+  …
+}
+```
+
+### `kiln next [--milestone ID] [--format text|json]`
+
+The work ready to start (DESIGN.md, "The plan"): items of a type the
+`part-of` role may link from (`task` by default) that are neither done
+nor closed, whose status isn't `blocked`, and that `depends-on` nothing
+still open. Earliest milestone first (open milestones in ID order, work in
+no milestone last), then by ID; a sub-task counts in its parent's
+milestone. A milestone groups and orders work but doesn't gate it: a task
+in a milestone that depends on an unfinished one is ready when its own
+dependencies are.
+
+```
+$ kiln next
+TASK-004  todo   Write the CSV writer  (MS-001)
+TASK-006  doing  Measure the export    (MS-001)
+TASK-009  todo   Draft the help page   (MS-002)
+```
+
+`--milestone ID` keeps that milestone's work. JSON gives each item's
+`id`, `title`, `status`, `type`, `path`, `line` and `milestone` (`{id,
+title, status}`, or `null`). When nothing is ready it prints nothing
+and says on stderr how much is waiting. Without a `part-of` role in
+`kiln.toml` there is no work, and it stops (exit 2).
+
+### `kiln status [--format text|json]`
+
+The plan by milestone: each milestone that is open or still has open
+work, with its status, due date and its own progress (done out of its
+non-closed work, not counting the milestones it depends on), the work
+ready to start and the work waiting, with what it waits on; then work in
+no milestone; then what `kiln check` finds.
+
+```
+$ kiln status
+MS-001 First release · active · 2 of 5 done · due 2026-11-30
+  ready    TASK-004  todo   Write the CSV writer
+           TASK-006  doing  Measure the export
+  waiting  TASK-005  todo   Wire the button  (on TASK-004)
+
+MS-002 Second release · planned · 0 of 2 done
+  ready    TASK-009  todo   Draft the help page
+  waiting  TASK-010  blocked  Ask legal  (blocked)
+
+kiln check: 1 warning
+```
+
+JSON gives `project`, `milestones` (each `{milestone, done, total,
+ready, waiting}`, a waiting item with `waits_on` and `blocked`) and
+`findings` (`{errors, warnings}`). It exits 0 whatever it finds.
 
 ### `kiln trace [--type TYPE | --levels] [--format text|json|csv]`
 
@@ -546,10 +659,14 @@ They refuse a duplicated ID: renumber it first.
 
 ### `kiln set ID KEY=VALUE…`
 
-Sets `status`, `title`, `parent`, `owner` or `due` (`YYYY-MM-DD`). An
-empty value removes `parent`, `owner` or `due`. Values are checked first:
+Sets `status`, `title`, `parent`, `owner`, `due` (`YYYY-MM-DD`), `tags`
+or `jira`. `tags` and `jira` take comma-separated lists and replace the
+whole list (`tags=csv,io`; `jira=DEMO-4`, written as a string when there
+is one key). An empty value removes `parent`, `owner`, `due`, `tags` or
+`jira`. Values are checked first:
 a status of the item's type, an existing parent of an allowed type that
-doesn't make a cycle, a real date.
+doesn't make a cycle, a real date, lowercase tags, Jira keys written
+`PROJ-123`.
 
 ```
 $ kiln set REQ-014 status=approved due=2026-11-30

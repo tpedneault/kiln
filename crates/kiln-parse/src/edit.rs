@@ -15,6 +15,8 @@ use crate::item::sections;
 pub enum FieldValue {
     String(String),
     Date(Date),
+    /// An array of strings (`tags = ["a", "b"]`).
+    Strings(Vec<String>),
 }
 
 /// Why an edit wasn't made. Messages are one line.
@@ -65,6 +67,7 @@ pub fn set_field(text: &str, key: &str, value: Option<FieldValue>) -> Result<Str
             Some(value) => {
                 let mut new = match value {
                     FieldValue::String(s) => Value::from(s),
+                    FieldValue::Strings(list) => Value::Array(list.into_iter().collect::<Array>()),
                     FieldValue::Date(d) => {
                         let date = toml_edit::Date {
                             year: d.year as u16,

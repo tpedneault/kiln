@@ -20,7 +20,7 @@ use crate::source::{DiskSource, Stamp};
 use crate::write::{read_for_edit, write_back, WriteError};
 
 /// The keys [`plan_set`] changes, for messages.
-pub const SETTABLE: &str = "status, title, parent, owner or due";
+pub const SETTABLE: &str = "status, title, parent, owner, due, tags or jira";
 
 /// Why an edit wasn't made. Nothing was written in any case.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,7 +77,10 @@ pub fn unique<'p>(project: &'p Project, id: &ItemId) -> Result<&'p Item, String>
 }
 
 /// The value to write for `key` on `item`, or why not. `None` removes the
-/// key. An empty value removes `parent`, `owner` and `due`.
+/// key. An empty value removes `parent`, `owner`, `due`, `tags` and
+/// `jira`. `tags` and `jira` take comma-separated lists and replace the
+/// whole list: a command that adds one tag would need a second to remove
+/// one, and an agent can read the list first (`kiln show`).
 pub fn plan_set(
     p: &Project,
     item: &Item,
@@ -140,8 +143,43 @@ pub fn plan_set(
         "due" => parse_date(value)
             .map(|d| Some(FieldValue::Date(d)))
             .ok_or_else(|| format!("`{value}` isn't a date (2026-11-30)")),
+        "tags" | "jira" => {
+            let list: Vec<String> = value
+                .split(',')
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+                .map(str::to_owned)
+                .collect();
+            for v in &list {
+                if key == "tags" && v.chars().any(|c| c.is_uppercase() || c.is_control()) {
+                    return Err(format!("tag `{v}` must be lowercase"));
+                }
+                if key == "jira" && !is_jira_key(v) {
+                    return Err(format!("`{v}` isn't a Jira issue key (PROJ-123)"));
+                }
+            }
+            Ok(match (key, list.len()) {
+                (_, 0) => None,
+                ("jira", 1) => Some(FieldValue::String(list[0].clone())),
+                _ => Some(FieldValue::Strings(list)),
+            })
+        }
         _ => Err(format!("kiln set changes {SETTABLE}, not `{key}`")),
     }
+}
+
+/// `PROJ-123`: a project key (a capital letter, then capitals, digits or
+/// underscores) and a number.
+fn is_jira_key(s: &str) -> bool {
+    let Some((project, number)) = s.split_once('-') else {
+        return false;
+    };
+    project.starts_with(|c: char| c.is_ascii_uppercase())
+        && project
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+        && !number.is_empty()
+        && number.chars().all(|c| c.is_ascii_digit())
 }
 
 /// `YYYY-MM-DD`, a real day.
@@ -253,6 +291,8 @@ fn current(item: &Item, key: &str) -> String {
             .map(|r| r.raw.clone())
             .unwrap_or_default(),
         "owner" => item.owner.clone().unwrap_or_default(),
+        "tags" => item.tags.join(","),
+        "jira" => item.jira.join(","),
         _ => item.due.map(|d| d.to_string()).unwrap_or_default(),
     }
 }
@@ -548,6 +588,17 @@ mod tests {
             .unwrap_err()
             .contains("can't have a test as parent"));
         assert!(plan_set(&p, req1, "due", "soon").is_err());
+        assert_eq!(
+            plan_set(&p, req1, "tags", "perf, ux").unwrap(),
+            Some(FieldValue::Strings(vec!["perf".into(), "ux".into()]))
+        );
+        assert_eq!(plan_set(&p, req1, "tags", "").unwrap(), None);
+        assert!(plan_set(&p, req1, "tags", "Perf").is_err());
+        assert_eq!(
+            plan_set(&p, req1, "jira", "DEMO-12").unwrap(),
+            Some(FieldValue::String("DEMO-12".into()))
+        );
+        assert!(plan_set(&p, req1, "jira", "demo-12").is_err());
         assert!(plan_set(&p, req1, "colour", "red")
             .unwrap_err()
             .contains("not `colour`"));

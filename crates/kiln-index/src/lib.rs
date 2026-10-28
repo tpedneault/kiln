@@ -3,8 +3,8 @@
 //! (`rayon`), and builds the graph: forward and inverse links from items
 //! and code locations, the parent tree, mentions. Answers the queries
 //! everything above it asks: children, ancestors, transitive impact with
-//! paths, coverage, milestone progress, the next free ID, and the edits a
-//! renumbering needs.
+//! paths, coverage, milestone progress, the plan (ready and waiting
+//! work), the next free ID, and the edits a renumbering needs.
 //!
 //! Pure given a file-source trait: the index reads only through
 //! [`FileSource`], so tests feed it an in-memory project and the language
@@ -24,6 +24,7 @@ mod diff;
 mod edit;
 mod levels;
 mod new_item;
+mod plan;
 mod project;
 mod renumber;
 mod source;
@@ -36,6 +37,7 @@ pub use edit::{
 };
 pub use levels::{LevelNode, LevelTrace};
 pub use new_item::{plan_new_item, toml_string, NewItem, NewItemSpec};
+pub use plan::{Group, Waiting, BLOCKED, DEPENDS_ON, PART_OF};
 pub use project::{labelled, Impact, Inbound, LoadError, Progress, Project, Source, Step};
 pub use renumber::{plan_renumber, FileEdits, RenumberPlan};
 pub use source::{find_root, DiskSource, FileSource, Listing, MemorySource, Stamp};

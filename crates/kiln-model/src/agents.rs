@@ -97,6 +97,17 @@ fn markers(text: &str) -> Result<Option<(usize, usize)>, AgentsError> {
     }
 }
 
+/// The line to add to the repository's own `AGENTS.md` or `CLAUDE.md`, so
+/// an agent working on the code learns the guide exists: one in the
+/// design folder is read only by agents that look there (ADR-017).
+pub fn agents_pointer(config: &Config) -> String {
+    format!(
+        "The design (requirements, decisions, milestones and tasks) is in {}, kept with Kiln; read `{}` before changing it or implementing what it describes, and `kiln next` lists the work ready to start.",
+        folder(config),
+        agents_path(config)
+    )
+}
+
 /// The rules: written once, then the project's.
 fn intro(config: &Config) -> String {
     let folder = folder(config);
@@ -111,25 +122,32 @@ This part is the project's to edit; the section below it is generated.
 
 ## Rules
 
-- **Read with Kiln.** `kiln show ID` prints an item with every link in
-  and out; `kiln list --type TYPE --format json` lists items; `kiln
-  impact ID` shows everything that depends on one; `kiln trace` shows
-  what is implemented and verified, and the gaps.
+- **Read with Kiln.** `kiln show ID` prints an item, its body and every
+  link in and out (`--format json` for all of it as data); `kiln list
+  --format json --body` loads every item at once; `kiln impact ID` shows
+  everything that depends on one; `kiln trace` shows what is implemented
+  and verified, and the gaps.
+- **Take work from the plan.** `kiln next` lists the work ready to
+  start, earliest milestone first, and `kiln status` the plan by
+  milestone. When you take an item, move it past its first status; when
+  it is finished and `kiln check` is clean, set it to a done status.
 - **Create and change front matter with Kiln, not by hand.** `kiln new
-  TYPE --title "…" [--parent ID]` allocates the next free ID and prints
-  the new file's path: never choose an ID yourself. `kiln set ID
-  status=…` (also `title`, `parent`, `owner`, `due`), `kiln link ID ROLE
-  TARGET` and `kiln unlink ID ROLE TARGET` keep the file's comments and
-  layout and refuse when the file changed under them. Write the body
+  TYPE --title "…" [--parent ID] [--link ROLE=ID]… [--tag TAG]…
+  [--body-file FILE|-]` allocates the next free ID and writes the item
+  whole, then prints its path (`--format json` for its ID too): never
+  choose an ID yourself. `kiln set ID status=…` (also `title`, `parent`,
+  `owner`, `due`, `tags=a,b`, `jira=KEY`), `kiln link ID ROLE TARGET`
+  and `kiln unlink ID ROLE TARGET` keep the file's comments and layout
+  and refuse when the file changed under them. Write or change the body
   (everything after the second `+++`) with any editor.
 - **Link once, from the source side.** A test says `verifies =
   ["REQ-014"]`; the requirement never says "verified by", which Kiln
   computes. Mention an item in prose as `[[REQ-014]]`; a mention is not
   a link and counts toward nothing.
 - **Leave sign-off to people.** Moving a requirement to approved,
-  accepting a decision or closing a risk is a person's call: propose it
-  in the pull request. Moving work forward (a task to done, a test to
-  passing when it passes) is fine.
+  accepting a decision, closing a risk or finishing a milestone is a
+  person's call: propose it in the pull request. Moving work forward (a
+  task to done, a test to passing when it passes) is fine.
 - **When you implement or test a requirement, say so in the code.** A
   comment `implements: REQ-014` near the code and `verifies: REQ-014`
   on its test (see "Links" below for the roles code may use) make the
@@ -342,6 +360,48 @@ pub fn agents_section(config: &Config) -> String {
             if config.trace().is_some() { ", K208–K210" } else { "" }
         ));
     }
+    if let Some(part_of) = config.role("part-of") {
+        let work: Vec<&str> = part_of
+            .from
+            .iter()
+            .map(String::as_str)
+            .filter(|t| *t != CODE)
+            .collect();
+        if !work.is_empty() {
+            line("");
+            line("### Planning");
+            line("");
+            let a = |names: &[&str]| -> String {
+                names
+                    .iter()
+                    .map(|n| format!("a {n}"))
+                    .collect::<Vec<_>>()
+                    .join(" or ")
+            };
+            let to: Vec<&str> = part_of.to.iter().map(String::as_str).collect();
+            let ordered = config.role("depends-on").is_some();
+            line(&format!(
+                "Work is {} `part-of` {}{}. `kiln next` lists the work ready to start: not done or closed, not `blocked`{}, earliest milestone first; `kiln status` shows the plan by milestone, with what waits on what.",
+                a(&work),
+                a(&to),
+                if ordered { ", ordered by `depends-on`" } else { "" },
+                if ordered { ", and nothing it `depends-on` still open" } else { "" },
+            ));
+            let finishing: Vec<String> = work
+                .iter()
+                .filter_map(|w| config.type_named(w))
+                .filter(|t| !t.done.is_empty())
+                .map(|t| format!("{} {}", t.name, t.done.join(" or ")))
+                .collect();
+            if !finishing.is_empty() {
+                line("");
+                line(&format!(
+                    "Finished work has a done status ({}); `kiln check` warns when the plan contradicts itself: a done milestone with open work (K211), done work whose dependencies aren't (K212), open work in no milestone (K213), a requirement implemented or verified while work implementing it is open (K214).",
+                    finishing.join("; ")
+                ));
+            }
+        }
+    }
     let generated: Vec<String> = config
         .exports
         .iter()
@@ -428,6 +488,50 @@ mod tests {
         ));
         assert_eq!(agents_current(&c, &text), Ok(Some(true)));
         assert_eq!(agents_path(&c), "design/AGENTS.md");
+        assert!(!text.contains("### Planning"), "no part-of role, no plan");
+        assert!(agents_pointer(&c).contains("read `design/AGENTS.md`"));
+    }
+
+    #[test]
+    // verifies: REQ-020
+    fn the_planning_part_names_the_work_and_its_done_statuses() {
+        let mut c = config();
+        let ty =
+            |name: &str, prefix: &str, statuses: &[&str], done: &[&str]| crate::config::TypeDef {
+                name: name.into(),
+                prefix: prefix.into(),
+                title: name.into(),
+                plural: format!("{name}s"),
+                statuses: statuses.iter().map(|s| s.to_string()).collect(),
+                initial: statuses[0].into(),
+                done: done.iter().map(|s| s.to_string()).collect(),
+                closed: vec![],
+                parents: vec![],
+                template: None,
+            };
+        c.types
+            .push(ty("milestone", "MS", &["planned", "done"], &["done"]));
+        c.types
+            .push(ty("task", "TASK", &["todo", "doing", "done"], &["done"]));
+        let role = |name: &str, from: &str, to: &str| crate::config::LinkRole {
+            name: name.into(),
+            from: vec![from.into()],
+            to: vec![to.into()],
+            inverse: "x".into(),
+        };
+        c.links.push(role("part-of", "task", "milestone"));
+        c.links.push(role("depends-on", "task", "task"));
+        let section = agents_section(&c);
+        assert!(
+            section.contains(
+                "### Planning\n\nWork is a task `part-of` a milestone, ordered by `depends-on`."
+            ),
+            "{section}"
+        );
+        assert!(
+            section.contains("Finished work has a done status (task done);"),
+            "{section}"
+        );
     }
 
     #[test]

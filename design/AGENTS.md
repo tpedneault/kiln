@@ -8,25 +8,32 @@ This part is the project's to edit; the section below it is generated.
 
 ## Rules
 
-- **Read with Kiln.** `kiln show ID` prints an item with every link in
-  and out; `kiln list --type TYPE --format json` lists items; `kiln
-  impact ID` shows everything that depends on one; `kiln trace` shows
-  what is implemented and verified, and the gaps.
+- **Read with Kiln.** `kiln show ID` prints an item, its body and every
+  link in and out (`--format json` for all of it as data); `kiln list
+  --format json --body` loads every item at once; `kiln impact ID` shows
+  everything that depends on one; `kiln trace` shows what is implemented
+  and verified, and the gaps.
+- **Take work from the plan.** `kiln next` lists the work ready to
+  start, earliest milestone first, and `kiln status` the plan by
+  milestone. When you take an item, move it past its first status; when
+  it is finished and `kiln check` is clean, set it to a done status.
 - **Create and change front matter with Kiln, not by hand.** `kiln new
-  TYPE --title "…" [--parent ID]` allocates the next free ID and prints
-  the new file's path: never choose an ID yourself. `kiln set ID
-  status=…` (also `title`, `parent`, `owner`, `due`), `kiln link ID ROLE
-  TARGET` and `kiln unlink ID ROLE TARGET` keep the file's comments and
-  layout and refuse when the file changed under them. Write the body
+  TYPE --title "…" [--parent ID] [--link ROLE=ID]… [--tag TAG]…
+  [--body-file FILE|-]` allocates the next free ID and writes the item
+  whole, then prints its path (`--format json` for its ID too): never
+  choose an ID yourself. `kiln set ID status=…` (also `title`, `parent`,
+  `owner`, `due`, `tags=a,b`, `jira=KEY`), `kiln link ID ROLE TARGET`
+  and `kiln unlink ID ROLE TARGET` keep the file's comments and layout
+  and refuse when the file changed under them. Write or change the body
   (everything after the second `+++`) with any editor.
 - **Link once, from the source side.** A test says `verifies =
   ["REQ-014"]`; the requirement never says "verified by", which Kiln
   computes. Mention an item in prose as `[[REQ-014]]`; a mention is not
   a link and counts toward nothing.
 - **Leave sign-off to people.** Moving a requirement to approved,
-  accepting a decision or closing a risk is a person's call: propose it
-  in the pull request. Moving work forward (a task to done, a test to
-  passing when it passes) is fine.
+  accepting a decision, closing a risk or finishing a milestone is a
+  person's call: propose it in the pull request. Moving work forward (a
+  task to done, a test to passing when it passes) is fine.
 - **When you implement or test a requirement, say so in the code.** A
   comment `implements: REQ-014` near the code and `verifies: REQ-014`
   on its test (see "Links" below for the roles code may use) make the
@@ -83,6 +90,12 @@ Code under `crates/` links to items with a comment naming the role and IDs: `imp
 ### Coverage
 
 A requirement past its first status is expected to be covered by `implements` (to requirement), `verifies` (to requirement), each where its `to` allows: `kiln check` warns about the gaps (K201, K202), and `kiln trace` lists them.
+
+### Planning
+
+Work is a task `part-of` a milestone, ordered by `depends-on`. `kiln next` lists the work ready to start: not done or closed, not `blocked`, and nothing it `depends-on` still open, earliest milestone first; `kiln status` shows the plan by milestone, with what waits on what.
+
+Finished work has a done status (task done); `kiln check` warns when the plan contradicts itself: a done milestone with open work (K211), done work whose dependencies aren't (K212), open work in no milestone (K213), a requirement implemented or verified while work implementing it is open (K214).
 
 ### Exports
 

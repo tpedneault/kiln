@@ -222,6 +222,10 @@ edit) and in exports with the `findings` report, at the same severities.
 | K208 | warning | a requirement below the top level that traces to nothing above it and isn't `derived` |
 | K209 | warning | a trace link that doesn't point at the level directly above |
 | K210 | warning | a requirement above the lowest level that nothing below refines |
+| K211 | warning | a done milestone with open work in it |
+| K212 | warning | a done item that depends on one that isn't |
+| K213 | warning | open work in no milestone |
+| K214 | warning | a requirement implemented or verified while work implementing it is open |
 
 ## Configuration rules (K001–K005)
 
@@ -553,7 +557,7 @@ statuses.
 changes. Without a guide, or with the section deleted, there is nothing
 to check.
 
-## Design rules (K201–K210)
+## Design rules (K201–K214)
 
 These look at the design as a whole: what is covered, what is overdue,
 what is inconsistent. They are warnings by default (K207 is off), because
@@ -785,6 +789,64 @@ design/stakeholder/STK-002-audit.md:2:7: K210 warning: STK-002 is approved but n
 **Fix:** write the requirement of the level below that answers it, and
 link it upward; or, if it needs no further refinement, close it or
 reconsider whether it belongs at this level.
+
+### K211
+
+**Triggers:** a milestone whose status is done (`done` by default) while
+work that is `part-of` it, directly or through its parent, is neither
+done nor closed. One finding per such item, on the milestone's status.
+
+```text
+design/milestones/MS-001-first-release.md:5:10: K211 warning: MS-001 is done, but TASK-004 (doing) is part of it
+```
+
+**Fix:** finish the work, drop it (`kiln set TASK-004 status=dropped`),
+move it to the next milestone (`kiln unlink TASK-004 part-of MS-001`,
+then `kiln link TASK-004 part-of MS-002`), or set the milestone back to
+`active`.
+
+### K212
+
+**Triggers:** an item whose status is done while something it
+`depends-on` is neither done nor closed.
+
+```text
+design/tasks/TASK-002-wire-the-button.md:5:10: K212 warning: TASK-002 is done, but it depends on TASK-001 (doing)
+```
+
+**Fix:** finish the dependency, or, if the work never needed it, remove
+the link (`kiln unlink TASK-002 depends-on TASK-001`).
+
+### K213
+
+**Triggers:** open work (an item of a type the `part-of` role may link
+from: `task` by default) that is `part-of` no milestone, itself or
+through its parent. A sub-task (a task with a task `parent`) belongs
+where its parent does.
+
+```text
+design/tasks/TASK-007-tidy-the-logs.md:2:7: K213 warning: TASK-007 is open work in no milestone; `kiln link TASK-007 part-of MS-…` places it
+```
+
+**Fix:** place it (`kiln link TASK-007 part-of MS-002`). If your project
+keeps loose tasks on purpose, turn the rule off (`K213 = "off"`).
+
+### K214
+
+**Triggers:** a requirement with status `implemented` or `verified`
+while work that `implements` it is neither done nor closed.
+
+```text
+design/requirements/REQ-003-export-csv.md:5:10: K214 warning: REQ-003 is implemented, but TASK-001 (doing) implementing it isn't done
+```
+
+**Fix:** finish the work, or set the requirement back to `approved`
+until it is.
+
+All four come from the same idea as `kiln next`: work is *open* while
+neither done nor closed. They catch a status moved ahead of the work it
+stands for, the mistake that is easiest to make quietly, by a person or
+a coding agent.
 
 ## Recommended settings for a team
 

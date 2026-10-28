@@ -361,6 +361,23 @@ roadmap report and on the GUI's Roadmap page. Give milestones a `due`
 date (`due = 2026-11-30`) and Kiln warns (K206) when one passes its date
 unfinished.
 
+Order the work with `depends-on` between tasks. `kiln next` then lists
+what is ready to start: open, not `blocked`, nothing it depends on still
+open, earliest milestone first. `kiln status` shows the whole plan by
+milestone, with what waits on what:
+
+```console
+$ kiln status
+MS-002 E1: configuration and run · active · 1 of 3 done · due 2026-11-30
+  ready    TASK-004  todo  Parse the configuration
+  waiting  TASK-005  todo  Run the checks  (on TASK-004)
+```
+
+`kiln check` warns when the plan says more than the work: a milestone
+marked done with open tasks (K211), a task done before what it depends
+on (K212), an open task in no milestone (K213), a requirement marked
+implemented while its tasks are open (K214).
+
 > [!NOTE]
 > A milestone's progress also counts the items of every milestone it
 > `depends-on`, transitively. That is right when "MS-003 depends on
@@ -543,15 +560,22 @@ Adapt the rules to your team (who may approve what, which items an agent
 may create), and keep the generated section current with `kiln agents`;
 `kiln check` reports it stale (K113).
 
-If your repository has its own `AGENTS.md` (or `CLAUDE.md`) at the root,
-add one line pointing at the design guide, so an agent working on the
-code knows it exists:
+Many agents read only the repository's own `AGENTS.md` (or `CLAUDE.md`)
+at the root, not the one in `design/`. Add one line there pointing at
+the design guide; `kiln init` and `kiln agents` print it when they write
+a guide:
 
 ```markdown
-The design (requirements, decisions, milestones) is in `design/`, kept
-with Kiln; read `design/AGENTS.md` before changing it or implementing
-what it describes.
+The design (requirements, decisions, milestones and tasks) is in `design/`, kept with Kiln; read `design/AGENTS.md` before changing it or implementing what it describes, and `kiln next` lists the work ready to start.
 ```
+
+With tasks in milestones, "do the next task" is a complete instruction:
+the agent runs `kiln next`, reads the task with `kiln show` (body and
+links, as JSON if it likes), moves it to `doing`, implements it with
+code references to the requirements it `implements`, and sets it
+`done` once `kiln check` is clean. It creates what it finds along the
+way in one command each: `kiln new task --title "…" --link
+part-of=MS-002 --body-file -`.
 
 In review, treat an agent's design changes like anyone's: the front
 matter changes are small and `kiln check` has run on them; read the

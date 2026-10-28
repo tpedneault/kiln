@@ -138,8 +138,10 @@ fn a_project_from_init_to_check() {
     );
     let json: serde_json::Value =
         serde_json::from_str(&ok(d, &["show", "REQ-001", "--format", "json"])).unwrap();
-    assert_eq!(json["verified by"][0], "TEST-001 Benchmark");
-    assert_eq!(json["children"][0], "REQ-002 Untitled requirement");
+    assert_eq!(json["inbound"]["verifies"][0]["id"], "TEST-001");
+    assert_eq!(json["inbound"]["verifies"][0]["title"], "Benchmark");
+    assert_eq!(json["children"][0]["id"], "REQ-002");
+    assert_eq!(json["coverage"]["verifies"], true);
     let impact = ok(d, &["impact", "REQ-001"]);
     assert!(
         impact.contains("TEST-001  verifies REQ-001 — TEST-001 Benchmark"),
@@ -1353,4 +1355,112 @@ fn the_agent_guide_is_written_by_init_and_kept_current() {
     let added = ok(d, &["preset", "add", "srs"]);
     assert!(added.contains("design/AGENTS.md"), "{added}");
     assert_eq!(stderr(&kiln_in(d, &["check"])).trim(), "kiln: no findings");
+}
+
+#[test]
+// verifies: REQ-020
+fn an_agent_works_through_the_plan_from_the_command_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    let init = kiln_in(d, &["init", "--name", "Demo"]);
+    assert!(
+        stderr(&init).contains("add this line to the repository's AGENTS.md or CLAUDE.md"),
+        "{}",
+        stderr(&init)
+    );
+    let guide = std::fs::read_to_string(d.join("design/AGENTS.md")).unwrap();
+    assert!(guide.contains("### Planning") && guide.contains("`kiln next`"));
+    ok(d, &["new", "milestone", "--title", "First release"]);
+    ok(d, &["new", "requirement", "--title", "Export as CSV"]);
+
+    // One command creates a task whole: links, tag, body.
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_kiln"))
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Write the CSV writer",
+            "--link",
+            "part-of=MS-001",
+            "--link",
+            "implements=REQ-001",
+            "--tag",
+            "csv",
+            "--body-file",
+            "-",
+            "--format",
+            "json",
+        ])
+        .current_dir(d)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    std::io::Write::write_all(child.stdin.as_mut().unwrap(), b"One row per item.\n").unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success());
+    let created: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(created["id"], "TASK-001");
+    ok(
+        d,
+        &[
+            "new",
+            "task",
+            "--title",
+            "Wire the button",
+            "--link",
+            "part-of=MS-001",
+            "--link",
+            "depends-on=TASK-001",
+        ],
+    );
+
+    let show = ok(d, &["show", "TASK-001"]);
+    assert!(show.ends_with("\nOne row per item.\n"), "{show}");
+    let json: serde_json::Value =
+        serde_json::from_str(&ok(d, &["show", "TASK-001", "--format", "json"])).unwrap();
+    assert_eq!(json["links"]["part-of"][0]["id"], "MS-001");
+    assert_eq!(json["tags"][0], "csv");
+    assert_eq!(json["body"], "\nOne row per item.\n");
+    let list: serde_json::Value = serde_json::from_str(&ok(
+        d,
+        &["list", "--type", "task", "--format", "json", "--body"],
+    ))
+    .unwrap();
+    assert_eq!(list[1]["links"]["depends-on"][0], "TASK-001");
+    assert_eq!(list[0]["body"], "\nOne row per item.\n");
+
+    assert_eq!(
+        ok(d, &["next"]),
+        "TASK-001  todo  Write the CSV writer  (MS-001)\n"
+    );
+    let status = ok(d, &["status"]);
+    assert!(
+        status.contains("MS-001 First release · planned · 0 of 2 done"),
+        "{status}"
+    );
+    assert!(
+        status.contains("waiting  TASK-002  todo  Wire the button  (on TASK-001)"),
+        "{status}"
+    );
+
+    ok(d, &["set", "TASK-001", "tags=csv,io", "jira=DEMO-4"]);
+    let shown = ok(d, &["show", "TASK-001"]);
+    assert!(
+        shown.contains("tags        csv, io") && shown.contains("jira        DEMO-4"),
+        "{shown}"
+    );
+
+    // Marking the plan done ahead of the work is reported.
+    ok(d, &["set", "TASK-002", "status=done"]);
+    ok(d, &["set", "MS-001", "status=done"]);
+    let check = ok(d, &["check"]);
+    assert!(
+        check.contains("K211 warning: MS-001 is done, but TASK-001 (todo) is part of it"),
+        "{check}"
+    );
+    assert!(
+        check.contains("K212 warning: TASK-002 is done, but it depends on TASK-001 (todo)"),
+        "{check}"
+    );
 }

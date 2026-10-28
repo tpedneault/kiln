@@ -26,6 +26,7 @@ pub fn findings(project: &Project, files: &dyn FileSource, today: Date) -> Vec<F
     coverage_rules(project, &mut out);
     level_rules(project, &mut out);
     status_rules(project, today, &mut out);
+    plan_rules(project, &mut out);
     diagram_rules(project, &mut out);
     template_rules(project, files, &mut out);
     agents_rule(project, files, &mut out);
@@ -737,6 +738,101 @@ fn status_rules(project: &Project, today: Date, out: &mut Vec<Finding>) {
                         &item.path,
                         item.id_span,
                         format!("{} was due {due} and is {}", item.id, item.status),
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// K211–K214: the plan contradicting itself (ADR-018). Each is a status
+/// someone moved ahead of the work it stands for, the mistake an agent
+/// moving statuses makes quietly; each is reported on the status that
+/// says too much, once per item that contradicts it.
+// implements: REQ-020
+fn plan_rules(project: &Project, out: &mut Vec<Finding>) {
+    let work_types = project.work_types();
+    if work_types.is_empty() {
+        return;
+    }
+    let state = |i: &Item| format!("{} ({})", i.id, i.status);
+    // An item whose status its type doesn't have is K107's: whether it
+    // is open isn't known, so it contradicts nothing here.
+    let valid = |i: &Item| {
+        project
+            .type_of(i)
+            .is_some_and(|t| t.statuses.contains(&i.status))
+    };
+    for item in project.items.iter().filter(|i| valid(i)) {
+        let is_work = work_types.contains(&item.type_name.as_str());
+        if is_work && project.is_open(item) {
+            let milestones = project.milestones_of(item);
+            if milestones.is_empty() {
+                report(
+                    out,
+                    Rule::K213,
+                    &item.path,
+                    item.id_span,
+                    format!(
+                        "{} is open work in no milestone; `kiln link {} {} MS-…` places it",
+                        item.id,
+                        item.id,
+                        kiln_index::PART_OF
+                    ),
+                );
+            }
+            for m in milestones.into_iter().filter(|m| project.is_done(m)) {
+                report(
+                    out,
+                    Rule::K211,
+                    &m.path,
+                    m.status_span,
+                    format!(
+                        "{} is {}, but {} is part of it",
+                        m.id,
+                        m.status,
+                        state(item)
+                    ),
+                );
+            }
+        }
+        if project.is_done(item) {
+            for dep in project.open_dependencies(item) {
+                report(
+                    out,
+                    Rule::K212,
+                    &item.path,
+                    item.status_span,
+                    format!(
+                        "{} is {}, but it depends on {}",
+                        item.id,
+                        item.status,
+                        state(dep)
+                    ),
+                );
+            }
+        }
+        if item.status == "implemented" || item.status == "verified" {
+            for link in project.inbound(&item.id) {
+                let Source::Item(j) = link.source else {
+                    continue;
+                };
+                let source = &project.items[j];
+                if link.role == "implements"
+                    && work_types.contains(&source.type_name.as_str())
+                    && project.is_open(source)
+                {
+                    report(
+                        out,
+                        Rule::K214,
+                        &item.path,
+                        item.status_span,
+                        format!(
+                            "{} is {}, but {} implementing it isn't done",
+                            item.id,
+                            item.status,
+                            state(source)
+                        ),
                     );
                 }
             }

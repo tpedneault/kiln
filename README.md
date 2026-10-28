@@ -92,6 +92,11 @@ design-md (markdown, document) → docs/DESIGN.md
   programming language (`// implements: REQ-007`), feed a traceability
   matrix. `kiln trace` shows the gaps, and `kiln impact` shows everything
   a change reaches.
+- **A plan agents can work through.** Milestones and tasks: `kiln next`
+  lists the work ready to start, `kiln status` shows the plan by
+  milestone, and `kiln check` warns when a status says more than the
+  work. Every command reads and writes items whole, as JSON if asked, and
+  `design/AGENTS.md` tells coding agents how.
 - **Checks for CI.** Broken references, duplicate IDs, links the
   configuration doesn't allow, approved requirements nothing verifies,
   late milestones. Findings come out as text, JSON, a GitLab Code Quality

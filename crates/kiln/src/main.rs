@@ -118,9 +118,21 @@ enum Command {
         parent: Option<String>,
         #[arg(long, value_name = "TEXT")]
         title: Option<String>,
+        /// A link to write, ROLE=ID (`--link part-of=MS-002`); repeatable.
+        #[arg(long = "link", value_name = "ROLE=ID")]
+        links: Vec<String>,
+        /// A tag; repeatable.
+        #[arg(long = "tag", value_name = "TAG")]
+        tags: Vec<String>,
+        /// The body, from a file or `-` for stdin, in place of the type's template.
+        #[arg(long, value_name = "PATH")]
+        body_file: Option<PathBuf>,
         /// Open the new file in Fenix at its title.
         #[arg(long)]
         open: bool,
+        /// json prints {"id", "path"}.
+        #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
+        format: TextOrJson,
     },
     /// List items, filtered.
     List {
@@ -133,12 +145,28 @@ enum Command {
         /// Each linked Jira ticket's status and assignee (read-only, cached 10 minutes).
         #[arg(long)]
         jira: bool,
+        /// With --format json, each item's body too: the whole plan in one call.
+        #[arg(long)]
+        body: bool,
         #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
         format: TextOrJson,
     },
-    /// Show one item with its links in both directions, coverage and progress.
+    /// Show one item: its links in both directions, coverage, progress and body.
     Show {
         id: String,
+        #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
+        format: TextOrJson,
+    },
+    /// Work ready to start: open, not blocked, nothing it depends on open; earliest milestone first.
+    Next {
+        /// Only this milestone's work.
+        #[arg(long, value_name = "ID")]
+        milestone: Option<String>,
+        #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
+        format: TextOrJson,
+    },
+    /// The plan by milestone: progress, ready and waiting work, and kiln check's findings.
+    Status {
         #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
         format: TextOrJson,
     },
@@ -147,7 +175,7 @@ enum Command {
         #[arg(long, value_enum, default_value_t = CheckFormat::Text)]
         format: CheckFormat,
     },
-    /// Change front-matter values: status=, title=, parent=, owner=, due= (empty removes).
+    /// Change front-matter values: status=, title=, parent=, owner=, due=, tags=a,b, jira=KEY (empty removes).
     Set {
         id: String,
         #[arg(required = true, value_name = "KEY=VALUE")]
@@ -371,16 +399,47 @@ fn main() -> ExitCode {
             type_name,
             parent,
             title,
+            links,
+            tags,
+            body_file,
             open,
-        } => cmd::new::run(project, &type_name, parent, title, open),
+            format,
+        } => cmd::new::run(
+            project,
+            cmd::new::Args {
+                type_name: &type_name,
+                parent,
+                title,
+                links: &links,
+                tags,
+                body_file: body_file.as_deref(),
+                open,
+                format,
+            },
+        ),
         Command::List {
             type_name,
             status,
             tag,
             jira,
+            body,
             format,
-        } => cmd::list::run(project, type_name, status, tag, jira, format),
+        } => cmd::list::run(
+            project,
+            cmd::list::Filters {
+                type_name,
+                status,
+                tag,
+            },
+            jira,
+            body,
+            format,
+        ),
         Command::Show { id, format } => cmd::show::run(project, &id, format),
+        Command::Next { milestone, format } => {
+            cmd::plan::next(project, milestone.as_deref(), format)
+        }
+        Command::Status { format } => cmd::plan::status(project, format),
         Command::Check { format } => cmd::check::run(project, format),
         Command::Set { id, assignments } => cmd::edit::set(project, &id, &assignments),
         Command::Link { id, role, target } => cmd::edit::link(project, &id, &role, &target, true),

@@ -70,12 +70,17 @@ pub fn run(
     println!("kiln.toml");
     println!("design/");
     let source = kiln_index::DiskSource::new(&dir);
+    let mut hint = None;
     if let Ok(project) = kiln_index::Project::load(&source) {
         if let Some((path, true)) = super::agents::refresh(&dir, &project.config, true)? {
             println!("{path}");
+            hint = Some(super::agents::pointer_hint(&project.config));
         }
     }
     eprintln!("kiln: started project \"{name}\"; `kiln new requirement --title \"…\"` adds the first item");
+    if let Some(hint) = hint {
+        eprintln!("{hint}");
+    }
     if let Some(p) = preset {
         super::preset::add_at(&dir, p, false)?;
     }
