@@ -28,7 +28,10 @@ ADR-016) and K14 (the agent guide: `kiln agents` writes
 `design/AGENTS.md`, rules once and a section generated from `kiln.toml`,
 K113 when stale, ADR-017) and K15 (the plan from the command line:
 `kiln next`, `kiln status`, `show` with the body and structured JSON,
-`new --link/--tag/--body-file`, K211–K214, ADR-018) are done.
+`new --link/--tag/--body-file`, K211–K214, ADR-018) and K16 (a first
+project that explains itself: body templates, `kiln init` adds the
+`design-doc` export, strict `list` filters, `KILN_EDITOR`, grouped
+`--help`, ADR-019) are done.
 
 ## Read first, in this order
 

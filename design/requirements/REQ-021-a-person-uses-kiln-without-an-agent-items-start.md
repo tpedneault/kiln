@@ -2,7 +2,7 @@
 id = "REQ-021"
 type = "requirement"
 title = "A person uses Kiln without an agent: items start with a shape, the first export works, mistakes are said"
-status = "approved"
+status = "verified"
 +++
 
 Someone who has never used Kiln, without an agent or Fenix, starts a

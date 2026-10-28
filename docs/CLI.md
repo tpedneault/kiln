@@ -1,6 +1,6 @@
 # Command line
 
-How to run `kiln`, as it stands (K11). The commands planned for later
+How to run `kiln`, as it stands (K16). The commands planned for later
 milestones are in [DESIGN.md](DESIGN.md), "Command line"; each is
 documented here when it ships. The file format is
 [FORMAT.md](FORMAT.md); `kiln.toml` is summed up in
@@ -18,14 +18,33 @@ Results go to stdout, messages to stderr, so `kiln list --format json |
 ### `kiln init [--name NAME] [--fenix] [--preset NAME]`
 
 Writes `kiln.toml` with FORMAT.md's default types and links, and a
-`design/` folder with a README and the agent guide, `design/AGENTS.md`
-(`kiln agents`, below). `NAME` defaults to the folder's name.
+`design/` folder with a README, a body template for each type
+(`design/templates/<type>.md`, named by the type's `template` so `kiln
+new` starts each item from it; edit them freely) and the agent guide,
+`design/AGENTS.md` (`kiln agents`, below). `NAME` defaults to the
+folder's name.
 Never overwrites: with a `kiln.toml` already there it stops (exit 2). Add
 a `[code]` section yourself to have source code scanned for code
 references.
 
-`--preset NAME` then adds a preset, exactly as `kiln preset add NAME`
-does (below); an unknown name stops before anything is written.
+It then adds a preset, exactly as `kiln preset add` does (below):
+`design-doc` by default, so `kiln export` writes
+`docs/DESIGN-DOCUMENT.md` straight away; `--preset NAME` adds another,
+and `--preset none` none. An unknown name stops before anything is
+written.
+
+```
+$ kiln init --name Beacon
+kiln.toml
+design/
+design/templates/requirement.md
+…
+design/templates/risk.md
+design/AGENTS.md
+design/templates/design-doc.md
+kiln: added the design-doc preset; `kiln export design-doc` writes its document
+kiln: started project "Beacon"; `kiln new requirement --title "…"` adds the first item
+```
 
 `--fenix` also registers `kiln lsp` in `.fenix/tools.json` as an
 additional language server (`"lsp": {"additional": [{"name": "kiln",
@@ -74,10 +93,17 @@ $ echo "One row per item, a header first." | kiln new task --title "Write the CS
 `--format json` prints the new item's `id` and `path` instead of the
 path alone.
 
-`--open` opens the file at its title: in the running Fenix (through its
-control channel), else by starting `fenix <path>:4`, else, when Fenix
-isn't installed, with the operating system's default editor; stderr says
-which. The item is created either way.
+`--open` opens the file at its title, trying in order: the command in
+`KILN_EDITOR`, when it is set; the running Fenix (through its control
+channel); starting `fenix <path>:4`; then, when Fenix isn't installed,
+the command in `VISUAL`, then in `EDITOR`; then the operating system's
+default editor. stderr says which. The item is created either way. An
+editor command is split on spaces (quotes keep a path with spaces in
+one piece) and never run through a shell; `{path}` and `{line}` in it
+are replaced, and without `{path}` the path comes last: `KILN_EDITOR="code
+-g {path}:{line}"`, `KILN_EDITOR=vim`. From `kiln new`, a variable's
+editor gets the terminal and Kiln waits for it, so a terminal editor
+works; the GUI starts it in the background, so name a windowed one there.
 
 ### `kiln preset list`
 
@@ -189,6 +215,13 @@ $ kiln list --type requirement
 REQ-001  approved  The repository is the source of truth
 REQ-002  approved  Readable without Kiln
 ```
+
+`--type`, `--status` and `--tag` each take a comma-separated list, any of
+whose values matches (`--status todo,doing`). A type that doesn't exist,
+or a status no listed type (or no type at all) has, is an error naming
+the ones there are (exit 2), since a misspelt filter would otherwise
+print nothing and look like an empty answer. Tags are free-form, so an
+unknown tag just matches nothing.
 
 JSON gives each item's `id`, `type`, `title`, `status`, `parent`, `tags`,
 `jira_keys`, `owner`, `due`, `done` and `closed` (whether its status
@@ -704,7 +737,7 @@ kiln: left alone: design/tests/TEST-004-x.md:7 (may mean either REQ-015)
 
 | Command | Does |
 |---|---|
-| `kiln --help`, `kiln <command> --help` | usage |
+| `kiln --help`, `kiln <command> --help` | usage; `kiln --help` lists the commands in groups, the eight everyday ones (`init`, `new`, `list`, `show`, `set`, `link`, `check`, `export`) first |
 | `kiln --version` | `kiln <version>` |
 
 `kiln` with no arguments opens the GUI, as `kiln gui` does.

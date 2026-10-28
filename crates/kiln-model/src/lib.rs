@@ -30,7 +30,10 @@ pub use agents::{
     agents_current, agents_path, agents_pointer, agents_section, write_agents, AgentsError,
     AGENTS_FILE,
 };
-pub use config::{default_config, slug, CodeConfig, Config, JiraSync, LinkRole, TypeDef, CODE};
+pub use config::{
+    default_config, init_config, item_template_path, slug, CodeConfig, Config, JiraSync, LinkRole,
+    TypeDef, CODE, ITEM_TEMPLATES,
+};
 pub use export::{
     ChildList, ConfluenceConfig, ConfluenceFlavour, ConfluenceTarget, Diagrams, DocxOptions,
     ExportFormat, ExportTarget, Flavour, HtmlOptions, ItemStyle, Layout, MarkdownOptions, OnDrift,

@@ -237,9 +237,26 @@ All notable changes to Kiln are recorded here. The format follows
   print the line for the repository's own `AGENTS.md`. Kiln's own
   milestones K15 and K16 carry their tasks
   ([docs/CLI.md](docs/CLI.md), [docs/DESIGN.md](docs/DESIGN.md), "The plan").
+- K16: a first project that explains itself, for people without an agent
+  (REQ-021, ADR-019). `kiln init` writes a body template for each
+  default type under `design/templates/` and names it in `kiln.toml`, so
+  `kiln new` starts a requirement with rationale and acceptance, a
+  decision with context, decision and consequences; and it adds the
+  `design-doc` preset, so `kiln export` works straight away (`--preset
+  none` for neither preset nor export). `KILN_EDITOR` (before Fenix),
+  then `VISUAL` and `EDITOR` (before the OS default) open items from
+  `kiln new --open` and the GUI, with `{path}` and `{line}`. `kiln
+  --help` lists the commands in groups, the everyday ones first. Kiln's
+  own types use the same templates
+  ([docs/CLI.md](docs/CLI.md), "`kiln init`", "`kiln new`").
 
 ### Changed
 
+- `kiln list` filters take comma lists (`--status todo,doing`), and a
+  status that no type in scope has is an error (exit 2) instead of an
+  empty list (K16).
+- `kiln init` adds the `design-doc` export and body templates by default
+  (K16); `kiln init --preset none` keeps the export out.
 - `kiln show --format json` is structured (K15): links, inbound links,
   children and parent as `{id, title, status}` objects keyed by role,
   coverage as booleans, progress as numbers, plus the body. It used to

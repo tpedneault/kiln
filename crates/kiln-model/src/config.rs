@@ -280,6 +280,54 @@ pub fn default_config(name: &str) -> String {
     DEFAULT_CONFIG.replace("{name}", &name)
 }
 
+/// The body templates `kiln init` writes for the default types, by type
+/// name: a few bold labels or headings saying what the item should say,
+/// so a new item starts with a shape rather than an empty body (REQ-021).
+/// Like a preset's, they are copied into the project and its own from
+/// then on (ADR-015); Kiln never rewrites them.
+pub const ITEM_TEMPLATES: &[(&str, &str)] = &[
+    ("requirement", include_str!("../templates/requirement.md")),
+    ("design", include_str!("../templates/design.md")),
+    ("decision", include_str!("../templates/decision.md")),
+    ("milestone", include_str!("../templates/milestone.md")),
+    ("task", include_str!("../templates/task.md")),
+    ("test", include_str!("../templates/test.md")),
+    ("risk", include_str!("../templates/risk.md")),
+];
+
+/// Where `kiln init` puts a type's body template: `<dir>/templates/<type>.md`.
+pub fn item_template_path(dir: &str, type_name: &str) -> String {
+    format!("{dir}/templates/{type_name}.md")
+}
+
+/// The `kiln.toml` `kiln init` writes: [`default_config`] with each
+/// default type's `template` set to the file [`ITEM_TEMPLATES`] gives
+/// it, under `dir` (the first of `paths`). Kept apart from
+/// `default_config`, which is FORMAT.md's defaults and what tests build
+/// projects from without template files.
+pub fn init_config(name: &str, dir: &str) -> String {
+    let mut out = String::new();
+    let mut in_type: Option<&str> = None;
+    for line in default_config(name).split_inclusive('\n') {
+        out.push_str(line);
+        if let Some(t) = line
+            .trim_end()
+            .strip_prefix("[types.")
+            .and_then(|r| r.strip_suffix(']'))
+        {
+            in_type = ITEM_TEMPLATES
+                .iter()
+                .find(|(n, _)| *n == t)
+                .map(|(n, _)| *n);
+        } else if line.starts_with("prefix = ") {
+            if let Some(t) = in_type.take() {
+                out.push_str(&format!("template = \"{}\"\n", item_template_path(dir, t)));
+            }
+        }
+    }
+    out
+}
+
 const DEFAULT_CONFIG: &str = r#"# Kiln project configuration: docs/FORMAT.md in Kiln's repository.
 format = 1
 name = "{name}"
@@ -368,6 +416,21 @@ inverse = "blocks"
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn init_names_a_template_for_each_default_type() {
+        let text = init_config("Demo", "design");
+        for (t, _) in ITEM_TEMPLATES {
+            assert!(text.contains(&format!("[types.{t}]\nprefix = ")), "{t}");
+            assert_eq!(
+                text.matches(&format!("template = \"design/templates/{t}.md\"\n"))
+                    .count(),
+                1,
+                "{t}"
+            );
+        }
+        assert_eq!(text.matches("template = ").count(), ITEM_TEMPLATES.len());
+    }
 
     #[test]
     fn slugs_are_lowercase_words_joined_by_dashes() {

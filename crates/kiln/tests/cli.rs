@@ -96,9 +96,9 @@ fn outside_a_project_is_a_usage_error() {
 fn a_project_from_init_to_check() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     assert_eq!(
-        kiln_in(d, &["init"]).status.code(),
+        kiln_in(d, &["init", "--preset", "none"]).status.code(),
         Some(2),
         "init never overwrites"
     );
@@ -159,7 +159,7 @@ fn a_project_from_init_to_check() {
     std::fs::write(&test, format!("{text}\nSee [[REQ-099]].\n")).unwrap();
     let check = kiln_in(d, &["check", "--format", "github"]);
     assert_eq!(check.status.code(), Some(1));
-    assert!(stdout(&check).contains("::error file=design/tests/TEST-001-benchmark.md,line=11,col=7,title=K102::reference REQ-099 doesn't exist"), "{}", stdout(&check));
+    assert!(stdout(&check).contains("::error file=design/tests/TEST-001-benchmark.md,line=17,col=7,title=K102::reference REQ-099 doesn't exist"), "{}", stdout(&check));
 }
 
 #[test]
@@ -167,7 +167,7 @@ fn a_project_from_init_to_check() {
 fn trace_levels_follows_requirements_down_the_levels() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     let one = kiln_in(d, &["trace", "--levels"]);
     assert_eq!(one.status.code(), Some(2));
     assert!(
@@ -238,7 +238,7 @@ levels = [\"requirement\", \"system\"]
 fn renumber_moves_an_id_everywhere() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init"]);
+    ok(d, &["init", "--preset", "none"]);
     std::fs::write(
         d.join("kiln.toml"),
         format!(
@@ -275,7 +275,7 @@ fn renumber_moves_an_id_everywhere() {
 fn export_writes_markdown_and_check_notices_staleness() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
     std::fs::write(
         d.join("kiln.toml"),
@@ -318,7 +318,7 @@ fn export_writes_markdown_and_check_notices_staleness() {
 fn confluence_targets_plan_from_a_snapshot_and_never_write() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
     std::fs::write(
         d.join("kiln.toml"),
@@ -435,7 +435,7 @@ fn confluence_targets_publish_with_yes_and_stop_on_drift() {
     let fake = Fake::start(state, false);
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
     std::fs::write(
         d.join("kiln.toml"),
@@ -531,7 +531,10 @@ fn init_registers_the_language_server_for_fenix() {
         serde_json::from_str(&std::fs::read_to_string(d.join(".fenix/tools.json")).unwrap())
             .unwrap()
     };
-    ok(d, &["init", "--name", "Demo", "--fenix"]);
+    ok(
+        d,
+        &["init", "--preset", "none", "--name", "Demo", "--fenix"],
+    );
     let tools = read();
     let kiln = &tools["lsp"]["additional"][0];
     assert_eq!(kiln["name"], "kiln");
@@ -560,7 +563,7 @@ fn init_registers_the_language_server_for_fenix() {
         "{\"lsp\": {\"markdown\": {\"executable\": \"kiln\", \"args\": [\"lsp\"]}, \"rust\": {\"executable\": \"rust-analyzer\"}}}\n",
     )
     .unwrap();
-    let out = kiln_in(d, &["init", "--fenix"]);
+    let out = kiln_in(d, &["init", "--preset", "none", "--fenix"]);
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     assert!(
         stderr(&out).contains("moved `kiln lsp` from the Markdown server"),
@@ -582,14 +585,14 @@ fn init_registers_the_language_server_for_fenix() {
         .unwrap()
         .push("python".into());
     std::fs::write(d.join(".fenix/tools.json"), tools.to_string()).unwrap();
-    let out = kiln_in(d, &["init", "--fenix"]);
+    let out = kiln_in(d, &["init", "--preset", "none", "--fenix"]);
     assert!(
         stderr(&out).contains("already runs `kiln lsp` for markdown, rust, tcl, python"),
         "{}",
         stderr(&out)
     );
     assert_eq!(
-        kiln_in(d, &["init"]).status.code(),
+        kiln_in(d, &["init", "--preset", "none"]).status.code(),
         Some(2),
         "kiln.toml exists"
     );
@@ -600,7 +603,7 @@ fn lsp_speaks_the_protocol_on_stdio() {
     use std::io::{BufRead, BufReader, Read, Write};
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     let mut child = Command::new(env!("CARGO_BIN_EXE_kiln"))
         .arg("lsp")
         .current_dir(d)
@@ -646,7 +649,7 @@ fn provider_says_hello_and_registers_the_items() {
     use std::io::{BufRead, BufReader, Read, Write};
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     ok(d, &["new", "requirement", "--title", "Fast"]);
     let mut child = Command::new(env!("CARGO_BIN_EXE_kiln"))
         .args(["provider", "--project"])
@@ -717,7 +720,7 @@ fn diff_and_export_since_a_tag() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
     git(d, &["init", "-q"]);
-    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
     std::fs::write(
         d.join("kiln.toml"),
@@ -795,7 +798,7 @@ fn confluence_comments_are_listed_per_item() {
     let fake = Fake::start(state, false);
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
     std::fs::write(
         d.join("kiln.toml"),
@@ -880,7 +883,7 @@ fn list_jira_and_k207_read_the_mirror_once_per_ten_minutes() {
     );
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
     std::fs::write(
         d.join("kiln.toml"),
@@ -955,7 +958,7 @@ fn jira_sync_creates_sub_tasks_records_their_keys_and_pull_takes_status_back() {
     let fake = Fake::start(State::default());
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
     std::fs::write(
         d.join("kiln.toml"),
@@ -1167,7 +1170,7 @@ fn presets_populate_kiln_toml_once_and_the_wiki_says_what_they_add() {
     // All three in one project: nothing twice.
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init", "--name", "Shop"]);
+    ok(d, &["init", "--preset", "none", "--name", "Shop"]);
     for name in ["arc42", "srs", "design-doc"] {
         ok(d, &["preset", "add", name]);
     }
@@ -1278,7 +1281,7 @@ fn presets_populate_kiln_toml_once_and_the_wiki_says_what_they_add() {
 fn the_wiki_s_requirement_levels_work_as_pasted() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    ok(d, &["init", "--name", "Demo"]);
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     let config = d.join("kiln.toml");
     let mut text = std::fs::read_to_string(&config).unwrap();
     for snippet in wiki_blocks("Configuration", "tested: levels") {
@@ -1317,7 +1320,7 @@ fn the_wiki_s_requirement_levels_work_as_pasted() {
 fn the_agent_guide_is_written_by_init_and_kept_current() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    let init = ok(d, &["init", "--name", "Demo"]);
+    let init = ok(d, &["init", "--preset", "none", "--name", "Demo"]);
     assert!(init.contains("design/AGENTS.md"), "{init}");
     let guide = d.join("design/AGENTS.md");
     let text = std::fs::read_to_string(&guide).unwrap();
@@ -1362,7 +1365,7 @@ fn the_agent_guide_is_written_by_init_and_kept_current() {
 fn an_agent_works_through_the_plan_from_the_command_line() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    let init = kiln_in(d, &["init", "--name", "Demo"]);
+    let init = kiln_in(d, &["init", "--preset", "none", "--name", "Demo"]);
     assert!(
         stderr(&init).contains("add this line to the repository's AGENTS.md or CLAUDE.md"),
         "{}",
@@ -1463,4 +1466,50 @@ fn an_agent_works_through_the_plan_from_the_command_line() {
         check.contains("K212 warning: TASK-002 is done, but it depends on TASK-001 (todo)"),
         "{check}"
     );
+}
+
+#[test]
+// verifies: REQ-021
+fn a_first_project_explains_itself() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok(d, &["init", "--name", "Demo"]);
+    // Each default type starts from a body template.
+    let path = ok(d, &["new", "decision", "--title", "Use CSV"]);
+    let text = std::fs::read_to_string(d.join(path.trim())).unwrap();
+    assert!(
+        text.contains("## Context") && text.contains("## Consequences"),
+        "{text}"
+    );
+    // The design-doc export works on day one.
+    let export = kiln_in(d, &["export"]);
+    assert_eq!(export.status.code(), Some(0), "{}", stderr(&export));
+    assert!(d.join("docs/DESIGN-DOCUMENT.md").exists());
+    // Filters take lists, and a status nothing has is said aloud.
+    ok(d, &["new", "task", "--title", "One"]);
+    ok(d, &["set", "TASK-001", "status=doing"]);
+    let both = ok(d, &["list", "--status", "proposed,doing"]);
+    assert_eq!(both.lines().count(), 2, "{both}");
+    let typo = kiln_in(d, &["list", "--type", "task", "--status", "in-progress"]);
+    assert_eq!(typo.status.code(), Some(2));
+    assert!(
+        stderr(&typo).contains(
+            "`in-progress` isn't a status of a task (blocked, doing, done, dropped, todo)"
+        ),
+        "{}",
+        stderr(&typo)
+    );
+    // The help shows the everyday commands first.
+    let help = ok(d, &["--help"]);
+    assert!(
+        help.find("Everyday:") < help.find("Integrations:"),
+        "{help}"
+    );
+
+    // `--preset none` starts bare.
+    let bare = tempfile::tempdir().unwrap();
+    ok(bare.path(), &["init", "--preset", "none"]);
+    assert!(!std::fs::read_to_string(bare.path().join("kiln.toml"))
+        .unwrap()
+        .contains("[[export]]"));
 }

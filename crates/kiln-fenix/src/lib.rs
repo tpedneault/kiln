@@ -2,7 +2,10 @@
 //! (`fenix-control`). K1: open a file at a line, for `kiln new --open`.
 //! When Fenix isn't running it starts `fenix <path>:<line>`; when Fenix
 //! isn't installed it falls back to the OS default editor and says so
-//! (docs/INTEGRATION.md, "Opening items in Fenix"). K5: clock in on the
+//! (docs/INTEGRATION.md, "Opening items in Fenix"). K16: an editor the
+//! user names wins over all of that (`KILN_EDITOR`), and `VISUAL` or
+//! `EDITOR` come before the OS default, so a machine without Fenix opens
+//! items in the editor its user already set. K5: clock in on the
 //! agenda task linked to an item's Jira key, and open a URL with the OS
 //! (the Flint provider's "Open in Confluence").
 //!
@@ -29,22 +32,141 @@ pub enum Opened {
     StartedFenix,
     /// Fenix isn't installed; handed to the OS default editor.
     DefaultEditor,
+    /// With the command in this environment variable.
+    Editor(&'static str),
 }
 
 impl Opened {
     /// One line for the user, naming the fallback when there was one.
-    pub fn describe(&self) -> &'static str {
+    pub fn describe(&self) -> String {
         match self {
-            Opened::Fenix => "opened in Fenix",
-            Opened::StartedFenix => "started Fenix with it",
-            Opened::DefaultEditor => "Fenix isn't installed; opened with the default editor",
+            Opened::Fenix => "opened in Fenix".to_owned(),
+            Opened::StartedFenix => "started Fenix with it".to_owned(),
+            Opened::DefaultEditor => {
+                "Fenix isn't installed; opened with the default editor".to_owned()
+            }
+            Opened::Editor(var) => format!("opened with {var}"),
         }
     }
 }
 
-/// Opens `path` at `line` (1-based): the running Fenix, else a new
-/// Fenix, else the OS default editor.
+/// How an editor named by an environment variable runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Attach {
+    /// On this terminal, waited for: `kiln new --open` from a shell, where
+    /// the editor may be a terminal one (`vim`) and must have the terminal
+    /// to itself until it exits, as `git commit` does.
+    Terminal,
+    /// Started and left running, its output dropped: the GUI, which has no
+    /// terminal to lend; such a user names a windowed editor.
+    Detached,
+}
+
+/// The editor variables, in the order they are tried: `KILN_EDITOR`
+/// before Fenix (the user said so for Kiln), `VISUAL` and `EDITOR` after
+/// Fenix (they are set for every tool, and a Fenix user's shell may well
+/// set them) but before the OS default.
+pub const KILN_EDITOR: &str = "KILN_EDITOR";
+const FALLBACK_EDITORS: [&str; 2] = ["VISUAL", "EDITOR"];
+
+/// The program and arguments for an editor `command` opening `path` at
+/// `line`: split on whitespace, with `"…"` or `'…'` keeping spaces (a
+/// Windows path to the program), and `{path}` and `{line}` replaced; with
+/// no `{path}` in it, the path is the last argument. `None` for a command
+/// with nothing in it. Never through a shell, so a path with `&` or `;`
+/// stays one argument.
+pub fn editor_command(command: &str, path: &Path, line: usize) -> Option<Vec<String>> {
+    let mut words: Vec<String> = Vec::new();
+    let mut word = String::new();
+    let mut quote: Option<char> = None;
+    let mut started = false;
+    for c in command.chars() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), c) => word.push(c),
+            (None, '"' | '\'') => {
+                quote = Some(c);
+                started = true;
+            }
+            (None, c) if c.is_whitespace() => {
+                if started || !word.is_empty() {
+                    words.push(std::mem::take(&mut word));
+                }
+                started = false;
+            }
+            (None, c) => word.push(c),
+        }
+    }
+    if started || !word.is_empty() {
+        words.push(word);
+    }
+    if words.is_empty() {
+        return None;
+    }
+    let path = path.to_string_lossy();
+    let mut placed = false;
+    for w in &mut words[1..] {
+        if w.contains("{path}") {
+            placed = true;
+            *w = w.replace("{path}", &path);
+        }
+        *w = w.replace("{line}", &line.to_string());
+    }
+    if !placed {
+        words.push(path.into_owned());
+    }
+    Some(words)
+}
+
+/// The command in `var`, when it is set and not blank.
+fn editor_from(var: &str) -> Option<String> {
+    std::env::var(var).ok().filter(|v| !v.trim().is_empty())
+}
+
+fn run_editor(
+    var: &'static str,
+    command: &str,
+    path: &Path,
+    line: usize,
+    attach: Attach,
+) -> Result<Opened, String> {
+    let words =
+        editor_command(command, path, line).ok_or_else(|| format!("{var} names no command"))?;
+    let mut c = Command::new(&words[0]);
+    c.args(&words[1..]);
+    match attach {
+        Attach::Terminal => {
+            let status = c
+                .status()
+                .map_err(|e| format!("{var}: couldn't start `{}`: {e}", words[0]))?;
+            if !status.success() {
+                return Err(format!("{var}: `{}` exited with {status}", words[0]));
+            }
+        }
+        Attach::Detached => {
+            c.stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .map_err(|e| format!("{var}: couldn't start `{}`: {e}", words[0]))?;
+        }
+    }
+    Ok(Opened::Editor(var))
+}
+
+/// Opens `path` at `line` (1-based), detached (the GUI): see
+/// [`open_from`].
 pub fn open(path: &Path, line: usize) -> Result<Opened, String> {
+    open_from(path, line, Attach::Detached)
+}
+
+/// Opens `path` at `line` (1-based): with `KILN_EDITOR` when it is set,
+/// else in the running Fenix, else a new Fenix, else with `VISUAL` or
+/// `EDITOR`, else the OS default editor.
+pub fn open_from(path: &Path, line: usize, attach: Attach) -> Result<Opened, String> {
+    if let Some(command) = editor_from(KILN_EDITOR) {
+        return run_editor(KILN_EDITOR, &command, path, line, attach);
+    }
     if open_in_running(&Endpoint::current(), path, line)? {
         return Ok(Opened::Fenix);
     }
@@ -57,6 +179,11 @@ pub fn open(path: &Path, line: usize) -> Result<Opened, String> {
     match spawn {
         Ok(_) => Ok(Opened::StartedFenix),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            for var in FALLBACK_EDITORS {
+                if let Some(command) = editor_from(var) {
+                    return run_editor(var, &command, path, line, attach);
+                }
+            }
             default_editor(path).map(|()| Opened::DefaultEditor)
         }
         Err(e) => Err(format!("couldn't start fenix: {e}")),
@@ -198,6 +325,33 @@ mod tests {
 
     fn endpoint(name: &str) -> Endpoint {
         Endpoint::instance(&format!("kiln-test-{name}-{}", std::process::id()))
+    }
+
+    #[test]
+    fn editor_commands_take_the_path_and_line() {
+        let p = Path::new("design/my items/REQ-001.md");
+        let words = |c: &str| editor_command(c, p, 4);
+        assert_eq!(
+            words("vim"),
+            Some(vec!["vim".into(), "design/my items/REQ-001.md".into()])
+        );
+        assert_eq!(
+            words("code -g {path}:{line}"),
+            Some(vec![
+                "code".into(),
+                "-g".into(),
+                "design/my items/REQ-001.md:4".into()
+            ])
+        );
+        assert_eq!(
+            words(r#""C:\Program Files\Notepad++\notepad++.exe" -n{line}"#),
+            Some(vec![
+                r"C:\Program Files\Notepad++\notepad++.exe".into(),
+                "-n4".into(),
+                "design/my items/REQ-001.md".into()
+            ])
+        );
+        assert_eq!(words("  "), None);
     }
 
     #[test]

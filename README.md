@@ -133,7 +133,13 @@ $ kiln new requirement --title "Users can export their data as CSV"
 design/requirements/REQ-001-users-can-export-their-data-as-csv.md
 $ kiln check
 kiln: no findings
+$ kiln export
+design-doc (markdown, document) → docs/DESIGN-DOCUMENT.md
+  create docs/DESIGN-DOCUMENT.md
 ```
+
+Each new item starts from a short template saying what it should say,
+and `kiln --help` lists the everyday commands first.
 
 Then follow the **[Tutorial](https://github.com/tpedneault/kiln/wiki/Tutorial)**.
 It designs a small project from an empty folder to a generated document.

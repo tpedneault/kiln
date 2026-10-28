@@ -27,16 +27,33 @@ $ git init
 $ kiln init --name Beacon
 kiln.toml
 design/
+design/templates/requirement.md
+design/templates/design.md
+design/templates/decision.md
+design/templates/milestone.md
+design/templates/task.md
+design/templates/test.md
+design/templates/risk.md
 design/AGENTS.md
+design/templates/design-doc.md
+kiln: added the design-doc preset; `kiln export design-doc` writes its document
 kiln: started project "Beacon"; `kiln new requirement --title "…"` adds the first item
+kiln: so agents working on the code find it, add this line to the repository's AGENTS.md or CLAUDE.md:
+  The design (requirements, decisions, milestones and tasks) is in `design/`, kept with Kiln; read `design/AGENTS.md` before changing it or implementing what it describes, and `kiln next` lists the work ready to start.
 ```
 
-`kiln init` writes three things:
+`kiln init` writes four things:
 
 - **`kiln.toml`**, the project's configuration. It declares seven item
   **types**, the **link roles** between them, and nothing else yet.
 - **`design/`**, the folder your items will live in, with a short
   `README.md`.
+- **`design/templates/`**: a body for each type, which `kiln new` starts
+  every item from (a requirement asks for its rationale and acceptance, a
+  decision for its context, decision and consequences), and the template
+  of a ready-made design document, `design-doc.md`. `kiln export` already
+  writes that document to `docs/DESIGN-DOCUMENT.md`; step 8 writes your
+  own instead.
 - **`design/AGENTS.md`**, a guide for coding agents: how to read and
   change the design with Kiln, and how this project's design is
   organised. See [Designing with Kiln](Designing-with-Kiln#with-coding-agents).
@@ -71,7 +88,7 @@ design/requirements/REQ-003-failures-are-reported-within-one-minute.md
 
 Each item is an ordinary Markdown file. It starts with a **front matter**
 block in TOML between two `+++` lines. Here is REQ-002 as `kiln new`
-wrote it:
+wrote it, its body from `design/templates/requirement.md`:
 
 ```markdown
 +++
@@ -81,13 +98,17 @@ title = "A check finishes within 5 seconds per site"
 status = "draft"
 parent = "REQ-001"
 +++
+
+**Rationale:** why it is needed, and who needs it.
+
+**Acceptance:** how anyone can tell it is met, with a number where there is one.
 ```
 
 `parent` makes REQ-002 a child of REQ-001. Use it to break a broad
 requirement into precise ones.
 
-Open REQ-001 and write what it means, below the front matter. Add a tag,
-too. Tags are free-form words you can later use to group items in the
+Open REQ-001 and replace the template's prompts with what it means. Add
+a tag, too. Tags are free-form words you can later use to group items in the
 document:
 
 ```markdown
@@ -384,9 +405,9 @@ job. [Checking](Checking) lists every rule and how to fix it. Put
 
 A **template** gives the document its shape: your own headings and prose,
 with **directives** (HTML comments) where Kiln places items and reports.
-(`kiln preset add design-doc` writes a ready-made one and its export for
-you; arc42 and a requirements specification are [presets](Presets) too.
-Here you write one, to see how it works.) Create
+(`kiln init` added a ready-made one, the `design-doc` preset; arc42 and a
+requirements specification are [presets](Presets) too. Here you write
+your own, to see how it works.) Create
 `design/templates/design-document.md`:
 
 ```markdown
@@ -424,8 +445,10 @@ This document is generated from the files in `design/`; edit those.
 <!-- kiln:report traceability -->
 ```
 
-Declare two **export targets** at the end of `kiln.toml`: a Markdown file
-to commit, and a self-contained HTML file to send to people:
+In `kiln.toml`, delete the `[[export]]` target named `design-doc` that
+`kiln init` added (and `design/templates/design-doc.md`, which only it
+used), and declare two **export targets** at the end instead: a Markdown
+file to commit, and a self-contained HTML file to send to people:
 
 ```toml
 [[export]]

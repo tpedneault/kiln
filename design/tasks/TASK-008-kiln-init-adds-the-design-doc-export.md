@@ -2,7 +2,7 @@
 id = "TASK-008"
 type = "task"
 title = "kiln init adds the design-doc export"
-status = "todo"
+status = "done"
 
 [links]
 part-of = ["MS-017"]

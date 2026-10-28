@@ -28,8 +28,9 @@ design/templates/building-block.md
 kiln: added the arc42 preset (types quality-goal, quality-scenario, constraint, block, term; already in kiln.toml, kept as they are: decision, risk; roles addresses; mitigates gains from decision, block; export `arc42`); `kiln export arc42` writes it
 ```
 
-`kiln init --preset arc42` does the same in a new project. `--dry-run`
-prints what would change and writes nothing.
+`kiln init --preset arc42` does the same in a new project. `kiln init`
+without `--preset` adds `design-doc`, and `--preset none` adds nothing.
+`--dry-run` prints what would change and writes nothing.
 
 `kiln preset add` writes:
 
@@ -461,8 +462,9 @@ tags = ["performance"]
 - **Starting text for requirements.** On a project without a
   `requirement` type, the preset adds one with `template =
   "design/templates/requirement.md"` ("The system shall…", rationale,
-  acceptance). With the `kiln init` one, add that line yourself and write
-  the file.
+  acceptance). `kiln init` already gives its `requirement` a template,
+  `design/templates/requirement.md` (rationale and acceptance); edit
+  that file to start from "The system shall…" too.
 - **Your own kinds.** Change the tags in the template's section 3, or
   add sections: `<!-- kiln:items type="requirement" tag="security" -->`.
 - **A page per section.** `layout = "sections"` when the document grows
@@ -473,7 +475,8 @@ tags = ["performance"]
 The general design document: goals and non-goals, requirements, design,
 decisions, milestones, risks, traceability and open findings, in one
 document. It places the types `kiln init` writes, so on such a project
-it adds only an export:
+it adds only an export; `kiln init` adds it unless `--preset` names
+another preset or `none`:
 
 <!-- added: design-doc -->
 ```toml

@@ -1,4 +1,5 @@
-//! `kiln list`: items, filtered by type, status and tag; with `--jira`,
+//! `kiln list`: items, filtered by type, status and tag (each a comma
+//! list, any of whose values matches); with `--jira`,
 //! each linked ticket's status and assignee from the Jira mirror.
 //!
 //! The JSON form carries each item's outgoing links, and with `--body`
@@ -37,17 +38,52 @@ pub fn run(
     } = filters;
     let loaded = load(project)?;
     let p = &loaded.project;
-    if let Some(t) = &type_name {
+    let types = split(type_name.as_deref());
+    let statuses = split(status.as_deref());
+    let tags = split(tag.as_deref());
+    for t in &types {
         if p.config.type_named(t).is_none() {
-            return Err(Fail::usage(format!("`{t}` isn't a type")));
+            let names: Vec<&str> = p.config.types.iter().map(|t| t.name.as_str()).collect();
+            return Err(Fail::usage(format!(
+                "`{t}` isn't a type ({})",
+                names.join(", ")
+            )));
+        }
+    }
+    // A status no type in scope has would match nothing, silently; it is
+    // a typo, so say so, as for a type (REQ-021). Tags are free-form and
+    // have no list to check against.
+    let in_scope: Vec<&kiln_model::TypeDef> = p
+        .config
+        .types
+        .iter()
+        .filter(|t| types.is_empty() || types.contains(&t.name.as_str()))
+        .collect();
+    for s in &statuses {
+        if !in_scope.iter().any(|t| t.statuses.iter().any(|x| x == s)) {
+            let mut known: Vec<&str> = in_scope
+                .iter()
+                .flat_map(|t| t.statuses.iter().map(String::as_str))
+                .collect();
+            known.sort_unstable();
+            known.dedup();
+            let of = match types.as_slice() {
+                [] => "any type".to_owned(),
+                [one] => format!("a {one}"),
+                _ => "those types".to_owned(),
+            };
+            return Err(Fail::usage(format!(
+                "`{s}` isn't a status of {of} ({})",
+                known.join(", ")
+            )));
         }
     }
     let items: Vec<_> = p
         .items
         .iter()
-        .filter(|i| type_name.as_ref().is_none_or(|t| &i.type_name == t))
-        .filter(|i| status.as_ref().is_none_or(|s| &i.status == s))
-        .filter(|i| tag.as_ref().is_none_or(|t| i.tags.contains(t)))
+        .filter(|i| types.is_empty() || types.contains(&i.type_name.as_str()))
+        .filter(|i| statuses.is_empty() || statuses.contains(&i.status.as_str()))
+        .filter(|i| tags.is_empty() || tags.iter().any(|t| i.tags.iter().any(|x| x == t)))
         .collect();
     let mirror = if jira {
         if p.config.jira_url.is_none() {
@@ -158,4 +194,17 @@ pub fn run(
         }
     }
     Ok(0)
+}
+
+/// A filter's comma-separated values (`--status todo,doing`): any of them
+/// matches.
+fn split(value: Option<&str>) -> Vec<&str> {
+    value
+        .map(|v| {
+            v.split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
 }

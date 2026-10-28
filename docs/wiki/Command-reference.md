@@ -38,7 +38,7 @@ All examples on this page come from one small scratch project, made with `kiln i
 | Option | Does |
 |---|---|
 | `--project <DIR>` | starts the search for `kiln.toml` from `DIR` instead of the current folder. Accepted by every command, before or after the command name |
-| `-h`, `--help` | prints usage. `kiln <command> --help` prints the usage of one command |
+| `-h`, `--help` | prints usage: the commands in groups, the everyday ones first. `kiln <command> --help` prints the usage of one command |
 | `-V`, `--version` | prints `kiln <version>` |
 
 ```console
@@ -65,21 +65,32 @@ Commands:
 kiln init [--name NAME] [--fenix] [--preset NAME] [--project DIR]
 ```
 
-Writes `kiln.toml` with the seven default types (requirement, design, decision, milestone, task, test, risk) and six default link roles, plus a `design/` folder with a README and the agent guide, `design/AGENTS.md` ([`kiln agents`](#kiln-agents)). It never overwrites: if a `kiln.toml` is already there, it stops with exit 2.
+Writes `kiln.toml` with the seven default types (requirement, design, decision, milestone, task, test, risk) and six default link roles, plus a `design/` folder with a README, a body template for each type (`design/templates/requirement.md` and so on, which `kiln new` starts each item from) and the agent guide, `design/AGENTS.md` ([`kiln agents`](#kiln-agents)). It then adds the `design-doc` [preset](Presets), so `kiln export` writes a design document from the first day. It never overwrites: if a `kiln.toml` is already there, it stops with exit 2.
 
 | Option | Does |
 |---|---|
 | `--name NAME` | the project's name in reports and exports. Default: the folder's name |
 | `--fenix` | also registers `kiln lsp` in `.fenix/tools.json` as an additional language server for the Fenix editor, beside each language's own, for Markdown and the languages of the code `[code] paths` scans. It merges into an existing file. In a folder that already has a `kiln.toml`, `kiln init --fenix` does only this; run it again after adding `[code] paths` |
-| `--preset NAME` | also adds a preset, exactly as [`kiln preset add NAME`](#kiln-preset-add) does. An unknown name stops before anything is written |
+| `--preset NAME` | the preset to add, exactly as [`kiln preset add NAME`](#kiln-preset-add) does: `design-doc` (the default), `arc42`, `srs`, or `none` for no preset and no export. An unknown name stops before anything is written |
 | `--project DIR` | writes the project in `DIR` instead of the current folder |
 
 ```console
 $ kiln init --name Demo
 kiln.toml
 design/
+design/templates/requirement.md
+design/templates/design.md
+design/templates/decision.md
+design/templates/milestone.md
+design/templates/task.md
+design/templates/test.md
+design/templates/risk.md
 design/AGENTS.md
+design/templates/design-doc.md
+kiln: added the design-doc preset; `kiln export design-doc` writes its document
 kiln: started project "Demo"; `kiln new requirement --title "…"` adds the first item
+kiln: so agents working on the code find it, add this line to the repository's AGENTS.md or CLAUDE.md:
+  The design (requirements, decisions, milestones and tasks) is in `design/`, kept with Kiln; read `design/AGENTS.md` before changing it or implementing what it describes, and `kiln next` lists the work ready to start.
 $ kiln init
 kiln: /home/me/demo/kiln.toml already exists; kiln init never overwrites
 $ echo $?
@@ -91,7 +102,8 @@ kiln: Fenix now runs `kiln lsp` beside each language's own server for markdown i
 
 Notes:
 
-- The files written go to stdout, one per line; the message goes to stderr.
+- The files written go to stdout, one per line; the messages go to stderr.
+- The body templates are yours: change the labels, add sections, or delete a type's `template` line in `kiln.toml` to start that type empty. Kiln never rewrites them.
 - Source code is not scanned for code references until you add a `[code]` section to `kiln.toml`. The generated file has one commented out. See [Configuration](Configuration).
 - `--fenix` keeps everything else in `.fenix/tools.json`, including another Markdown server, which stays the primary one. Kiln's older entry (Kiln as the Markdown server) is moved to the additional form. See [Editors and Flint](Editors-and-Flint#setting-it-up-in-fenix).
 
@@ -227,7 +239,7 @@ Notes:
 
 - The file goes in `<first folder of paths>/<type plural>/`, named by the ID and up to 50 characters of the title. Retitling an item later does not rename its file; only the ID at the start of the name matters ([Item files](Item-files)).
 - The front matter has `id`, `type`, `title`, the type's initial status, `parent`, `tags` and `[links]`. The body is the `--body-file` text, else the type's `template` file when `kiln.toml` sets one. Everything goes in one write, so nothing is left to edit by hand: what a coding agent needs.
-- `--open` tries, in order: the running Fenix (through its control channel), starting `fenix <path>:4`, and the operating system's default editor. stderr says which one it used. The item is created even when nothing can open it:
+- `--open` tries, in order: the command in `KILN_EDITOR` when it is set, the running Fenix (through its control channel), starting `fenix <path>:4`, then (when Fenix isn't installed) the command in `VISUAL` or `EDITOR`, and the operating system's default editor. stderr says which one it used. An editor command may contain `{path}` and `{line}` (`KILN_EDITOR="code -g {path}:{line}"`); without `{path}` the path is added at the end. A terminal editor (`KILN_EDITOR=vim`) gets the terminal, and `kiln new` waits for it to exit. The item is created even when nothing can open it:
 
   ```console
   $ kiln new decision --title "Try open" --open
@@ -249,9 +261,9 @@ Lists items in type order (the order of `[types]` in `kiln.toml`), then by ID. T
 
 | Option | Does |
 |---|---|
-| `--type TYPE` | only this type. An unknown type is an error (exit 2) |
-| `--status STATUS` | only this status. Exact match; there is no negation (`!draft` matches nothing) |
-| `--tag TAG` | only items with this tag |
+| `--type TYPE` | only these types, comma-separated (`requirement,design`). An unknown type is an error (exit 2) |
+| `--status STATUS` | only these statuses, comma-separated (`todo,doing`). Exact match; a status that no listed type has (or, without `--type`, no type at all) is an error (exit 2) |
+| `--tag TAG` | only items with any of these tags, comma-separated |
 | `--jira` | adds each linked Jira ticket's status and assignee; see the notes |
 | `--body` | with `--format json`, each item's body too: the whole design in one call |
 | `--format text\|json` | output format. Default: `text` |
@@ -270,13 +282,17 @@ RISK-001  open      Fonts differ between machines
 $ kiln list --type requirement --status approved
 REQ-001  approved  Exports are deterministic
 REQ-003  approved  Exports finish within 3 s
+$ kiln list --type task --status todo,doing
+TASK-001  doing     Sort every unordered list
+$ kiln list --type task --status in-progress
+kiln: `in-progress` isn't a status of a task (blocked, doing, done, dropped, todo)
 $ kiln list --type bogus
-kiln: `bogus` isn't a type
+kiln: `bogus` isn't a type (requirement, design, decision, milestone, task, test, risk)
 ```
 
 Notes:
 
-- An unknown status or tag is not an error; it just matches nothing.
+- An unknown tag is not an error (tags are free-form); it just matches nothing.
 - `--jira` reads the Jira mirror: a read-only copy of each linked ticket's status and assignee, cached for ten minutes. It needs `[jira] url` in `kiln.toml` and a token (`KILN_JIRA_TOKEN`, or the one `kiln auth jira` stored). It works with Jira Server and Data Center only, and does not use `HTTPS_PROXY` yet. Items without `jira` keys cost no request. A ticket shows after the item, for example `[FLINT-88 In Review · Alice]`. A network error, or no readable token, exits 3. See [Jira](Jira).
 
 ### kiln show
