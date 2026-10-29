@@ -28,6 +28,7 @@ pub fn findings(project: &Project, files: &dyn FileSource, today: Date) -> Vec<F
     status_rules(project, today, &mut out);
     plan_rules(project, &mut out);
     template_text_rules(project, files, &mut out);
+    result_rules(project, files, &mut out);
     diagram_rules(project, &mut out);
     template_rules(project, files, &mut out);
     agents_rule(project, files, &mut out);
@@ -710,7 +711,7 @@ fn status_rules(project: &Project, today: Date, out: &mut Vec<Finding>) {
             let passing = inbound.iter().any(|l| {
                 l.role == "verifies"
                     && match l.source {
-                        Source::Code(_) => true,
+                        Source::Code(_) => project.source_is_open(l.source),
                         Source::Item(j) => {
                             let s = &project.items[j];
                             j != i && s.type_name == "test" && s.status == "passing"
@@ -814,6 +815,40 @@ fn template_text_rules(project: &Project, files: &dyn FileSource, out: &mut Vec<
             format!(
                 "{} is {} but still has {template}'s text \"{shown}\"{more}; write what it says, or delete the line",
                 item.id, item.status
+            ),
+        );
+    }
+}
+
+/// K216, K217: with test results applied (`--results`), a `verifies`
+/// code reference whose test failed, or didn't run, on its own line. The
+/// coverage those references would have given is already gone (K201
+/// follows); these say why, where the fix is.
+// implements: REQ-023
+fn result_rules(project: &Project, files: &dyn FileSource, out: &mut Vec<Finding>) {
+    for (i, code) in project.code_refs.iter().enumerate() {
+        let Some(verdict) = project.verdict(i) else {
+            continue;
+        };
+        let test = project
+            .test_name_of(files, i)
+            .map(|n| format!("`{n}`"))
+            .unwrap_or_else(|| "no test found below the comment".to_owned());
+        let (rule, what) = match verdict {
+            kiln_index::Verdict::Passed => continue,
+            kiln_index::Verdict::Failed => (Rule::K216, "failed"),
+            kiln_index::Verdict::NotRun => {
+                (Rule::K217, "isn't in the test results, or was skipped")
+            }
+        };
+        report(
+            out,
+            rule,
+            &code.path,
+            code.target.span,
+            format!(
+                "the test verifying {} here ({test}) {what}, so it doesn't count",
+                code.target.raw
             ),
         );
     }

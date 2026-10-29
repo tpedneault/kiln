@@ -30,6 +30,46 @@ pub struct Loaded {
     pub project: Project,
 }
 
+/// The JUnit reports given with `--results`, for every command that loads
+/// the project: one global, set once from the command line, so each
+/// command applies them the same way without passing them down.
+static RESULTS: std::sync::OnceLock<Vec<PathBuf>> = std::sync::OnceLock::new();
+
+/// Records `--results` for [`load`] and [`apply_results`].
+pub fn set_results(files: Vec<PathBuf>) {
+    let _ = RESULTS.set(files);
+}
+
+/// Applies the `--results` reports to `project`, when there are any: a
+/// report that can't be read or parsed is a usage error naming it; the
+/// verdicts are summed up on stderr (K18, ADR-021).
+// implements: REQ-023
+pub fn apply_results(project: &mut Project, source: &DiskSource) -> Result<(), Fail> {
+    let Some(files) = RESULTS.get().filter(|f| !f.is_empty()) else {
+        return Ok(());
+    };
+    let mut cases = Vec::new();
+    for file in files {
+        let text = std::fs::read(file).map_err(|e| {
+            Fail::usage(format!("--results {}: can't read it: {e}", file.display()))
+        })?;
+        let text = String::from_utf8_lossy(&text);
+        cases.extend(
+            kiln_parse::parse_junit(&text)
+                .map_err(|e| Fail::usage(format!("--results {}: {e}", file.display())))?,
+        );
+    }
+    let summary = project.apply_results(source, &cases);
+    eprintln!(
+        "kiln: test results ({} cases): {} verifying references passed, {} failed, {} didn't run",
+        cases.len(),
+        summary.passed,
+        summary.failed,
+        summary.not_run
+    );
+    Ok(())
+}
+
 /// Loads the project for a command other than `check`. A configuration
 /// Kiln can't use is a usage error (exit 2); lesser configuration
 /// findings are summed up in one line on stderr and the command goes on.
@@ -54,6 +94,8 @@ pub fn load(project: Option<&Path>) -> Result<Loaded, Fail> {
             if config_errors == 1 { "" } else { "s" }
         );
     }
+    let mut project = project;
+    apply_results(&mut project, &source)?;
     Ok(Loaded { source, project })
 }
 

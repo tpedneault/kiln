@@ -45,6 +45,11 @@ pub struct Group<'p> {
     /// Done ÷ non-closed over this milestone's own work
     /// ([`Project::progress`]); for the work in no milestone, over it.
     pub progress: Progress,
+    /// Open work past its first status, not blocked, nothing it depends on
+    /// open: someone is on it (K18).
+    pub in_progress: Vec<&'p Item>,
+    /// Open work still at its first status, not blocked, nothing it
+    /// depends on open: what `kiln next` offers.
     pub ready: Vec<&'p Item>,
     pub waiting: Vec<Waiting<'p>>,
 }
@@ -108,9 +113,21 @@ impl Project {
             .unwrap_or_default()
     }
 
-    /// Whether open `item` is ready to start.
-    pub fn is_ready(&self, item: &Item) -> bool {
+    /// Whether `item` has moved past its type's first status: started.
+    pub fn is_started(&self, item: &Item) -> bool {
+        self.type_of(item).is_some_and(|t| item.status != t.initial)
+    }
+
+    /// Whether `item` could be worked on now: open, not `blocked`, and
+    /// nothing it `depends-on` still open.
+    pub fn is_unblocked(&self, item: &Item) -> bool {
         self.is_open(item) && item.status != BLOCKED && self.open_dependencies(item).is_empty()
+    }
+
+    /// Whether `item` is ready to start: unblocked and not started yet.
+    /// Work already under way is in progress, not offered again (K18).
+    pub fn is_ready(&self, item: &Item) -> bool {
+        self.is_unblocked(item) && !self.is_started(item)
     }
 
     /// The plan: a group per milestone that is open or still has open
@@ -130,6 +147,7 @@ impl Project {
             .map(|m| Group {
                 milestone: Some(m),
                 progress: Progress { done: 0, total: 0 },
+                in_progress: Vec::new(),
                 ready: Vec::new(),
                 waiting: Vec::new(),
             })
@@ -137,6 +155,7 @@ impl Project {
         let mut loose = Group {
             milestone: None,
             progress: Progress { done: 0, total: 0 },
+            in_progress: Vec::new(),
             ready: Vec::new(),
             waiting: Vec::new(),
         };
@@ -163,6 +182,8 @@ impl Project {
                 group.progress.done += 1;
             } else if self.is_ready(item) {
                 group.ready.push(item);
+            } else if self.is_unblocked(item) {
+                group.in_progress.push(item);
             } else {
                 group.waiting.push(Waiting {
                     item,
@@ -184,9 +205,10 @@ impl Project {
         groups.retain(|g| {
             g.milestone.is_some_and(|m| self.is_open(m))
                 || !g.ready.is_empty()
+                || !g.in_progress.is_empty()
                 || !g.waiting.is_empty()
         });
-        if !loose.ready.is_empty() || !loose.waiting.is_empty() {
+        if !loose.ready.is_empty() || !loose.in_progress.is_empty() || !loose.waiting.is_empty() {
             groups.push(loose);
         }
         groups
@@ -295,7 +317,12 @@ mod tests {
             ["MS-001", "MS-002", "none"],
             "MS-003 is done with nothing open"
         );
-        assert_eq!(ids(&plan[0].ready), ["TASK-002"]);
+        assert!(plan[0].ready.is_empty());
+        assert_eq!(
+            ids(&plan[0].in_progress),
+            ["TASK-002"],
+            "doing: in progress, not offered"
+        );
         assert_eq!(plan[0].progress.done, 1);
         assert_eq!(plan[0].progress.total, 3);
         assert_eq!(plan[0].waiting.len(), 1);

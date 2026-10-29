@@ -3,7 +3,8 @@
 //! `[[ID]]` and bare-ID references in bodies (outside code, through
 //! `pulldown-cmark`), and matches code-reference patterns in source text
 //! (docs/FORMAT.md). Also the comment-preserving front-matter edits, and
-//! adding a preset to `kiln.toml` the same way.
+//! adding a preset to `kiln.toml` the same way. And (K18) JUnit test
+//! reports, and the name of the test below a code reference.
 //!
 //! Every value keeps its byte span. That costs memory and some ceremony,
 //! and buys the two things Kiln is for at the point of an error: a
@@ -24,6 +25,7 @@ mod config;
 mod edit;
 mod exports;
 mod item;
+mod junit;
 mod preset;
 mod text;
 mod toml_walk;
@@ -35,5 +37,6 @@ pub use edit::{
     FieldValue,
 };
 pub use item::{parse_item, relative_destination, sections, ItemOptions, Sections, MAX_TITLE};
+pub use junit::{case_matches, parse_junit, test_name_after, TestCase, TestOutcome};
 pub use preset::{add_preset, PresetPlan};
 pub use text::{denormalize, normalize, uses_crlf, LineIndex};

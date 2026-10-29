@@ -227,6 +227,8 @@ edit) and in exports with the `findings` report, at the same severities.
 | K213 | warning | open work in no milestone |
 | K214 | warning | a requirement implemented or verified while work implementing it is open |
 | K215 | warning | an item past its first status still has its template's text |
+| K216 | warning | with `--results`: a test verifying an item failed |
+| K217 | warning | with `--results`: a test verifying an item didn't run |
 
 ## Configuration rules (K001–K005)
 
@@ -558,7 +560,7 @@ statuses.
 changes. Without a guide, or with the section deleted, there is nothing
 to check.
 
-## Design rules (K201–K215)
+## Design rules (K201–K217)
 
 These look at the design as a whole: what is covered, what is overdue,
 what is inconsistent. They are warnings by default (K207 is off), because
@@ -859,6 +861,33 @@ design/tasks/TASK-004-write-the-csv-writer.md:12:1: K215 warning: TASK-004 is do
 **Fix:** replace each prompt with what the item says, or delete the
 line. A draft (or a task still `todo`) may carry prompts while it is
 written; past that they would reach the exported document.
+
+### K216
+
+**Triggers:** with `--results FILE`, a `verifies` code reference whose
+test failed: a report case matched to it has a `failure` or `error`.
+The reference no longer counts, so K201 may follow on the requirement.
+
+```text
+src/export.rs:40:14: K216 warning: the test verifying REQ-002 here (`is_small`) failed, so it doesn't count
+```
+
+**Fix:** fix the test or the code. If the test is gone or renamed, move
+the comment to the test that verifies the requirement now.
+
+### K217
+
+**Triggers:** with `--results FILE`, a `verifies` code reference whose
+test isn't in the report, or was only skipped.
+
+```text
+src/export.rs:52:14: K217 warning: the test verifying REQ-003 here (`round_trips`) isn't in the test results, or was skipped, so it doesn't count
+```
+
+**Fix:** make sure the test runs in the job that writes the report (and
+that every report is passed: `--results` repeats). If Kiln names the
+wrong test, put the comment on the line just above the test's
+declaration, or above its attribute (`#[test]`, `@Test`).
 
 K211–K214 come from the same idea as `kiln next`: work is *open* while
 neither done nor closed. They catch a status moved ahead of the work it

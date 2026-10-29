@@ -33,12 +33,14 @@ project that explains itself: body templates, `kiln init` adds the
 `design-doc` export, strict `list` filters, `KILN_EDITOR`, grouped
 `--help`, ADR-019) and K17 (one milestone progress everywhere, ADR-020;
 the plan on the GUI's Board and Roadmap; claimed work with `kiln next
---unowned`; K215; tasks and tests in `design-doc`; `kiln_json`) are done.
+--unowned`; K215; tasks and tests in `design-doc`; `kiln_json`) and K18
+(`--results` with JUnit reports, K216 and K217, ADR-021; `kiln affected`,
+ADR-022; in-progress work apart from ready) are done.
 
 ## Read first, in this order
 
 1. `docs/DESIGN.md` — goals, non-goals, architecture, crates, CLI,
-   budgets and milestones K0–K17.
+   budgets and milestones K0–K19.
 2. `docs/FORMAT.md` — the item file format and `kiln.toml`; the contract.
    `kiln-model`/`kiln-parse` implement exactly this; change both together.
 3. `docs/EXPORT.md` — export targets, the three layouts (one document is

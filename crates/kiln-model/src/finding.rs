@@ -121,6 +121,8 @@ rules! {
     K213 Warning "K15" "open work in no milestone",
     K214 Warning "K15" "a requirement implemented or verified while work implementing it is open",
     K215 Warning "K17" "an item past its first status still has its template's text",
+    K216 Warning "K18" "a test verifying an item failed in the test results",
+    K217 Warning "K18" "a test verifying an item didn't run in the test results",
 }
 
 impl Rule {

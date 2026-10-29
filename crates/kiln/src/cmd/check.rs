@@ -20,7 +20,8 @@ pub fn run(project: Option<&Path>, format: CheckFormat) -> Result<u8, Fail> {
     let root = root(project)?;
     let source = DiskSource::new(&root);
     let findings = match Project::load(&source) {
-        Ok(project) => {
+        Ok(mut project) => {
+            crate::project::apply_results(&mut project, &source)?;
             let mut findings = check(&project, &source, today());
             jira_findings(&project, &mut findings);
             findings

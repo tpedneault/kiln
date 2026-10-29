@@ -3,7 +3,8 @@
 //! `git log` pass, for exports' repository links), whether the clone is
 //! shallow, and whether a path is ignored; and (K6) a revision resolved
 //! to its commit, the files at a revision and the tags, for `kiln diff`,
-//! `kiln export --since` and the GUI's baseline.
+//! `kiln export --since` and the GUI's baseline; and (K18) the lines
+//! changed since a revision, for `kiln affected`.
 //!
 //! Shells out to `git`, as `fenix-git` does, rather than linking a git
 //! library: the user's own git already honours their credentials,
@@ -296,6 +297,71 @@ pub fn files_at(
     Ok(out)
 }
 
+/// The lines changed since `commit`, in the working tree (tracked files,
+/// committed or not), by path relative to `dir` with `/`: each a list of
+/// `(first, last)` 1-based line ranges in the file as it is now; a pure
+/// deletion is the line it was deleted before, `(n, n)`. Deleted files
+/// are left out (nothing of theirs is there to touch). For `kiln affected`
+/// (K18); untracked files aren't seen, as `git diff` doesn't.
+pub fn changed_lines(
+    dir: &Path,
+    commit: &str,
+) -> Result<HashMap<String, Vec<(u32, u32)>>, GitError> {
+    let output = git(
+        dir,
+        &[
+            "diff",
+            "--relative",
+            "--unified=0",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-renames",
+            commit,
+            "--",
+            ".",
+        ],
+    )?;
+    if !output.status.success() {
+        return Err(failed(&output));
+    }
+    Ok(parse_changed_lines(&String::from_utf8_lossy(
+        &output.stdout,
+    )))
+}
+
+/// [`changed_lines`] from `git diff --unified=0` output.
+pub fn parse_changed_lines(diff: &str) -> HashMap<String, Vec<(u32, u32)>> {
+    let mut out: HashMap<String, Vec<(u32, u32)>> = HashMap::new();
+    let mut current: Option<String> = None;
+    for line in diff.lines() {
+        if let Some(path) = line.strip_prefix("+++ ") {
+            current = path
+                .strip_prefix("b/")
+                .filter(|_| path != "/dev/null")
+                .map(str::to_owned);
+            continue;
+        }
+        let Some(hunk) = line.strip_prefix("@@ ") else {
+            continue;
+        };
+        let Some(path) = &current else { continue };
+        // `@@ -a,b +c,d @@`: the new side is `+c,d`, `d` defaulting to 1.
+        let Some(new) = hunk.split_whitespace().find(|w| w.starts_with('+')) else {
+            continue;
+        };
+        let mut parts = new[1..].splitn(2, ',');
+        let start: u32 = parts.next().and_then(|n| n.parse().ok()).unwrap_or(0);
+        let count: u32 = parts.next().and_then(|n| n.parse().ok()).unwrap_or(1);
+        let range = if count == 0 {
+            (start.max(1), start.max(1))
+        } else {
+            (start, start + count - 1)
+        };
+        out.entry(path.clone()).or_default().push(range);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -410,5 +476,13 @@ mod tests {
                 ("design/b.md".to_owned(), b"b".to_vec())
             ]
         );
+    }
+
+    #[test]
+    fn unified_zero_diffs_give_the_new_sides_lines() {
+        let diff = "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n@@ -3 +3 @@ fn x\n-a\n+b\n@@ -10,2 +11,4 @@\n+c\n@@ -20,3 +23,0 @@\n-d\ndiff --git a/old.rs b/old.rs\n--- a/old.rs\n+++ /dev/null\n@@ -1,5 +0,0 @@\n";
+        let changed = parse_changed_lines(diff);
+        assert_eq!(changed["src/a.rs"], [(3, 3), (11, 14), (23, 23)]);
+        assert!(!changed.contains_key("old.rs"));
     }
 }

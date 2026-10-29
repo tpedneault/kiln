@@ -169,6 +169,11 @@ closed, that lack coverage:
 `kiln trace` and the traceability report show coverage for every
 requirement, with the gaps.
 
+With **test results** (`--results junit.xml`, the report your test runner
+writes in CI), a code reference that `verifies` counts only when its test
+passed in that run. Without them, it counts as written. See
+[Continuous integration](Continuous-integration#test-results-and-what-a-pull-request-touches).
+
 ## Requirement level
 
 Requirements written at several levels (stakeholder, system, software;

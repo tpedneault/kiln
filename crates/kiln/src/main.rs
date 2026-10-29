@@ -59,6 +59,10 @@ struct Cli {
     #[arg(long, global = true, value_name = "DIR")]
     project: Option<PathBuf>,
 
+    /// A JUnit XML test report (repeatable): a `verifies` code reference then counts only when its test passed.
+    #[arg(long = "results", global = true, value_name = "FILE")]
+    results: Vec<PathBuf>,
+
     /// What to do; none opens the GUI.
     #[command(subcommand)]
     command: Option<Command>,
@@ -86,6 +90,15 @@ pub enum TraceFormat {
     Text,
     Json,
     Csv,
+}
+
+/// `kiln affected`'s outputs.
+#[derive(Clone, Copy, ValueEnum)]
+pub enum AffectedFormat {
+    Text,
+    Json,
+    /// GitHub workflow annotations: a notice on each changed reference.
+    Github,
 }
 
 #[derive(Subcommand)]
@@ -302,6 +315,14 @@ enum Command {
         #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
         format: TextOrJson,
     },
+    /// The items a change reaches: requirements whose code or file changed since REV (default HEAD), and what verifies them.
+    Affected {
+        /// The revision to compare the working tree with (`origin/main` in a pull request).
+        #[arg(default_value = "HEAD")]
+        rev: String,
+        #[arg(long, value_enum, default_value_t = AffectedFormat::Text)]
+        format: AffectedFormat,
+    },
     /// Everything that reaches an item by links or parents, transitively.
     Impact {
         id: String,
@@ -385,7 +406,7 @@ const COMMAND_GROUPS: &[(&str, &[&str])] = &[
         "Changing the design",
         &["unlink", "renumber", "preset", "agents"],
     ),
-    ("Reviewing", &["diff", "confluence"]),
+    ("Reviewing", &["diff", "affected", "confluence"]),
     ("The window and editors", &["gui", "lsp", "provider"]),
     ("Integrations", &["jira", "auth"]),
 ];
@@ -425,6 +446,7 @@ fn main() -> ExitCode {
         Ok(cli) => cli,
         Err(err) => return report(&err),
     };
+    project::set_results(cli.results);
     let project = cli.project.as_deref();
     let command = cli.command.unwrap_or(Command::Gui {
         since: None,
@@ -521,6 +543,7 @@ fn main() -> ExitCode {
             type_name, format, ..
         } => cmd::trace::run(project, type_name, format),
         Command::Impact { id, format } => cmd::impact::run(project, &id, format),
+        Command::Affected { rev, format } => cmd::affected::run(project, &rev, format),
         Command::Diff {
             range,
             type_name,

@@ -133,9 +133,12 @@ pub fn run(
                     r.item.status
                 );
                 for (role, sources) in roles.iter().zip(&r.sources) {
-                    let value = if !sources.is_empty() {
+                    let gap = r.gaps.iter().any(|g| g == role);
+                    let value = if !sources.is_empty() && gap {
+                        format!("{} — gap", sources.join(", "))
+                    } else if !sources.is_empty() {
                         sources.join(", ")
-                    } else if r.gaps.iter().any(|g| g == role) {
+                    } else if gap {
                         "— gap".to_owned()
                     } else {
                         "(through its children)".to_owned()
@@ -172,8 +175,27 @@ fn row<'a>(p: &Project, item: &'a Item, roles: &[&str]) -> Row<'a> {
         .map(|role| {
             inbound
                 .iter()
-                .filter(|l| l.role == *role && p.source_is_open(l.source))
-                .map(|l| p.describe(l.source))
+                .filter(|l| l.role == *role)
+                .filter_map(|l| {
+                    // A test the results say failed or didn't run is shown,
+                    // marked, though it doesn't count (K18).
+                    let verdict = match l.source {
+                        kiln_index::Source::Code(i) => p.verdict(i),
+                        kiln_index::Source::Item(_) => None,
+                    };
+                    match verdict {
+                        Some(kiln_index::Verdict::Failed) => {
+                            Some(format!("{} (failed)", p.describe(l.source)))
+                        }
+                        Some(kiln_index::Verdict::NotRun) => {
+                            Some(format!("{} (didn't run)", p.describe(l.source)))
+                        }
+                        Some(kiln_index::Verdict::Passed) => {
+                            Some(format!("{} (passed)", p.describe(l.source)))
+                        }
+                        None => p.source_is_open(l.source).then(|| p.describe(l.source)),
+                    }
+                })
                 .collect()
         })
         .collect();

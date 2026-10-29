@@ -1445,7 +1445,7 @@ fn an_agent_works_through_the_plan_from_the_command_line() {
         "{status}"
     );
     assert!(
-        status.contains("waiting  TASK-002  todo  Wire the button  (on TASK-001)"),
+        status.contains("waiting      TASK-002  todo  Wire the button  (on TASK-001)"),
         "{status}"
     );
 
@@ -1538,16 +1538,20 @@ fn claimed_work_versioned_json_and_template_text() {
     );
 
     // Claiming: the owner shows, and --unowned leaves claimed work out.
-    ok(d, &["set", "TASK-001", "owner=ana", "status=doing"]);
+    ok(d, &["set", "TASK-001", "owner=ana"]);
     let next = ok(d, &["next"]);
     assert!(
-        next.contains("TASK-001  doing  One  (MS-001)  · ana"),
+        next.contains("TASK-001  todo  One  (MS-001)  · ana"),
         "{next}"
     );
     assert_eq!(
         ok(d, &["next", "--unowned"]),
         "TASK-002  todo  Two  (MS-001)\n"
     );
+    // Started work is in progress, not offered again (K18).
+    ok(d, &["set", "TASK-001", "status=doing"]);
+    assert_eq!(ok(d, &["next"]), "TASK-002  todo  Two  (MS-001)\n");
+    assert!(ok(d, &["status"]).contains("in progress  TASK-001  doing  One  · ana"));
     let status = ok(d, &["status"]);
     assert!(
         status.contains("MS-001 First · planned · 0 of 2 done"),
@@ -1562,7 +1566,7 @@ fn claimed_work_versioned_json_and_template_text() {
     let status: serde_json::Value =
         serde_json::from_str(&ok(d, &["status", "--format", "json"])).unwrap();
     assert_eq!(status["kiln_json"], 1);
-    assert_eq!(status["milestones"][0]["ready"][0]["owner"], "ana");
+    assert_eq!(status["milestones"][0]["in_progress"][0]["owner"], "ana");
 
     // TASK-001 is past its first status with the template's prompts in it.
     let check = ok(d, &["check"]);
@@ -1574,4 +1578,76 @@ fn claimed_work_versioned_json_and_template_text() {
         !check.contains("TASK-002 is"),
         "a todo task may keep them: {check}"
     );
+}
+
+#[test]
+// verifies: REQ-023
+fn test_results_and_what_a_change_touches() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    git(d, &["init", "-q"]);
+    ok(d, &["init", "--name", "Demo", "--preset", "none"]);
+    let toml = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    std::fs::write(
+        d.join("kiln.toml"),
+        format!("{toml}\n[code]\npaths = [\"src\"]\n"),
+    )
+    .unwrap();
+    ok(d, &["new", "requirement", "--title", "Fast"]);
+    ok(d, &["new", "requirement", "--title", "Small"]);
+    let tag = |role: &str, id: &str| format!("// {role}: {id}\n");
+    std::fs::create_dir_all(d.join("src")).unwrap();
+    std::fs::write(
+        d.join("src/lib.rs"),
+        format!(
+            "{}fn fast() {{}}\n{}fn small() {{}}\n{}#[test]\nfn is_fast() {{}}\n{}#[test]\nfn is_small() {{}}\n",
+            tag("implements", "REQ-001"),
+            tag("implements", "REQ-002"),
+            tag("verifies", "REQ-001"),
+            tag("verifies", "REQ-002"),
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        d.join("junit.xml"),
+        r#"<testsuite><testcase name="tests::is_fast"/><testcase name="tests::is_small"><failure/></testcase></testsuite>"#,
+    )
+    .unwrap();
+
+    // Results: only the passing test verifies.
+    let trace = ok(d, &["trace", "--results", "junit.xml"]);
+    assert!(
+        trace.contains("verified by: src/lib.rs:5 (passed)"),
+        "{trace}"
+    );
+    assert!(
+        trace.contains("verified by: src/lib.rs:8 (failed) — gap"),
+        "{trace}"
+    );
+    ok(d, &["set", "REQ-002", "status=approved"]);
+    let check = ok(d, &["check", "--results", "junit.xml"]);
+    assert!(
+        check.contains(
+            "src/lib.rs:8:14: K216 warning: the test verifying REQ-002 here (`is_small`) failed"
+        ),
+        "{check}"
+    );
+    let bad = kiln_in(d, &["check", "--results", "nope.xml"]);
+    assert_eq!(bad.status.code(), Some(2));
+    assert!(stderr(&bad).contains("--results nope.xml: can't read it"));
+
+    // Affected: one changed line under REQ-002's reference.
+    git(d, &["add", "-A"]);
+    git(d, &["commit", "-qm", "base"]);
+    let lib = std::fs::read_to_string(d.join("src/lib.rs")).unwrap();
+    std::fs::write(
+        d.join("src/lib.rs"),
+        lib.replace("fn small() {}", "fn small() { 1; }"),
+    )
+    .unwrap();
+    let affected = ok(d, &["affected"]);
+    assert!(affected.starts_with("REQ-002 Small  (approved)\n  changed   src/lib.rs:4 (under `implements` at line 3)\n  re-check  src/lib.rs:8\n"), "{affected}");
+    assert!(!affected.contains("REQ-001"), "{affected}");
+    let github = ok(d, &["affected", "HEAD", "--format", "github"]);
+    assert!(github.starts_with("::notice file=src/lib.rs,line=4,title=Kiln affected::changes code that `implements` REQ-002 Small"), "{github}");
 }

@@ -353,6 +353,32 @@ Related rules you may raise the same way:
 
 Any rule can also be turned off with `"off"`. [Checking](Checking) lists all of them.
 
+## Test results and what a pull request touches
+
+Two steps make the trace say what passed in this run and show reviewers
+which requirements a change reaches (K18). Run the tests so they write a
+JUnit report (for Rust, `cargo nextest run --profile ci` with JUnit
+output in `.config/nextest.toml`; for Python, `pytest --junitxml=junit.xml`),
+then:
+
+```yaml
+      - name: Check the design against the test results
+        run: kiln check --format github --results target/nextest/ci/junit.xml
+      - name: The requirements this pull request touches
+        if: github.event_name == 'pull_request'
+        run: kiln affected "origin/${{ github.base_ref }}" --format github
+```
+
+- **`--results`** makes a `verifies` comment count only when its test
+  passed. A failed test is K216 on the comment's line, a test missing
+  from the report K217, and the requirement it verified loses that
+  coverage (K201). Make K201 an error (see below) and a requirement whose
+  tests fail fails CI.
+- **`kiln affected`** needs the base branch in the clone: `fetch-depth:
+  0` on checkout. It puts a notice on each changed line that sits under
+  an `implements:` or `verifies:` comment, naming the requirement and
+  the tests to re-check. It never fails the job.
+
 ## Keeping a committed design document current
 
 A committed export is a Markdown (or HTML, or Word) document that lives in the repository, such as `docs/generated/DESIGN.md`, so people can read the design without Kiln. CI keeps it honest. Here the target writes `docs/DESIGN.md`, and an item changed since the last export:

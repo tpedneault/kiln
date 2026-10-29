@@ -144,6 +144,7 @@ pub fn status(project: Option<&Path>, format: TextOrJson) -> Result<u8, Fail> {
                         }),
                         "done": g.progress.done,
                         "total": g.progress.total,
+                        "in_progress": g.in_progress.iter().map(|i| with_owner(i)).collect::<Vec<_>>(),
                         "ready": g.ready.iter().map(|i| with_owner(i)).collect::<Vec<_>>(),
                         "waiting": g.waiting.iter().map(|w| {
                             let mut v = with_owner(w.item);
@@ -170,9 +171,10 @@ pub fn status(project: Option<&Path>, format: TextOrJson) -> Result<u8, Fail> {
             let rows: Vec<&Item> = groups
                 .iter()
                 .flat_map(|g| {
-                    g.ready
+                    g.in_progress
                         .iter()
                         .copied()
+                        .chain(g.ready.iter().copied())
                         .chain(g.waiting.iter().map(|w| w.item))
                 })
                 .collect();
@@ -182,7 +184,10 @@ pub fn status(project: Option<&Path>, format: TextOrJson) -> Result<u8, Fail> {
                 if n > 0 {
                     println!();
                 }
-                let progress = format!("{} of {} done", g.progress.done, g.progress.total);
+                let progress = match g.progress.total {
+                    0 => "no work yet".to_owned(),
+                    total => format!("{} of {total} done", g.progress.done),
+                };
                 match g.milestone {
                     Some(m) => {
                         let due = m.due.map(|d| format!(" · due {d}")).unwrap_or_default();
@@ -190,8 +195,18 @@ pub fn status(project: Option<&Path>, format: TextOrJson) -> Result<u8, Fail> {
                     }
                     None => println!("In no milestone · {progress}"),
                 }
+                for (k, i) in g.in_progress.iter().enumerate() {
+                    let label = if k == 0 { "in progress" } else { "           " };
+                    println!(
+                        "  {label}  {:id_w$}  {:st_w$}  {}{}",
+                        i.id.to_string(),
+                        i.status,
+                        i.title,
+                        claimed(i)
+                    );
+                }
                 for (k, i) in g.ready.iter().enumerate() {
-                    let label = if k == 0 { "ready  " } else { "       " };
+                    let label = if k == 0 { "ready      " } else { "           " };
                     println!(
                         "  {label}  {:id_w$}  {:st_w$}  {}{}",
                         i.id.to_string(),
@@ -201,7 +216,7 @@ pub fn status(project: Option<&Path>, format: TextOrJson) -> Result<u8, Fail> {
                     );
                 }
                 for (k, w) in g.waiting.iter().enumerate() {
-                    let label = if k == 0 { "waiting" } else { "       " };
+                    let label = if k == 0 { "waiting    " } else { "           " };
                     let on: Vec<String> = w.on.iter().map(|i| i.id.to_string()).collect();
                     let why = match (w.blocked, on.is_empty()) {
                         (true, true) => "blocked".to_owned(),

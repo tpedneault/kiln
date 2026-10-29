@@ -17,6 +17,7 @@ All examples on this page come from one small scratch project, made with `kiln i
 | [`kiln status`](#kiln-status) | the plan by milestone: progress, ready and waiting work, findings |
 | [`kiln trace`](#kiln-trace) | coverage of every item of a type, and the gaps; or the requirement levels as chains |
 | [`kiln impact`](#kiln-impact) | everything that depends on an item, transitively |
+| [`kiln affected`](#kiln-affected) | the items a change reaches since a revision, and what to re-check |
 | [`kiln diff`](#kiln-diff) | items added, changed and removed between two revisions |
 | [`kiln check`](#kiln-check) | checks the project against the rules |
 | [`kiln export`](#kiln-export) | writes file exports and publishes Confluence exports |
@@ -38,6 +39,7 @@ All examples on this page come from one small scratch project, made with `kiln i
 | Option | Does |
 |---|---|
 | `--project <DIR>` | starts the search for `kiln.toml` from `DIR` instead of the current folder. Accepted by every command, before or after the command name |
+| `--results <FILE>` | a JUnit XML test report; repeatable. A `verifies` code reference then counts only when its test passed (`kiln trace` marks it, `kiln check` reports K216 and K217). Accepted by every command; see [Continuous integration](Continuous-integration#test-results-and-what-a-pull-request-touches) |
 | `-h`, `--help` | prints usage: the commands in groups, the everyday ones first. `kiln <command> --help` prints the usage of one command |
 | `-V`, `--version` | prints `kiln <version>` |
 
@@ -346,7 +348,7 @@ Notes:
 kiln next [--milestone ID] [--unowned] [--format text|json]
 ```
 
-Lists the work ready to start. *Work* is an item of a type the `part-of` role may link from (`task` by default). It is ready when it is neither done nor closed, its status isn't `blocked`, and nothing it `depends-on` is still open. Earliest milestone first (open milestones in ID order, work in no milestone last), then by ID.
+Lists the work ready to start. *Work* is an item of a type the `part-of` role may link from (`task` by default). It is ready when it is still at its first status (not started), its status isn't `blocked`, and nothing it `depends-on` is still open. Work already started is in progress: `kiln status` lists it, `kiln next` doesn't offer it again. Earliest milestone first (open milestones in ID order, work in no milestone last), then by ID.
 
 | Option | Does |
 |---|---|
@@ -356,10 +358,10 @@ Lists the work ready to start. *Work* is an item of a type the `part-of` role ma
 
 ```console
 $ kiln next
-TASK-001  doing  Sort every unordered list  (MS-001)  · thomas
-TASK-003  todo   Automate the comparison    (MS-001)
+TASK-003  todo  Automate the comparison  (MS-001)  · thomas
+TASK-005  todo  Publish the notes        (MS-001)
 $ kiln next --unowned
-TASK-003  todo  Automate the comparison  (MS-001)
+TASK-005  todo  Publish the notes  (MS-001)
 ```
 
 Claim work when you take it, so nobody else does: `kiln set TASK-003 owner=ana status=doing`. Who has claimed what shows after a `·` here, in `kiln status` and on the GUI's Board.
@@ -376,14 +378,14 @@ Notes:
 kiln status [--format text|json]
 ```
 
-The plan by milestone: each milestone that is open or still has open work, its status, its own progress (done out of its non-closed work, without the milestones it depends on) and due date, the work ready to start and the work waiting with what it waits on; then work in no milestone; then the summary of `kiln check`.
+The plan by milestone: each milestone that is open or still has open work, its status, its own progress, the work in progress (done out of its non-closed work, without the milestones it depends on) and due date, the work ready to start and the work waiting with what it waits on; then work in no milestone; then the summary of `kiln check`.
 
 ```console
 $ kiln status
 MS-001 First release · planned · 1 of 4 done · due 2026-12-15
-  ready    TASK-001  doing  Sort every unordered list
-           TASK-003  todo   Automate the comparison
-  waiting  TASK-004  todo   Publish the notes  (on TASK-003)
+  in progress  TASK-001  doing  Sort every unordered list
+  ready        TASK-003  todo   Automate the comparison
+  waiting      TASK-004  todo   Publish the notes  (on TASK-003)
 
 kiln check: 1 warning
 ```
@@ -486,6 +488,32 @@ src/export.rs:5  verifies REQ-001
 TASK-001         implements REQ-002, child of REQ-001 — TASK-001 Sort every unordered list
 TEST-001         verifies REQ-002, child of REQ-001 — TEST-001 Export twice and compare
 ```
+
+### kiln affected
+
+```text
+kiln affected [REV] [--format text|json|github]
+```
+
+Lists the items a change reaches: from the lines `git diff` says changed between `REV` (default `HEAD`: what isn't committed yet) and the working tree, to each requirement (or other item) whose code or file changed, and what verifies it, to re-check.
+
+| Option | Does |
+|---|---|
+| `REV` | the revision to compare with: `origin/main` in a pull request, a tag for a release. Default: `HEAD` |
+| `--format text\|json\|github` | output format. `github` prints a notice on each changed reference. Default: `text` |
+
+```console
+$ kiln affected origin/main
+REQ-001 Exports are deterministic  (approved)
+  changed   src/export.rs:3 (under `implements` at line 1)
+  re-check  src/export.rs:5
+kiln: since origin/main (1a2b3c4), 1 item reached
+```
+
+Notes:
+
+- A code reference covers its own line down to the line before the next code reference in the same file, or the end of the file. It reports too much rather than too little; keep references just above the code they are about.
+- A changed item file reaches that item. Untracked files aren't seen (`git diff` doesn't see them); `git add -N` makes them visible.
 
 ### kiln diff
 
@@ -1051,7 +1079,11 @@ An array of the ready items, each `{id, title, status, owner, type, path, line, 
 
 ### kiln status
 
-`{project, milestones, findings}`: `milestones` is an array of `{milestone, done, total, ready, waiting}` (`milestone` is `{id, title, status, due}` or `null` for work in no milestone; `ready` is an array of items with their `owner`; each `waiting` item also has `owner`, `waits_on`, an array of items, and `blocked`, a boolean); `findings` is `{errors, warnings}`. Like every object, it carries `kiln_json`.
+`{project, milestones, findings}`: `milestones` is an array of `{milestone, done, total, in_progress, ready, waiting}` (`milestone` is `{id, title, status, due}` or `null` for work in no milestone; `ready` is an array of items with their `owner`; each `waiting` item also has `owner`, `waits_on`, an array of items, and `blocked`, a boolean); `findings` is `{errors, warnings}`. Like every object, it carries `kiln_json`.
+
+### kiln affected
+
+`{since, commit, items}`, `items` an array of `{id, title, status, type, changed, recheck}`: each change `{path, line, role, from, to}` (the reference at `line`, the changed lines `from` to `to`) or `{path, file: true}`; each re-check an item or `{path, line}`. It carries `kiln_json`.
 
 ### kiln trace
 
