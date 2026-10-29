@@ -3,21 +3,36 @@ name: Release
 # A tag vX.Y.Z publishes a GitHub release with Windows and Linux archives
 # (docs/CI.md, "Releasing"). The release stays a draft until every
 # archive is uploaded, so a failed build never leaves a half release.
+#
+# It starts two ways: pushing the tag, or "Run workflow" on master with
+# the version, which creates the tag itself on master's head. A tag
+# pushed with this workflow's own token starts no other workflow, so the
+# second way can't hand over to the first: it creates the tag and goes
+# on in the same run.
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The version to release, X.Y.Z: master is tagged vX.Y.Z'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
   cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: never
   RUST_BACKTRACE: '1'
+  # The tag being released: the one pushed, or v + the version asked for.
+  # Steps read it from the environment, never pasted into a script.
+  TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
 
 jobs:
   prepare:
@@ -33,17 +48,32 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - name: Run by hand only from master
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/master'
+        run: |
+          Write-Error "release: run the Release workflow on master, not $env:GITHUB_REF"
+          exit 1
       - name: Tag, Cargo.toml and CHANGELOG.md agree
-        run: ./scripts/release.ps1 -Step check -Tag $env:GITHUB_REF_NAME
+        run: ./scripts/release.ps1 -Step check -Tag $env:TAG
+      - name: Create the tag on master's head
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # A lightweight tag through the API, so no credentials stay in the
+          # checkout. It fails when the tag exists: a version is released once.
+          gh api "repos/$env:GH_REPO/git/refs" -f "ref=refs/tags/$env:TAG" -f "sha=$env:GITHUB_SHA" --silent
+          if ($LASTEXITCODE -ne 0) { Write-Error "release: couldn't create $env:TAG (does it exist already?)"; exit 1 }
       - name: Draft the release with the changelog section
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          ./scripts/release.ps1 -Step notes -Tag $env:GITHUB_REF_NAME
+          ./scripts/release.ps1 -Step notes -Tag $env:TAG
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $prerelease = if ($env:GITHUB_REF_NAME -like '*-*') { @('--prerelease') } else { @() }
-          gh release create $env:GITHUB_REF_NAME --draft --verify-tag --title "Kiln $($env:GITHUB_REF_NAME.TrimStart('v'))" --notes-file target/dist/notes.md @prerelease
+          $prerelease = if ($env:TAG -like '*-*') { @('--prerelease') } else { @() }
+          gh release create $env:TAG --draft --verify-tag --title "Kiln $($env:TAG.TrimStart('v'))" --notes-file target/dist/notes.md @prerelease
 
   build:
     name: ${{ matrix.name }}
@@ -69,6 +99,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          # The tagged commit, whichever way the run started.
+          ref: refs/tags/${{ env.TAG }}
       - name: Install Rust stable with Clippy and rustfmt
         run: |
           rustup toolchain install stable --profile minimal --component clippy,rustfmt --no-self-update
@@ -88,14 +120,14 @@ jobs:
           TMP: ${{ runner.temp }}
         run: ./scripts/ci.ps1
       - name: Build and archive kiln and kilnw
-        run: ./scripts/release.ps1 -Step package -Tag $env:GITHUB_REF_NAME
+        run: ./scripts/release.ps1 -Step package -Tag $env:TAG
       - name: Upload to the draft release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           $files = Get-ChildItem target/dist -File | Where-Object { $_.Name -match '\.(zip|tar\.gz)(\.sha256)?$' } | ForEach-Object FullName
-          gh release upload $env:GITHUB_REF_NAME @files --clobber
+          gh release upload $env:TAG @files --clobber
 
   publish:
     name: Publish the release
@@ -109,4 +141,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release edit "$GITHUB_REF_NAME" --draft=false
+        run: gh release edit "$TAG" --draft=false
