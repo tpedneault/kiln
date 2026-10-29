@@ -290,6 +290,9 @@ against a faithful fake of Cloud and Data Center) and the Jira mirror
   that made it, in `kiln check`'s formats, so CI shows reviewers an
   agent's approvals. `[signoff]` in `kiln.toml` says which statuses are
   sign-off ([docs/CLI.md](docs/CLI.md), "`kiln signoff`").
+- Release: the Release workflow can also be started by hand on `master`
+  with a version; it creates the tag itself and publishes from it
+  ([docs/CI.md](docs/CI.md), "Releasing").
 
 ### Changed
 
