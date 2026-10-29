@@ -1,11 +1,10 @@
 ==> out/tree/decisions/ADR-002.md <==
 # ADR-002 TOML front matter
 
-| Property | Value |
-| --- | --- |
 | Status | **accepted** |
+| --- | --- |
 | Type | Decision |
-| Supersedes | [ADR-001 YAML front matter](../../doc.md#3-decisions) |
+| Supersedes | [ADR-001](../../doc.md#3-decisions) |
 | Source | [design/ADR-002-toml.md](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/ADR-002-toml.md) |
 
 Comments survive edits.
@@ -37,9 +36,8 @@ Requirements: implemented by 1 of 3, verified by 1 of 3.
 ==> out/tree/requirements/REQ-001.md <==
 # REQ-001 Flint is a launcher
 
-| Property | Value |
-| --- | --- |
 | Status | **approved** |
+| --- | --- |
 | Type | Requirement |
 | Jira | [FLINT-12](https://jira.example.com/browse/FLINT-12) |
 | Source | [design/REQ-001-launcher.md](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/REQ-001-launcher.md) |
@@ -55,13 +53,12 @@ Windows and Linux.
 ==> out/tree/requirements/REQ-002.md <==
 # REQ-002 Fast enough to be a reflex
 
-| Property | Value |
-| --- | --- |
 | Status | **approved** |
+| --- | --- |
 | Type | Requirement |
-| Parent | [REQ-001 Flint is a launcher](REQ-001.md) |
+| Parent | [REQ-001](REQ-001.md) |
 | Implemented by | [src/launcher.rs:2](https://git.example.com/flint/-/blob/c0de/src/launcher.rs#L2) |
-| Verified by | [TEST-001 Hotkey benchmark](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/TEST-001-bench.md) |
+| Verified by | [TEST-001](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/TEST-001-bench.md) |
 | Tags | performance |
 | Source | [design/REQ-002-fast.md](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/REQ-002-fast.md) |
 
@@ -77,11 +74,10 @@ flowchart TD
 ==> out/tree/requirements/REQ-003.md <==
 # REQ-003 Themes follow Fenix
 
-| Property | Value |
-| --- | --- |
 | Status | **draft** |
+| --- | --- |
 | Type | Requirement |
-| Parent | [REQ-001 Flint is a launcher](REQ-001.md) |
+| Parent | [REQ-001](REQ-001.md) |
 | Source | [design/REQ-003-themes.md](https://git.example.com/flint/-/blob/9f8e7d6c5b4a/design/REQ-003-themes.md) |
 
 | Theme | Source |

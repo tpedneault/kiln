@@ -227,6 +227,13 @@ pub fn add_preset(text: &str, preset: &Preset) -> Result<PresetPlan, EditError> 
         )));
     }
 
+    // With several requirement levels, a preset's `requirement` stands
+    // for them: no single `requirement` type is added beside them, and
+    // the project's own roles already say which levels they reach.
+    let levels: Vec<String> = match config.trace() {
+        Some(_) => config.levels().iter().map(|l| (*l).to_owned()).collect(),
+        None => Vec::new(),
+    };
     let chunks: Vec<Chunk> = chunks(&fill(preset.types, dir, &config.name));
     let mut added_types = Vec::new();
     let mut kept_types = Vec::new();
@@ -234,6 +241,10 @@ pub fn add_preset(text: &str, preset: &Preset) -> Result<PresetPlan, EditError> 
     for c in chunks.iter().filter(|c| c.table == "types") {
         if declared("types", &c.name) {
             kept_types.push(c.name.clone());
+            continue;
+        }
+        if c.name == "requirement" && !levels.is_empty() {
+            kept_types.push(format!("requirement (as the levels {})", levels.join(", ")));
             continue;
         }
         let parsed: DocumentMut = c.text.parse().map_err(|e| {
@@ -291,7 +302,13 @@ pub fn add_preset(text: &str, preset: &Preset) -> Result<PresetPlan, EditError> 
             if !link_block.is_empty() {
                 link_block.push('\n');
             }
-            link_block.push_str(&c.text);
+            let text = if levels.is_empty() {
+                c.text.clone()
+            } else {
+                let all: Vec<String> = levels.iter().map(|l| format!("\"{l}\"")).collect();
+                c.text.replace("\"requirement\"", &all.join(", "))
+            };
+            link_block.push_str(&text);
             added_links.push(c.name.clone());
             continue;
         };
@@ -301,6 +318,7 @@ pub fn add_preset(text: &str, preset: &Preset) -> Result<PresetPlan, EditError> 
             let missing: Vec<String> = strings(wanted.get(side))
                 .into_iter()
                 .filter(|t| !have.contains(t))
+                .filter(|t| levels.is_empty() || t != "requirement")
                 .collect();
             if missing.is_empty() {
                 continue;

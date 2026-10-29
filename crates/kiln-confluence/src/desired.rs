@@ -164,7 +164,6 @@ pub fn desired_pages(p: &Prepared, ctx: &DesiredContext) -> Vec<DesiredPage> {
     labels.sort();
     labels.dedup();
     let commit = ctx.revision.commit.clone().unwrap_or_default();
-    let toc_levels = p.target.confluence.toc_levels.unwrap_or(3);
 
     p.split
         .pages
@@ -201,7 +200,13 @@ pub fn desired_pages(p: &Prepared, ctx: &DesiredContext) -> Vec<DesiredPage> {
                 jira_url: ctx.project.config.jira_url.as_deref(),
                 banner,
                 image_hash: ctx.image_hash,
-                toc_levels,
+                // Deep enough to list every item on the page, unless
+                // the target says (`toc_levels`).
+                toc_levels: p
+                    .target
+                    .confluence
+                    .toc_levels
+                    .unwrap_or_else(|| kiln_export::toc_levels(&page.nodes)),
                 child_list: (p.target.confluence.children == ChildList::List).then(|| {
                     p.split
                         .children(&page.key)

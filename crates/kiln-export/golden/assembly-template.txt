@@ -7,18 +7,18 @@
 § [2] depth 1 heading: Requirements
   § [2.1] depth 2 heading: Performance
     § [2.1.1] depth 3 item REQ-002 own-page: REQ-002 Fast enough to be a reflex
-      - Props(Props { style: List, status: Status { text: "approved", tone: Blue }, entries: [PropEntry { la
+      - Props(Props { style: Table, status: Status { text: "approved", tone: Blue }, entries: [PropEntry { l
       - Callout { kind: Note, content: [Paragraph([Text("Measured on the reference laptop.")])] }
       - Diagram { source: "flowchart TD\n  hotkey --> frame\n", line: 14 }
       - Paragraph([Image { target: Repo { path: "design/img/flow.png", line: None, fragment: None }, alt: "f
   § [2.2] depth 2 heading: Everything else
     § [2.2.1] depth 3 item REQ-001 own-page: REQ-001 Flint is a launcher
-      - Props(Props { style: List, status: Status { text: "approved", tone: Blue }, entries: [PropEntry { la
+      - Props(Props { style: Table, status: Status { text: "approved", tone: Blue }, entries: [PropEntry { l
       - Paragraph([Text("Flint finds and opens things; see "), Ref { id: ItemId { prefix: "ADR", number: 2 }
       - Heading { level: 5, content: [Text("Scope")] }
       - Paragraph([Text("Windows and Linux.")])
     § [2.2.2] depth 3 item REQ-003 own-page: REQ-003 Themes follow Fenix
-      - Props(Props { style: List, status: Status { text: "draft", tone: Grey }, entries: [PropEntry { label
+      - Props(Props { style: Table, status: Status { text: "draft", tone: Grey }, entries: [PropEntry { labe
       - Table(Table { align: [None, None], header: [[Text("Theme")], [Text("Source")]], rows: [[[Text("dark"
 § [3] depth 1 heading: Decisions
   - Table(Table { align: [None, None, None, None], header: [[Text("ID")], [Text("Title")], [Text("Status

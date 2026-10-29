@@ -299,13 +299,14 @@ impl Writer<'_> {
         };
         // Every section gets its id in order, listed or not, so repeated
         // headings are numbered as the page numbers them.
-        fn walk(w: &mut Writer, nodes: &[Node], depth: usize) -> String {
+        let levels = usize::from(crate::document::toc_levels(&page.nodes));
+        fn walk(w: &mut Writer, nodes: &[Node], depth: usize, levels: usize) -> String {
             let mut out = String::new();
             for n in nodes {
                 if let Node::Section(s) = n {
                     let id = w.section_id(s);
-                    let inner = walk(w, &s.nodes, depth + 1);
-                    if depth > 2 {
+                    let inner = walk(w, &s.nodes, depth + 1, levels);
+                    if depth >= levels {
                         continue;
                     }
                     let inner = if inner.is_empty() {
@@ -322,7 +323,7 @@ impl Writer<'_> {
             }
             out
         }
-        let items = walk(&mut scratch, &page.nodes, 0);
+        let items = walk(&mut scratch, &page.nodes, 0, levels);
         if items.is_empty() {
             String::new()
         } else {

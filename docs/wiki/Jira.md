@@ -82,10 +82,11 @@ export:
 ```markdown
 ### 5.1 TASK-001 Implement plugin loader
 
-**doing**\
-**Part-of:** [MS-001 Beta](#41-ms-001-beta)\
-**Implements:** [REQ-002 Cold start under one second](#12-req-002-cold-start-under-one-second)\
-**Jira:** [DEMO-12](https://jira.example.com/browse/DEMO-12)
+| Status | **doing** |
+| --- | --- |
+| Part-of | [MS-001](#41-ms-001-beta) |
+| Implements | [REQ-002](#12-req-002-cold-start-under-one-second) |
+| Jira | [DEMO-12](https://jira.example.com/browse/DEMO-12) |
 ```
 
 Without `[jira] url`, the key is plain text.

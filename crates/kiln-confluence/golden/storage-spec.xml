@@ -35,16 +35,31 @@ attachments ["diagram-84bd4a91e9b5.png (Diagram(\"flowchart TD\\n  a --> b\\n\")
 <ac:structured-macro ac:name="anchor">
 <ac:parameter ac:name="">REQ-001</ac:parameter>
 </ac:structured-macro>1.1 REQ-001 Flint is a launcher</h2>
-<p>
+<table data-layout="default">
+<colgroup>
+<col style="width: 160.0px;" />
+<col />
+</colgroup>
+<tbody>
+<tr>
+<th>Status</th>
+<td>
 <ac:structured-macro ac:name="status">
 <ac:parameter ac:name="colour">Blue</ac:parameter>
 <ac:parameter ac:name="title">approved</ac:parameter>
 </ac:structured-macro>
-<br />
-<strong>Jira:</strong> <ac:structured-macro ac:name="jira">
+</td>
+</tr>
+<tr>
+<th>Jira</th>
+<td>
+<ac:structured-macro ac:name="jira">
 <ac:parameter ac:name="key">FLINT-12</ac:parameter>
 </ac:structured-macro>
-</p>
+</td>
+</tr>
+</tbody>
+</table>
 <p>Finds things &amp; opens them; see <ac:link ac:anchor="ADR-001">
 <ac:plain-text-link-body>
 <![CDATA[ADR-001 TOML front matter]]>
@@ -59,20 +74,39 @@ attachments ["diagram-84bd4a91e9b5.png (Diagram(\"flowchart TD\\n  a --> b\\n\")
 <ac:structured-macro ac:name="anchor">
 <ac:parameter ac:name="">REQ-002</ac:parameter>
 </ac:structured-macro>1.2 REQ-002 Fast &lt;enough&gt;</h2>
-<p>
+<table data-layout="default">
+<colgroup>
+<col style="width: 160.0px;" />
+<col />
+</colgroup>
+<tbody>
+<tr>
+<th>Status</th>
+<td>
 <ac:structured-macro ac:name="status">
 <ac:parameter ac:name="colour">Green</ac:parameter>
 <ac:parameter ac:name="title">verified</ac:parameter>
 </ac:structured-macro>
-<br />
-<strong>Parent:</strong> <ac:link ac:anchor="REQ-001">
+</td>
+</tr>
+<tr>
+<th>Parent</th>
+<td>
+<ac:link ac:anchor="REQ-001">
 <ac:plain-text-link-body>
-<![CDATA[REQ-001 Flint is a launcher]]>
+<![CDATA[REQ-001]]>
 </ac:plain-text-link-body>
 </ac:link>
-<br />
-<strong>Verified by:</strong> <a href="https://git.example.com/flint/-/blob/9f8e7d6c5b4a/src/a.rs#L1">src/a.rs:1</a>
-</p>
+</td>
+</tr>
+<tr>
+<th>Verified by</th>
+<td>
+<a href="https://git.example.com/flint/-/blob/9f8e7d6c5b4a/src/a.rs#L1">src/a.rs:1</a>
+</td>
+</tr>
+</tbody>
+</table>
 <ac:structured-macro ac:name="note">
 <ac:rich-text-body>
 <p>Careful.</p>
@@ -112,12 +146,23 @@ attachments ["diagram-84bd4a91e9b5.png (Diagram(\"flowchart TD\\n  a --> b\\n\")
 <ac:structured-macro ac:name="anchor">
 <ac:parameter ac:name="">ADR-001</ac:parameter>
 </ac:structured-macro>2.1 ADR-001 TOML front matter</h2>
-<p>
+<table data-layout="default">
+<colgroup>
+<col style="width: 160.0px;" />
+<col />
+</colgroup>
+<tbody>
+<tr>
+<th>Status</th>
+<td>
 <ac:structured-macro ac:name="status">
 <ac:parameter ac:name="colour">Blue</ac:parameter>
 <ac:parameter ac:name="title">accepted</ac:parameter>
 </ac:structured-macro>
-</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h1>A Traceability</h1>
 <p>2 requirements: implemented by 0 of 2, verified by 2 of 2.</p>
 <table>

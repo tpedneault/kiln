@@ -290,6 +290,20 @@ against a faithful fake of Cloud and Data Center) and the Jira mirror
   that made it, in `kiln check`'s formats, so CI shows reviewers an
   agent's approvals. `[signoff]` in `kiln.toml` says which statuses are
   sign-off ([docs/CLI.md](docs/CLI.md), "`kiln signoff`").
+- K20: one-page documents read top-down (REQ-025, ADR-024). A document
+  without a template starts with the requirements; with several
+  requirement levels they are one "Requirements" section holding the
+  requirements tree, also placed by the new `<!-- kiln:requirements -->`:
+  each requirement with those of the level below that refine it as its
+  sub-sections, a requirement under several shown once and named under
+  the others, derived and untraced requirements under headings of their
+  own, and in `tree` on Confluence each requirement's page under the one
+  it refines. The `design-doc` preset's template is rewritten in that
+  order (introduction, requirements, design, decisions, verification,
+  plan, risks, traceability, findings), and with levels its
+  `requirement` stands for them. Tables of contents go as deep as the
+  deepest item (3 to 6; `toc_levels` still sets Confluence's)
+  ([docs/EXPORT.md](docs/EXPORT.md), "The requirements tree").
 
 ### Changed
 
@@ -317,6 +331,14 @@ against a faithful fake of Cloud and Data Center) and the Jira mirror
   ([docs/wiki/Command-reference.md](docs/wiki/Command-reference.md), "JSON output").
 - The agent guide's generated section gains "Planning" (K15): projects
   with a guide see K113 until they run `kiln agents` once.
+- Exports: an item's properties are a two-column table by default in
+  every layout (`item_style = "table"`), related items by ID, the status
+  row first (Markdown's header row) and, outside `tree`, no type or
+  source rows; `list` keeps the previous look. The summary lists the
+  requirement levels first. `traceability` without `type` is the chain
+  matrix when there are several levels.
+- Check: K203 no longer warns about a `supersedes` link to a superseded
+  decision, the link K204 asks for.
 - Check: K201 and K202 fire only when `verifies` or `implements` can
   point at the requirement's type; a project whose roles never allowed
   it got a warning it couldn't fix.

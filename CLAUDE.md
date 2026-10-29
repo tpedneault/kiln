@@ -36,12 +36,15 @@ the plan on the GUI's Board and Roadmap; claimed work with `kiln next
 --unowned`; K215; tasks and tests in `design-doc`; `kiln_json`) and K18
 (`--results` with JUnit reports, K216 and K217, ADR-021; `kiln affected`,
 ADR-022; in-progress work apart from ready) and K19 (`kiln log` and
-`kiln signoff` from git, `[signoff]`, K218, ADR-023) are done.
+`kiln signoff` from git, `[signoff]`, K218, ADR-023) and K20 (one-page
+documents read top-down: `kiln:requirements` puts requirement levels in
+one tree, item properties are a table by default, the `design-doc`
+preset rewritten, ADR-024) are done.
 
 ## Read first, in this order
 
 1. `docs/DESIGN.md` — goals, non-goals, architecture, crates, CLI,
-   budgets and milestones K0–K19.
+   budgets and milestones K0–K20.
 2. `docs/FORMAT.md` — the item file format and `kiln.toml`; the contract.
    `kiln-model`/`kiln-parse` implement exactly this; change both together.
 3. `docs/EXPORT.md` — export targets, the three layouts (one document is

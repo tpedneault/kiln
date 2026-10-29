@@ -163,7 +163,7 @@ fn template_problems_name_their_line() {
             "3: `gone` isn't a status of any type",
             "3: root `REQ-009` isn't an item",
             "6: kiln:item `REQ-099` isn't an item",
-            "9: unknown directive kiln:frobnicate (items, item, report, summary, toc, value)",
+            "9: unknown directive kiln:frobnicate (items, item, requirements, report, summary, toc, value)",
             "11: kiln:value `colour` isn't name, commit, date or since",
         ]
     );

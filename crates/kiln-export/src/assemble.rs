@@ -1,13 +1,14 @@
 //! Assembly (EXPORT.md, "Templates", "Items in a document"): selecting
-//! items, placing them where the template's directives say (or one
-//! section per type without a template), each item once, as a flat list
-//! in tree order or nested by `parent` (`nest=`; nested in `tree`), with
-//! its properties and body; reports, the summary and the table of
-//! contents; then numbering.
+//! items, placing them where the template's directives say (or, without
+//! a template, the requirements first and then one section per type),
+//! each item once, as a flat list in tree order or nested by `parent`
+//! (`nest=`; nested in `tree`), with its properties and body; the
+//! requirement levels as one tree (`kiln:requirements`); reports, the
+//! summary and the table of contents; then numbering.
 
 use std::collections::{HashMap, HashSet};
 
-use kiln_index::{Project, Source};
+use kiln_index::{LevelNode, Project, Source};
 use kiln_model::{ExportTarget, Finding, Item, ItemId, ItemStyle};
 use kiln_render::{
     render_markdown, report, status_tone, Block, BodyContext, Directive, Inline, PropEntry, Props,
@@ -52,6 +53,9 @@ struct State<'a> {
     a: &'a Assembly<'a>,
     target: &'a ExportTarget,
     placed: HashSet<ItemId>,
+    /// In the requirements tree: the requirement each one was placed
+    /// under, to name it where the tree meets the requirement again.
+    tree_parent: HashMap<ItemId, ItemId>,
     prefixes: Vec<String>,
 }
 
@@ -62,6 +66,7 @@ pub fn assemble(target: &ExportTarget, template: Option<&str>, a: &Assembly) -> 
         a,
         target,
         placed: HashSet::new(),
+        tree_parent: HashMap::new(),
         prefixes: a.project.config.prefixes(),
     };
     let mut nodes = match template {
@@ -111,12 +116,42 @@ impl<'a> State<'a> {
     }
 
     /// Without a template: summary, table of contents, a section per type,
-    /// reports as appendices.
+    /// reports as appendices. With several requirement levels, the level
+    /// types make one "Requirements" section holding their tree, where
+    /// the first of them is in `types` (first, unless `types` says
+    /// otherwise).
     fn default_layout(&mut self) -> Vec<Node> {
         let mut nodes: Vec<Node> = self.summary().into_iter().map(Node::Block).collect();
         nodes.push(Node::Block(Block::Toc));
         let types = self.target.types.clone();
+        let levels: Vec<String> = self
+            .project()
+            .config
+            .levels()
+            .iter()
+            .map(|l| (*l).to_owned())
+            .collect();
+        let tree = self.project().config.trace().is_some();
+        let mut requirements_done = false;
         for type_name in &types {
+            if tree && levels.contains(type_name) {
+                if !requirements_done {
+                    requirements_done = true;
+                    let children = self.requirements(2, true);
+                    if children.iter().any(|n| matches!(n, Node::Section(_))) {
+                        nodes.push(Node::Section(Section {
+                            number: String::new(),
+                            title: vec![Inline::text("Requirements")],
+                            depth: 1,
+                            kind: SectionKind::Heading,
+                            own_page: false,
+                            marker: None,
+                            nodes: children,
+                        }));
+                    }
+                }
+                continue;
+            }
             let Some(ty) = self.project().config.type_named(type_name) else {
                 continue;
             };
@@ -238,6 +273,7 @@ impl<'a> State<'a> {
         match d.name.as_str() {
             "summary" => self.summary().into_iter().map(Node::Block).collect(),
             "toc" => vec![Node::Block(Block::Toc)],
+            "requirements" => self.requirements(depth, true),
             "report" => {
                 let name = d.positional.first().map(String::as_str).unwrap_or("");
                 let options = ReportOptions {
@@ -346,6 +382,155 @@ impl<'a> State<'a> {
             })
             .map(|(n, _)| n)
             .collect()
+    }
+
+    /// The requirements as one tree (EXPORT.md, "The requirements tree"):
+    /// each top-level requirement at `depth`, the requirements of the
+    /// level below that refine it one level deeper, and so on down;
+    /// then the derived requirements and those tracing to nothing, each
+    /// group under a heading of its own. Within a level, a child follows
+    /// its parent at the same depth, as everywhere else (ADR-013), so the
+    /// depth of the tree is the number of levels. A requirement under
+    /// several is placed under the first and named under the others.
+    /// With one level, its items in tree order, as `kiln:items` places
+    /// them.
+    // implements: REQ-025
+    fn requirements(&mut self, depth: u8, own_page: bool) -> Vec<Node> {
+        let p = self.project();
+        let config = &p.config;
+        let levels = config.levels();
+        let Some(trace_role) = config.trace() else {
+            let selected: Vec<usize> = p
+                .items
+                .iter()
+                .enumerate()
+                .filter(|(_, i)| levels.contains(&i.type_name.as_str()))
+                .filter(|(_, i)| !self.excluded(i) && !self.placed.contains(&i.id))
+                .map(|(n, _)| n)
+                .collect();
+            let nest = self.target.nests_by_default();
+            return self.place(&selected, depth, own_page, nest);
+        };
+        let lower = |name: &str| {
+            config
+                .type_named(name)
+                .map_or(name.to_owned(), |t| t.plural.to_lowercase())
+        };
+        let trace = p.level_trace();
+        let mut intro = format!(
+            "Each {} is followed by the {} that refine it",
+            config
+                .type_named(levels[0])
+                .map_or(levels[0].to_owned(), |t| t.title.to_lowercase()),
+            lower(levels[1])
+        );
+        for level in &levels[2..] {
+            intro.push_str(&format!(
+                ", and those by the {} that refine them",
+                lower(level)
+            ));
+        }
+        intro.push_str(". A requirement that refines several is shown under the first and named under the others.");
+        if !trace.derived.is_empty() {
+            intro.push_str(" Derived requirements, which refine none on purpose, follow the tree.");
+        }
+        let inverse = capitalised(&trace_role.inverse);
+        let mut out = vec![Node::Block(Block::Paragraph(vec![Inline::text(intro)]))];
+        for node in &trace.roots {
+            out.extend(self.level_node(node, None, depth, own_page, &inverse));
+        }
+        for (title, nodes) in [
+            ("Derived requirements", &trace.derived),
+            ("Requirements not traced to a higher level", &trace.untraced),
+        ] {
+            let mut children = Vec::new();
+            for node in nodes {
+                children.extend(self.level_node(
+                    node,
+                    None,
+                    depth.saturating_add(1),
+                    own_page,
+                    &inverse,
+                ));
+            }
+            if children.iter().any(|n| matches!(n, Node::Section(_))) {
+                out.push(Node::Section(Section {
+                    number: String::new(),
+                    title: vec![Inline::text(title)],
+                    depth,
+                    kind: SectionKind::Heading,
+                    own_page: false,
+                    marker: None,
+                    nodes: children,
+                }));
+            }
+        }
+        out
+    }
+
+    /// One requirement's section with what refines it inside, or, when
+    /// it was placed already, a line naming it and where it is. An item
+    /// the target leaves out (`exclude_status`) gives way to what is
+    /// below it, at its depth.
+    fn level_node(
+        &mut self,
+        node: &LevelNode,
+        above: Option<&ItemId>,
+        depth: u8,
+        own_page: bool,
+        inverse: &str,
+    ) -> Vec<Node> {
+        let p = self.project();
+        let item = node.item;
+        let below = siblings_in_tree_order(&node.below);
+        // Left out by the target, or (at the top) placed already by an
+        // earlier directive: what is below takes its place.
+        if self.excluded(item) || (above.is_none() && self.placed.contains(&item.id)) {
+            return below
+                .into_iter()
+                .flat_map(|b| self.level_node(b, above, depth, own_page, inverse))
+                .collect();
+        }
+        if self.placed.contains(&item.id) {
+            let mut line = vec![
+                Inline::text(format!("Also {}: ", inverse.to_lowercase())),
+                Inline::Ref {
+                    id: item.id.clone(),
+                    text: None,
+                },
+            ];
+            match self.tree_parent.get(&item.id) {
+                Some(first) => {
+                    line.push(Inline::text(", shown under "));
+                    line.push(Inline::Ref {
+                        id: first.clone(),
+                        text: Some(first.to_string()),
+                    });
+                    line.push(Inline::text("."));
+                }
+                None => line.push(Inline::text(".")),
+            }
+            let line = vec![Inline::Emph(line)];
+            return vec![Node::Block(Block::Paragraph(line))];
+        }
+        let Some(&i) = p.indices(&item.id).first() else {
+            return Vec::new();
+        };
+        if let Some(above) = above {
+            self.tree_parent.insert(item.id.clone(), above.clone());
+        }
+        let mut section =
+            self.item_section(i, depth, own_page, &HashMap::new(), &mut HashSet::new());
+        for b in below {
+            section.nodes.extend(self.level_node(
+                b,
+                Some(&item.id),
+                depth.saturating_add(1),
+                own_page,
+                inverse,
+            ));
+        }
+        vec![Node::Section(section)]
     }
 
     /// Item sections for `selected` at `depth`: nested by `parent` within
@@ -463,13 +648,20 @@ impl<'a> State<'a> {
     fn props(&self, item: &Item, style: ItemStyle) -> Props {
         let p = self.project();
         let mut entries = Vec::new();
+        // In the table, related items by ID alone: rows stay one line
+        // and line up, and the ID links to the item's own heading, where
+        // its title is. Lines spell out titles, having no columns.
+        let ids_only = style == ItemStyle::Table;
         let r = |id: &ItemId| {
             vec![Inline::Ref {
                 id: id.clone(),
-                text: None,
+                text: ids_only.then(|| id.to_string()),
             }]
         };
-        if style == ItemStyle::Table {
+        // The type and the file only where an item is a page of its own:
+        // in a document its section already says both.
+        let own_page = self.target.layout == kiln_model::Layout::Tree;
+        if style == ItemStyle::Table && own_page {
             if let Some(ty) = p.type_of(item) {
                 entries.push(PropEntry {
                     label: "Type".into(),
@@ -514,7 +706,12 @@ impl<'a> State<'a> {
                 values,
             });
         }
-        for role in &p.config.links {
+        // The trace role's inverse first: in the requirements tree, what
+        // refines a requirement is the relationship the page is built on.
+        let trace = p.config.trace().map(|r| r.name.as_str());
+        let mut inbound_roles: Vec<&kiln_model::LinkRole> = p.config.links.iter().collect();
+        inbound_roles.sort_by_key(|r| Some(r.name.as_str()) != trace);
+        for role in inbound_roles {
             let sources: Vec<Source> = p
                 .inbound(&item.id)
                 .iter()
@@ -526,7 +723,7 @@ impl<'a> State<'a> {
             }
             let values = sources
                 .iter()
-                .map(|s| vec![kiln_render_source(p, *s)])
+                .map(|s| vec![kiln_render_source(p, *s, ids_only)])
                 .collect();
             entries.push(PropEntry {
                 label: capitalised(&role.inverse),
@@ -573,18 +770,20 @@ impl<'a> State<'a> {
                     values: vec![vec![Inline::text(due.to_string())]],
                 });
             }
-            entries.push(PropEntry {
-                label: "Source".into(),
-                lead: String::new(),
-                values: vec![vec![Inline::Link {
-                    target: Target::Repo {
-                        path: item.path.clone(),
-                        line: None,
-                        fragment: None,
-                    },
-                    content: vec![Inline::text(item.path.clone())],
-                }]],
-            });
+            if own_page {
+                entries.push(PropEntry {
+                    label: "Source".into(),
+                    lead: String::new(),
+                    values: vec![vec![Inline::Link {
+                        target: Target::Repo {
+                            path: item.path.clone(),
+                            line: None,
+                            fragment: None,
+                        },
+                        content: vec![Inline::text(item.path.clone())],
+                    }]],
+                });
+            }
         }
         Props {
             style,
@@ -691,8 +890,18 @@ impl<'a> State<'a> {
             }
         };
         let mut blocks = vec![Block::Paragraph(vec![Inline::text(origin)])];
+        // The requirement levels first, highest first, as the document
+        // places them; then the other types in kiln.toml's order.
+        let levels = p.config.levels();
+        let mut types: Vec<&kiln_model::TypeDef> = p.config.types.iter().collect();
+        types.sort_by_key(|t| {
+            levels
+                .iter()
+                .position(|l| *l == t.name)
+                .unwrap_or(levels.len())
+        });
         let mut rows = Vec::new();
-        for ty in &p.config.types {
+        for ty in &types {
             let items: Vec<&Item> = p.items.iter().filter(|i| i.type_name == ty.name).collect();
             if items.is_empty() {
                 continue;
@@ -726,7 +935,7 @@ impl<'a> State<'a> {
             }));
         }
         let mut coverage = Vec::new();
-        for ty in &p.config.types {
+        for ty in &types {
             let roles: Vec<&kiln_model::LinkRole> = p
                 .config
                 .coverage_roles
@@ -820,11 +1029,11 @@ impl<'a> State<'a> {
     }
 }
 
-fn kiln_render_source(p: &Project, s: Source) -> Inline {
+fn kiln_render_source(p: &Project, s: Source, ids_only: bool) -> Inline {
     match s {
         Source::Item(i) => Inline::Ref {
             id: p.items[i].id.clone(),
-            text: None,
+            text: ids_only.then(|| p.items[i].id.to_string()),
         },
         Source::Code(i) => {
             let code = &p.code_refs[i];
@@ -905,6 +1114,40 @@ fn claim_report_rows(node: &mut Node, placed: &mut HashSet<ItemId>) {
 
 /// Appends `i` and its descendants among `children`, depth first, each
 /// once (a parent cycle can't loop).
+/// Requirements placed under the same one, each parent followed by its
+/// children (`parent` within a level), otherwise in the order given.
+fn siblings_in_tree_order<'n, 'a>(nodes: &'n [LevelNode<'a>]) -> Vec<&'n LevelNode<'a>> {
+    // The index of each node's parent among `nodes`, if it is there.
+    let parent: Vec<Option<usize>> = nodes
+        .iter()
+        .map(|n| {
+            let id = n.item.parent.as_ref().and_then(|r| r.id.as_ref().ok())?;
+            nodes
+                .iter()
+                .position(|o| &o.item.id == id)
+                .filter(|_| *id != n.item.id)
+        })
+        .collect();
+    fn visit(at: usize, parent: &[Option<usize>], seen: &mut [bool], out: &mut Vec<usize>) {
+        if seen[at] {
+            return;
+        }
+        seen[at] = true;
+        out.push(at);
+        for c in (0..parent.len()).filter(|&c| parent[c] == Some(at)) {
+            visit(c, parent, seen, out);
+        }
+    }
+    let mut seen = vec![false; nodes.len()];
+    let mut order = Vec::with_capacity(nodes.len());
+    for n in (0..nodes.len()).filter(|&n| parent[n].is_none()) {
+        visit(n, &parent, &mut seen, &mut order);
+    }
+    // A parent cycle within the siblings: keep the rest in order.
+    order.extend((0..nodes.len()).filter(|&n| !seen[n]));
+    order.into_iter().map(|n| &nodes[n]).collect()
+}
+
 fn tree_order(
     p: &Project,
     i: usize,

@@ -715,7 +715,7 @@ flavour = "github"
         let spec = config.export("spec").unwrap();
         assert_eq!(
             (spec.format, spec.layout, spec.item_style()),
-            (ExportFormat::Confluence, Layout::Document, ItemStyle::List)
+            (ExportFormat::Confluence, Layout::Document, ItemStyle::Table)
         );
         assert_eq!(spec.link_to, ["spec-md"]);
         assert_eq!(spec.types.len(), 7);

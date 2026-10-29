@@ -83,7 +83,7 @@ path = "target/kiln/design.html"
 | `exclude_status` | each type's `closed` statuses | items left out |
 | `reports` | `["traceability", "findings"]` | without a template: report sections appended as appendices (`levels` is titled "Requirement levels") |
 | `numbering` | `true` | section numbers (`2.1.3`) on headings |
-| `item_style` | `list` for `document` and `sections`, `table` for `tree` | how an item's properties are shown (see "Items in a document") |
+| `item_style` | `table` | how an item's properties are shown (see "Items in a document") |
 | `link_to` | `[]` | other exports to link into for items this one doesn't contain, in order |
 | `path` | required for file formats | output file (`document`) or folder (`sections`, `tree`), relative to the project |
 | `[export.<format>]` | — | settings only that format reads |
@@ -118,7 +118,12 @@ and a browsable tree of the same items, or one document per audience.
 Without a template, a document is: the title, a short summary (the commit,
 counts by type and status, coverage, milestone progress), a table of
 contents, one section per type in `types` that has items, then the
-`reports` as appendices (lettered `A`, `B`).
+`reports` as appendices (lettered `A`, `B`). `types` defaults to the
+requirement levels first, highest first, then the other types in
+`kiln.toml`'s order, so a document starts with what the system must do.
+With several requirement levels, the level types make one
+"Requirements" section holding the requirements tree (below) instead of
+a section each.
 
 A template is a Markdown file in the repository that gives the document
 its own shape and prose: an introduction, scope, definitions, the order
@@ -178,6 +183,7 @@ Flint covers Windows and Linux (KDE Plasma 6 on Wayland). It does not…
 |---|---|
 | `<!-- kiln:items … -->` | the selected items, as a flat list (in `tree`: nested by `parent`), under the heading it sits in |
 | `<!-- kiln:item REQ-014 -->` | one item |
+| `<!-- kiln:requirements -->` | every requirement, as the requirements tree (below); with one level, its items as `kiln:items` would place them |
 | `<!-- kiln:report traceability\|levels\|findings\|roadmap\|changes\|risks … -->` | a report (see "Reports") |
 | `<!-- kiln:summary -->` | the commit, its date, counts, coverage, progress |
 | `<!-- kiln:toc -->` | a table of contents (Confluence's `toc` macro; a generated list in files) |
@@ -219,8 +225,7 @@ Rules:
 - Items are a flat list at the directive's level, in tree order: each
   item is followed by its children (within the directive), depth first,
   so related items stay together while every one is a heading of the
-  same level, and a table of contents a few levels deep (Confluence's
-  `toc` stops at `toc_levels`, 3 by default) lists every one. The parent
+  same level, and a table of contents lists every one. The parent
   shows in the item's properties. `nest="parent"` (the default in `tree`)
   puts children one heading level below their parent instead; an item
   whose parent isn't placed by the same directive then starts at the
@@ -231,35 +236,86 @@ Rules:
 - Unknown directives, unknown attributes, unknown types and IDs are K112
   errors with the template's line.
 
+### The requirements tree
+
+`<!-- kiln:requirements -->`, and without a template the "Requirements"
+section, place the requirement levels (FORMAT.md, "Requirement levels")
+as one tree, on one page (ADR-024):
+
+```
+2 Requirements
+  Each stakeholder requirement is followed by the system requirements that refine it, …
+  2.1 STK-001 Nurses see an occlusion alarm quickly
+    2.1.1 SYS-001 Occlusion detected within 2 s
+      2.1.1.1 SW-001 Sample pressure at 50 Hz
+      2.1.1.2 SW-002 Debounce occlusion over 2 s
+    2.1.2 SYS-004 Detection works on battery          ← SYS-001's child: same level, next
+    2.1.3 SYS-002 Alarm sounds at 70 dB(A) at 1 m
+  2.2 STK-003 Alarms are audible in a noisy ward
+      Also refined by: SYS-002 …, shown under STK-001.  ← a second parent names it
+  2.3 Derived requirements
+    2.3.1 SW-006 Watchdog resets a stalled sampler
+  2.4 Requirements not traced to a higher level        ← only when there are some
+```
+
+- Each top-level requirement is a heading at the directive's level; the
+  requirements of the level below that refine it (directly, or through
+  a parent of their own type) are headings one level deeper, and so on.
+- Within a level, a child follows its parent at the same depth, as
+  `kiln:items` places it, so the tree is as deep as there are levels.
+- A requirement that refines several is placed under the first (in
+  document order) and named in one italic line under the others: one
+  heading, one anchor, one page in `tree`.
+- Derived requirements, and those tracing to nothing above them (K208),
+  follow under headings of their own, each with what refines it below.
+- A one-sentence lead-in says how the tree reads, naming the levels.
+- Closed items are left out as everywhere; an item the target's
+  `exclude_status` leaves out gives way to what is below it, at its depth.
+- In `tree` on Confluence, the tree is the page tree: each requirement's
+  page is under the requirement it refines (files keep a folder per
+  section).
+
 ## Items in a document
 
 An item placed with `style="full"` becomes:
 
 ```
-2.1.3  REQ-014 Flint appears within 50 ms of the hotkey   ← heading, with an anchor "REQ-014"
-approved                                                  ← properties (item_style = "list")
-Parent: REQ-002 Flint is fast
-Verified by: TEST-031 Hotkey timing, TEST-032 Cold start
-Jira: FLINT-88
+2.1.3  SYS-002 Alarm sounds at 70 dB(A) at 1 m    ← heading, with an anchor "SYS-002"
+┌─────────────┬──────────────────┐
+│ Status      │ approved         │                ← properties (item_style = "table")
+│ Refines     │ STK-001, STK-003 │
+│ Refined by  │ SW-003           │
+│ Verified by │ TEST-003         │
+│ Jira        │ PUMP-88          │
+└─────────────┴──────────────────┘
 <body>
-2.1.4  REQ-031 …                                          ← a child: the next heading, same level
 ```
 
 `item_style`:
 
-- `list` (default for `document` and `sections`): the status lozenge on
-  its own line, then one line per relationship, its label in bold:
+- `table` (the default): a two-column table, the status first, then
   parent, "Derived" for a derived requirement (FORMAT.md, "Requirement
-  levels"), outgoing links, inverses ("Verified by", "Implemented by"
-  with code locations), Jira. Each relationship reads on its own, and an item
-  with none takes one line. Lines are broken inside one paragraph
-  (Confluence and HTML `<br>`, Markdown's `\` hard break, wiki markup's
-  `\\`, a Word line break), so the block stays compact.
+  levels"), outgoing links, inverses (the trace role's first, then
+  "Verified by", "Implemented by" with code locations), Jira, tags,
+  owner and due. Related items show by ID alone, linked to their heading,
+  so rows stay one line and line up from item to item. In `tree`, where
+  each item is a page of its own, the type and the source file are rows
+  too. In Markdown the status row is the table's header row; in
+  Confluence the label column is narrow and the table keeps the page's
+  text width.
+- `list`: the status lozenge on its own line, then one line per
+  relationship, its label in bold and related items with their titles.
+  Lines are broken inside one paragraph (Confluence and HTML `<br>`,
+  Markdown's `\` hard break, wiki markup's `\\`, a Word line break).
 - `line`: the same on a single line, joined with `·`; the most compact,
   for long documents whose items have few links.
-- `table`: the full properties table (default for `tree`, where each item
-  is a page of its own).
 - `none`: heading and body only, for documents meant to read as prose.
+
+The table of contents (`kiln:toc`) lists every item: it goes as deep as
+the deepest item heading on the page, three levels at least and six at
+most (Confluence's `toc` macro gets that `maxLevel` unless
+`[export.confluence] toc_levels` says otherwise; Word's TOC field the
+same range).
 
 Headings: the document's sections and items use levels 1–6 by depth. In
 Confluence the page title is the document's title and sections start at
@@ -273,8 +329,8 @@ and those that would pass level 6 become bold paragraphs.
 
 | Report | Content |
 |---|---|
-| `traceability` | per non-closed item of `type` (default: the highest requirement level, which is `requirement` without `[requirements]`): implemented by, verified by, gaps marked; `type="system"` traces one level |
-| `levels` | the requirement levels as a traceability matrix (FORMAT.md, "Requirement levels"): a line of totals, then one row per chain from a top-level requirement down, one column per level, then what covers the row's last requirement (`—` where a role can't point at its type). A requirement under several rows is shown on the first; a missing level below is a red "gap". Derived requirements follow with "derived" above them, then those tracing to nothing with "gap" above them. Says so when the project has one level. Upper levels' own verification is `traceability` with their `type` |
+| `traceability` | per non-closed item of `type` (default: the highest requirement level, which is `requirement` without `[requirements]`): implemented by, verified by, gaps marked; `type="system"` traces one level. Without `type` and with several levels, the `levels` matrix below: a document's traceability is then the chains |
+| `levels` | the requirement levels as a traceability matrix (FORMAT.md, "Requirement levels"): a line of totals, then one row per chain from a top-level requirement down, one column per level, then what covers the row's last requirement (`—` where a role can't point at its type). A requirement under several rows is shown on the first; a missing level below is a red "gap". Derived requirements follow with "derived" above them, then those tracing to nothing with "gap" above them. With one level, the `traceability` table. Upper levels' own verification is `traceability` with their `type` |
 | `findings` | `kiln check` warnings and errors, by rule, linked to the repository |
 | `roadmap` | milestones in `due` order, status, progress, included items |
 | `risks` | open risks and what mitigates them |

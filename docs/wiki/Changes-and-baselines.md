@@ -215,16 +215,18 @@ An excerpt of `out/review.md`:
 
 *Changed*
 
-**approved**\
-**Parent:** [REQ-001 The app starts quickly](#11-req-001-the-app-starts-quickly)\
+| Status | **approved** |
+| --- | --- |
+| Parent | [REQ-001](#11-req-001-the-app-starts-quickly) |
 …
 
 ### 1.3 REQ-003 Works offline
 
 *Changed*
 
-**approved**\
-**Verified by:** [TEST-002 Run with the network off](#22-test-002-run-with-the-network-off)
+| Status | **approved** |
+| --- | --- |
+| Verified by | [TEST-002](#22-test-002-run-with-the-network-off) |
 
 …
 
@@ -232,8 +234,9 @@ An excerpt of `out/review.md`:
 
 *New*
 
-**draft**\
-**Verifies:** [REQ-003 Works offline](#13-req-003-works-offline)
+| Status | **draft** |
+| --- | --- |
+| Verifies | [REQ-003](#13-req-003-works-offline) |
 
 ## A Changes
 

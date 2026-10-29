@@ -16,7 +16,7 @@ the documents it links to.
 
 # Requirements
 
-<!-- kiln:items type="requirement" -->
+<!-- kiln:requirements -->
 
 # Decisions
 

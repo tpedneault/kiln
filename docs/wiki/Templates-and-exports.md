@@ -85,7 +85,7 @@ Every key of `[[export]]`:
 | `exclude_status` | each type's `closed` statuses | Without a template (and for `kiln:items` without `status=`): items left out. |
 | `reports` | `["traceability", "findings"]` | Without a template: report sections added as appendices. `[]` for none. |
 | `numbering` | `true` | Section numbers (`2.1.3`) on headings. |
-| `item_style` | `list` for `document` and `sections`, `table` for `tree` | How an item's properties are shown (see [How items render](#how-items-render)). |
+| `item_style` | `table` | How an item's properties are shown (see [How items render](#how-items-render)). |
 | `link_to` | `[]` | Other targets to link into for items this one doesn't contain, in order (see [link_to](#linking-between-targets-link_to)). |
 | `path` | required for file formats | The output file (`document`) or folder (`sections`, `tree`), relative to the project root. |
 
@@ -174,7 +174,10 @@ Without `template`, a document contains, in order:
 3. a table of contents;
 4. one section per type listed in `types` that has items, its items a
    flat list in which each parent is followed by its children (nested by
-   `parent` in the `tree` layout);
+   `parent` in the `tree` layout). The requirements come first unless
+   `types` says otherwise; with several requirement levels they are one
+   "Requirements" section holding the
+   [requirements tree](#the-requirements-tree);
 5. the `reports` as appendices, lettered `A`, `B`, …
 
 Items with a closed status (for example `obsolete` requirements) are left
@@ -230,6 +233,7 @@ You don't have to start from nothing: see
 |---|---|
 | `<!-- kiln:items … -->` | the selected items, as a flat list, under the heading the directive sits in |
 | `<!-- kiln:item REQ-014 -->` | exactly one item |
+| `<!-- kiln:requirements -->` | every requirement as one tree: with several requirement levels, each requirement with those of the level below that refine it as sub-sections, then the derived ones (see [The requirements tree](#the-requirements-tree)); with one level, its items as `kiln:items` would place them |
 | `<!-- kiln:report NAME … -->` | a report: `traceability`, `findings`, `roadmap`, `risks` or `changes` (see [Reports](#reports)) |
 | `<!-- kiln:summary -->` | the commit and its date, counts by type and status, coverage, milestone progress |
 | `<!-- kiln:toc -->` | a table of contents: Confluence's `toc` macro, a Word TOC field, or a generated list in Markdown and HTML |
@@ -447,15 +451,17 @@ This document describes Demo, a desktop app that starts fast and works without a
 
 ### 3.1 REQ-001 The app starts quickly
 
-**approved**
+| Status | **approved** |
+| --- | --- |
 
 ### 3.2 REQ-002 Cold start under one second
 
-**approved**\
-**Parent:** [REQ-001 The app starts quickly](#31-req-001-the-app-starts-quickly)\
-**Mitigates:** [RISK-001 Slow disks on old laptops](#9-appendix-risks)\
-**Implemented by:** [DES-001 Lazy loading of plugins](#41-des-001-lazy-loading-of-plugins), [TASK-001 Implement plugin loader](../design/tasks/TASK-001-implement-plugin-loader.md)\
-**Verified by:** [TEST-001 Measure cold start](#7-tests)
+| Status | **approved** |
+| --- | --- |
+| Parent | [REQ-001](#31-req-001-the-app-starts-quickly) |
+| Mitigates | [RISK-001](#9-appendix-risks) |
+| Implemented by | [DES-001](#41-des-001-lazy-loading-of-plugins), [TASK-001](../design/tasks/TASK-001-implement-plugin-loader.md) |
+| Verified by | [TEST-001](#7-tests) |
 
 Measured from launch to the first usable window on the reference laptop. See [ADR-001 Use SQLite for local storage](#5-decisions) for why storage opens fast.
 
@@ -465,8 +471,9 @@ Measured from launch to the first usable window on the reference laptop. See [AD
 
 ### 4.1 DES-001 Lazy loading of plugins
 
-**accepted**\
-**Implements:** [REQ-002 Cold start under one second](#32-req-002-cold-start-under-one-second)
+| Status | **accepted** |
+| --- | --- |
+| Implements | [REQ-002](#32-req-002-cold-start-under-one-second) |
 
 Plugins load on first use, not at start.
 
@@ -523,10 +530,10 @@ it as headings of the same level (or one level deeper with
 
 ```text
 2.1.3  REQ-014 Flint appears within 50 ms of the hotkey   ← heading, anchor "REQ-014"
-approved                                                  ← properties (item_style = "list")
-Parent: REQ-002 Flint is fast
-Verified by: TEST-031 Hotkey timing, TEST-032 Cold start
-Jira: FLINT-88
+| Status      | approved           |                      ← properties (item_style = "table")
+| Parent      | REQ-002            |
+| Verified by | TEST-031, TEST-032 |
+| Jira        | FLINT-88           |
 <body>
 2.1.4  REQ-031 …                                          ← a child: the next heading, same level
 ```
@@ -535,26 +542,70 @@ Jira: FLINT-88
 
 | `item_style` | Shows | Default for |
 |---|---|---|
-| `list` | the status, then one line per relationship with its label in bold: parent, outgoing links, inverse links ("Implemented by", "Verified by", with code locations), Jira keys | `document`, `sections` |
+| `table` | a two-column table: the status, then parent, outgoing links, inverse links ("Refined by" first, then "Implemented by", "Verified by", with code locations), Jira keys, tags, owner, due. Related items by ID alone, linked to their heading, so rows stay short and line up from item to item. In `tree`, also the type and the source file | every layout |
+| `list` | the status, then one line per relationship with its label in bold, related items with their titles | — |
 | `line` | the same on one line, joined with `·`: the most compact, for long documents whose items have few links | — |
-| `table` | the full properties table: status, type, parent, each link role, source file | `tree`, where each item is a page of its own |
 | `none` | heading and body only, for documents meant to read as prose | — |
 
-A real `table` item page from a `tree` export:
+In Markdown the status row is the table's header row. In Confluence the
+labels are a narrow column and the table keeps to the page's text width.
+
+A `table` item page from a `tree` export:
 
 ```markdown
 # REQ-002 Cold start under one second
 
-| Property | Value |
-| --- | --- |
 | Status | **approved** |
+| --- | --- |
 | Type | Requirement |
-| Parent | [REQ-001 The app starts quickly](REQ-001.md) |
-| Mitigates | [RISK-001 Slow disks on old laptops](../risks/RISK-001.md) |
-| Implemented by | [DES-001 Lazy loading of plugins](../designs/DES-001.md), [TASK-001 Implement plugin loader](../tasks/TASK-001.md) |
-| Verified by | [TEST-001 Measure cold start](../tests/TEST-001.md) |
+| Parent | [REQ-001](REQ-001.md) |
+| Mitigates | [RISK-001](../risks/RISK-001.md) |
+| Implemented by | [DES-001](../designs/DES-001.md), [TASK-001](../tasks/TASK-001.md) |
+| Verified by | [TEST-001](../tests/TEST-001.md) |
 | Source | design/requirements/REQ-002-cold-start-under-one-second.md |
 ```
+
+### The requirements tree
+
+With several requirement levels ([Configuration](Configuration#requirements-requirement-levels)),
+`<!-- kiln:requirements -->` (and the "Requirements" section of a
+document without a template) places them as one tree on one page: each
+top-level requirement, then the requirements of the level below that
+refine it as its sub-sections, and so on down.
+
+```text
+2 Requirements
+  Each stakeholder requirement is followed by the system requirements that refine it, …
+  2.1 STK-001 Nurses see an occlusion alarm quickly
+    2.1.1 SYS-001 Occlusion detected within 2 s
+      2.1.1.1 SW-001 Sample pressure at 50 Hz
+      2.1.1.2 SW-002 Debounce occlusion over 2 s
+    2.1.2 SYS-002 Alarm sounds at 70 dB(A) at 1 m
+      2.1.2.1 SW-003 Drive the buzzer PWM
+  2.2 STK-002 The pump keeps a dose log
+    2.2.1 SYS-003 Dose log keeps 30 days
+      2.2.1.1 SW-004 Write log records to flash
+      2.2.1.2 SW-005 Flush log on brown-out       ← SW-004's child: same level, right after it
+  2.3 STK-003 Alarms are audible in a noisy ward
+      Also refined by: SYS-002 …, shown under STK-001.
+  2.4 Derived requirements
+    2.4.1 SW-006 Watchdog resets a stalled sampler
+```
+
+- A requirement that refines several appears once, under the first, and
+  is named in one line under the others.
+- Children within a level (`parent`) follow their parent at the same
+  heading level, so the tree is as deep as there are levels.
+- Derived requirements follow under their own heading, and requirements
+  that trace to nothing above (K208) under another, so neither hides in
+  the tree.
+- The table of contents goes as deep as the tree, so every requirement
+  is listed (`toc_levels` overrides it on Confluence).
+- In the `tree` layout on Confluence, each requirement's page is under
+  the requirement it refines.
+
+To place one level on its own instead, use `kiln:items type="system"`
+as before.
 
 Statuses show as a coloured lozenge in HTML, Word and Confluence and in
 bold in Markdown. Jira keys link to `<[jira] url>/browse/<KEY>` when
@@ -570,7 +621,7 @@ repository, see [Links to repository files](#links-to-repository-files-and-which
 
 | Report | Content |
 |---|---|
-| `traceability` | for each non-closed item of the traced type (default: the highest requirement level, `requirement` unless `[requirements]` says otherwise; or `type="…"`): what implements it, what verifies it, gaps marked. An item covered only through its children says "through its children". |
+| `traceability` | for each non-closed item of the traced type (default: the highest requirement level, `requirement` unless `[requirements]` says otherwise; or `type="…"`): what implements it, what verifies it, gaps marked. An item covered only through its children says "through its children". Without `type` and with several requirement levels it is the `levels` matrix below, so a document's traceability appendix follows the chains. |
 | `levels` | with several requirement levels ([Configuration](Configuration#requirements-requirement-levels)): the traceability matrix. One row per chain from a top-level requirement down, a column per level, then what implements and verifies the row's last requirement (`—` where the role can't point at its type). A requirement spanning several rows is shown on the first; a level with nothing below is a red "gap". Derived requirements come after, with "derived" in the levels above them, then requirements that trace to nothing, with "gap" there. Titled "Requirement levels" when listed in `reports`. |
 | `findings` | the `kiln check` warnings and errors, by rule, with the file and line |
 | `roadmap` | milestones in `due` order: due date, status, progress, the items they include |

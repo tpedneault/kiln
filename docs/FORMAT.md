@@ -454,7 +454,7 @@ Severities: `error` (exit 1), `warning`, `off`, overridable in `[check]`.
 | K113 | warning | the agent guide (`AGENTS.md` in the first of `paths`, `kiln agents`) has Kiln's section and it doesn't match what `kiln.toml` gives now, or its begin marker has no end marker; a guide without the section, or no guide, is never a finding |
 | K201 | warning | a requirement (of any level, see "Requirement levels") past its type's `initial` status (non-draft, by default) and not closed, with no `verifies` coverage, when `verifies` can point at its type |
 | K202 | warning | the same with no `implements` coverage |
-| K203 | warning | a non-closed item links to a closed one (e.g. implements an obsolete requirement) |
+| K203 | warning | a non-closed item links to a closed one (e.g. implements an obsolete requirement), except `supersedes` to a `superseded` decision, which K204 asks for |
 | K204 | warning | a decision with status `superseded` that nothing `supersedes` |
 | K205 | warning | status `verified` but no passing `verifies` source (a test item with status `passing`, or a code reference) |
 | K206 | warning | a milestone past its `due` date (compared with today, UTC) and neither done nor closed |
