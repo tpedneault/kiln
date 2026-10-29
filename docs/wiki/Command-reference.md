@@ -47,7 +47,7 @@ All examples on this page come from one small scratch project, made with `kiln i
 
 ```console
 $ kiln --version
-kiln 0.1.0
+kiln 1.0.0
 $ kiln --help
 Requirements, design decisions and project progress, kept as Markdown in the repository they describe
 

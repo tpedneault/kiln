@@ -6,6 +6,23 @@ All notable changes to Kiln are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-29
+
+The first release. Requirements, design notes, decisions, milestones,
+tasks, tests and risks as Markdown files with TOML front matter, checked
+in CI (`kiln check`), traced to code and to test results, exported as a
+Markdown, HTML or Word document or a Confluence page, and planned and
+worked through from the command line, the GUI, Fenix, Flint or a coding
+agent. Windows (`x86_64-pc-windows-msvc`, a `.zip` with `kiln.exe` and
+`kilnw.exe`) and Linux (`x86_64-unknown-linux-gnu`, glibc 2.35 or newer)
+archives are attached below, each with a `.sha256`; the
+[Installing](https://github.com/tpedneault/kiln/wiki/Installing) page
+says how to set them up.
+
+Not yet confirmed against live servers: Confluence publishing (tested
+against a faithful fake of Cloud and Data Center) and the Jira mirror
+(Server and Data Center only).
+
 ### Added
 
 - The design: [docs/DESIGN.md](docs/DESIGN.md),
