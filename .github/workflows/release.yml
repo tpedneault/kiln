@@ -62,15 +62,27 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           # A lightweight tag through the API, so no credentials stay in the
-          # checkout. It fails when the tag exists: a version is released once.
+          # checkout. A version is released once: an existing tag is reused
+          # only while no release has it (a run that failed before
+          # drafting), and the build then uses the tagged commit.
+          gh release view $env:TAG --json tagName 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) { Write-Error "release: $env:TAG is released already"; exit 1 }
+          $tagged = gh api "repos/$env:GH_REPO/git/ref/tags/$env:TAG" --jq .object.sha 2>$null
+          if ($LASTEXITCODE -eq 0 -and $tagged) {
+            Write-Host "release: $env:TAG exists at $tagged with no release; reusing it"
+            exit 0
+          }
           gh api "repos/$env:GH_REPO/git/refs" -f "ref=refs/tags/$env:TAG" -f "sha=$env:GITHUB_SHA" --silent
-          if ($LASTEXITCODE -ne 0) { Write-Error "release: couldn't create $env:TAG (does it exist already?)"; exit 1 }
+          if ($LASTEXITCODE -ne 0) { Write-Error "release: couldn't create $env:TAG"; exit 1 }
       - name: Draft the release with the changelog section
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          ./scripts/release.ps1 -Step notes -Tag $env:TAG
+          # A child pwsh, so its exit code is always set: a script run in
+          # this one leaves $LASTEXITCODE unset when it succeeds, and
+          # `exit $null` would end this step before the release is drafted.
+          pwsh -NoProfile -File ./scripts/release.ps1 -Step notes -Tag $env:TAG
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $prerelease = if ($env:TAG -like '*-*') { @('--prerelease') } else { @() }
           gh release create $env:TAG --draft --verify-tag --title "Kiln $($env:TAG.TrimStart('v'))" --notes-file target/dist/notes.md @prerelease

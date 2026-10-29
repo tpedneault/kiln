@@ -115,9 +115,10 @@ To release:
    with the version `X.Y.Z`. After the same check, `prepare` creates the
    tag `vX.Y.Z` on `master`'s head through the API, and the run goes on
    to build and publish from that tag. It goes on in the same run because
-   a tag pushed with the workflow's own token starts no other workflow;
-   and it refuses a tag that already exists, so a version is released
-   once.
+   a tag pushed with the workflow's own token starts no other workflow.
+   It refuses a version that already has a release, so a version is
+   released once; a tag left by a run that failed before drafting is
+   reused, and the build uses the commit it points at.
 
 When a step fails, the release stays a draft: delete it and the tag
 (`git push origin :refs/tags/vX.Y.Z`), fix the cause on `master`, and tag
