@@ -37,7 +37,8 @@ This part is the project's to edit; the section below it is generated.
 - **Leave sign-off to people.** Moving a requirement to approved,
   accepting a decision, closing a risk or finishing a milestone is a
   person's call: propose it in the pull request. Moving work forward (a
-  task to done, a test to passing when it passes) is fine.
+  task to done, a test to passing when it passes) is fine. `kiln
+  signoff` reports every sign-off change in CI, with its author.
 - **When you implement or test a requirement, say so in the code.** A
   comment `implements: REQ-014` near the code and `verifies: REQ-014`
   on its test (see "Links" below for the roles code may use) make the

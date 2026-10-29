@@ -2,7 +2,8 @@
 id = "TASK-020"
 type = "task"
 title = "kiln log: an item's history from git"
-status = "todo"
+status = "done"
+owner = "claude"
 
 [links]
 part-of = ["MS-020"]

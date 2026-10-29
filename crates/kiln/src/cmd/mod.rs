@@ -13,11 +13,13 @@ pub mod impact;
 pub mod init;
 pub mod jira;
 pub mod list;
+pub mod log;
 pub mod new;
 pub mod plan;
 pub mod preset;
 pub mod renumber;
 pub mod show;
+pub mod signoff;
 pub mod trace;
 
 use kiln_index::Project;

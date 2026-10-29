@@ -36,6 +36,7 @@ const TOP_KEYS: &[&str] = &[
     "check",
     "confluence",
     "export",
+    "signoff",
 ];
 const TYPE_KEYS: &[&str] = &[
     "prefix", "title", "plural", "statuses", "initial", "done", "closed", "parents", "template",
@@ -219,7 +220,10 @@ pub fn parse_config(text: &str) -> (Option<Config>, Vec<Finding>) {
         confluence.as_ref(),
     );
 
+    let signoff = signoff(&mut w, root.get("signoff"), &types);
+
     let config = Config {
+        signoff,
         jira_sync,
         format,
         name,
@@ -655,6 +659,43 @@ fn coverage(w: &mut Walk, item: Option<&Item>, links: &[LinkRole]) -> Vec<String
     out
 }
 
+/// `[signoff]` (K19): type → the statuses that are a person's call, for
+/// `kiln signoff`. A type or status that doesn't exist is reported and
+/// left out; written at all, it replaces the defaults whole, so a project
+/// can turn sign-off off for a type by leaving it out.
+fn signoff(
+    w: &mut Walk,
+    item: Option<&Item>,
+    types: &[kiln_model::TypeDef],
+) -> Option<BTreeMap<String, Vec<String>>> {
+    let table = item.and_then(|i| w.table(i, Rule::K002, "`[signoff]`"))?;
+    let mut out = BTreeMap::new();
+    for (name, value) in table.iter() {
+        let Some(ty) = types.iter().find(|t| t.name == name) else {
+            let span = w.span_of_key(table, name);
+            w.report(Rule::K002, span, format!("signoff: `{name}` isn't a type"));
+            continue;
+        };
+        let mut statuses = Vec::new();
+        for (status, span) in w
+            .strings(value, Rule::K002, &format!("`signoff.{name}`"))
+            .unwrap_or_default()
+        {
+            if ty.statuses.contains(&status) {
+                statuses.push(status);
+            } else {
+                w.report(
+                    Rule::K002,
+                    span,
+                    format!("signoff: `{status}` isn't a {name} status"),
+                );
+            }
+        }
+        out.insert(name.to_owned(), statuses);
+    }
+    Some(out)
+}
+
 /// `[requirements]`: the level types, highest first, and the role that
 /// traces a level to the one above (FORMAT.md, "Requirement levels"). A
 /// level that isn't a type is reported and left out; a trace role that
@@ -1079,5 +1120,41 @@ K105 = "off"
         for bad in ["/etc", "C:/x", "a/../../b", ""] {
             assert_eq!(confined(bad), None, "{bad}");
         }
+    }
+
+    #[test]
+    // verifies: REQ-024
+    fn signoff_names_types_and_their_statuses() {
+        let text = format!(
+            "{}\n[signoff]\nrequirement = [\"approved\", \"signed\"]\nwidget = [\"done\"]\n",
+            kiln_model::default_config("T")
+        );
+        let (config, findings) = parse_config(&text);
+        let config = config.unwrap();
+        assert_eq!(config.signoff_statuses("requirement"), ["approved"]);
+        assert!(
+            config.signoff_statuses("decision").is_empty(),
+            "written, it replaces the defaults"
+        );
+        let messages: Vec<&str> = findings.iter().map(|f| f.message.as_str()).collect();
+        assert!(
+            messages.contains(&"signoff: `signed` isn't a requirement status"),
+            "{messages:?}"
+        );
+        assert!(
+            messages.contains(&"signoff: `widget` isn't a type"),
+            "{messages:?}"
+        );
+        let (defaults, _) = parse_config(&kiln_model::default_config("T"));
+        let defaults = defaults.unwrap();
+        assert_eq!(
+            defaults.signoff_statuses("requirement"),
+            ["approved", "verified"]
+        );
+        assert_eq!(
+            defaults.signoff_statuses("decision"),
+            ["accepted", "rejected"]
+        );
+        assert!(defaults.signoff_statuses("task").is_empty());
     }
 }

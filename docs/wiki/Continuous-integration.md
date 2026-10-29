@@ -374,6 +374,11 @@ then:
   from the report K217, and the requirement it verified loses that
   coverage (K201). Make K201 an error (see below) and a requirement whose
   tests fail fails CI.
+- **`kiln signoff`** (K19), run the same way (`kiln signoff
+  "origin/${{ github.base_ref }}" --format github`), puts a warning on
+  every status that is a person's call (a requirement approved, a
+  decision accepted…) the pull request changed, naming the commit and
+  author. Reviewers see an agent's sign-off before they merge.
 - **`kiln affected`** needs the base branch in the clone: `fetch-depth:
   0` on checkout. It puts a notice on each changed line that sits under
   an `implements:` or `verifies:` comment, naming the requirement and

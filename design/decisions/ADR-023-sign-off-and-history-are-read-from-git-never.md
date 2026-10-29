@@ -2,7 +2,7 @@
 id = "ADR-023"
 type = "decision"
 title = "Sign-off and history are read from git, never stored in items"
-status = "proposed"
+status = "accepted"
 +++
 
 ## Context

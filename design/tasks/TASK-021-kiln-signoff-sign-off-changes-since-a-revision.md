@@ -2,7 +2,8 @@
 id = "TASK-021"
 type = "task"
 title = "kiln signoff: sign-off changes since a revision, with their authors"
-status = "todo"
+status = "done"
+owner = "claude"
 
 [links]
 part-of = ["MS-020"]

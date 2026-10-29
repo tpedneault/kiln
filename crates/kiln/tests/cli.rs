@@ -1651,3 +1651,69 @@ fn test_results_and_what_a_change_touches() {
     let github = ok(d, &["affected", "HEAD", "--format", "github"]);
     assert!(github.starts_with("::notice file=src/lib.rs,line=4,title=Kiln affected::changes code that `implements` REQ-002 Small"), "{github}");
 }
+
+#[test]
+// verifies: REQ-024
+fn an_items_history_and_its_sign_off_come_from_git() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    git(d, &["init", "-q"]);
+    ok(d, &["init", "--name", "Demo", "--preset", "none"]);
+    ok(d, &["new", "requirement", "--title", "Fast"]);
+    ok(d, &["new", "test", "--title", "Timing"]);
+    git(d, &["add", "-A"]);
+    git(d, &["commit", "-qm", "draft"]);
+    git(d, &["tag", "base"]);
+    ok(d, &["set", "REQ-001", "status=approved"]);
+    git(d, &["add", "-A"]);
+    git(d, &["commit", "-qm", "approve"]);
+    ok(d, &["link", "TEST-001", "verifies", "REQ-001"]);
+    ok(d, &["set", "REQ-001", "owner=ana"]);
+
+    let log = ok(d, &["log", "REQ-001"]);
+    let lines: Vec<&str> = log.lines().collect();
+    assert_eq!(lines[0], "REQ-001 Fast");
+    assert!(lines[1].ends_with("Kiln  created (draft)"), "{log}");
+    assert!(lines[2].ends_with("Kiln  status draft → approved"), "{log}");
+    assert!(
+        lines[3].starts_with("uncommitted") && lines[3].ends_with("owner (none) → ana"),
+        "{log}"
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&ok(d, &["log", "REQ-001", "--format", "json"])).unwrap();
+    assert_eq!(json["events"][1]["changes"][0], "status draft → approved");
+    assert_eq!(json["events"][1]["author"], "Kiln");
+
+    let signoff = kiln_in(d, &["signoff", "base"]);
+    assert_eq!(signoff.status.code(), Some(0));
+    let text = stdout(&signoff);
+    assert!(
+        text.contains("K218 warning: REQ-001 Fast: status draft → approved, in "),
+        "{text}"
+    );
+    assert!(text.contains(" by Kiln ("), "{text}");
+    assert!(!text.contains("TEST-001"), "a test isn't sign-off: {text}");
+    let github = ok(d, &["signoff", "base", "--format", "github"]);
+    assert!(
+        github.starts_with("::warning file=design/requirements/REQ-001-fast.md,line=5"),
+        "{github}"
+    );
+
+    // [signoff] replaces the defaults; [check] K218 = "error" makes it fail.
+    let toml = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    std::fs::write(
+        d.join("kiln.toml"),
+        format!("{toml}\n[signoff]\ntest = [\"passing\"]\n\n[check]\nK218 = \"error\"\n"),
+    )
+    .unwrap();
+    assert_eq!(
+        stdout(&kiln_in(d, &["signoff", "base"])),
+        "",
+        "requirement is no longer listed"
+    );
+    ok(d, &["set", "TEST-001", "status=passing"]);
+    let strict = kiln_in(d, &["signoff", "base"]);
+    assert_eq!(strict.status.code(), Some(1));
+    assert!(stdout(&strict)
+        .contains("K218 error: TEST-001 Timing: status draft → passing, not committed yet"));
+}

@@ -2,7 +2,7 @@
 id = "REQ-024"
 type = "requirement"
 title = "Sign-off is visible: who moved which status, when, in which change"
-status = "approved"
+status = "verified"
 +++
 
 **Rationale:** the agent guide leaves sign-off to people, but nothing showed when a status that is someone's call changed, or who changed it. Regulated work asks when a requirement was approved, by whom and in which change; git already knows, and Kiln should say it.

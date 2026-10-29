@@ -584,7 +584,9 @@ part-of=MS-002 --body-file -`.
 In review, treat an agent's design changes like anyone's: the front
 matter changes are small and `kiln check` has run on them; read the
 prose, and check that it hasn't moved a requirement to approved or
-accepted a decision on its own.
+accepted a decision on its own. `kiln signoff origin/main --format
+github` in CI puts a warning on every such change, with the commit and
+author, and `kiln log ID` shows an item's whole history.
 
 ### Two people, one ID
 

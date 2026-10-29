@@ -496,6 +496,25 @@ Errors make `kiln check` exit 1; warnings are listed but don't fail.
 Every rule and a recommended set of severities is on
 [Checking](Checking).
 
+## `[signoff]`
+
+Which statuses are a person's call, so `kiln signoff` reports every
+change to one (K218) with the commit and author that made it:
+
+```toml
+[signoff]
+requirement = ["approved", "verified"]
+decision = ["accepted"]
+risk = ["accepted", "closed"]
+```
+
+Each key is a type, each value the statuses that count. A type that
+doesn't exist, or a status it doesn't have, is K002. Without the table,
+the defaults follow the agent guide's rule: a requirement approved or
+verified, a decision accepted or rejected, a risk accepted or closed, a
+milestone done. Written, it replaces them whole: a type it leaves out has
+no sign-off. See [Checking](Checking#k218).
+
 ## `[confluence]` and `[[export]]`
 
 These two configure exports. In short:

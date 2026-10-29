@@ -45,7 +45,24 @@ pub struct Config {
     pub confluence: Option<ConfluenceConfig>,
     /// `[[export]]`, the valid ones, in order.
     pub exports: Vec<ExportTarget>,
+    /// `[signoff]`: type → the statuses that are a person's call (K19,
+    /// `kiln signoff`). `None` when not written; see
+    /// [`Config::signoff_statuses`].
+    pub signoff: Option<BTreeMap<String, Vec<String>>>,
 }
+
+/// The sign-off statuses when `[signoff]` isn't written: the agent
+/// guide's rule (approving a requirement, accepting or rejecting a
+/// decision, accepting or closing a risk, finishing a milestone), where
+/// the type has those statuses. A requirement's `verified` counts too: it
+/// says the evidence was accepted, and a requirement moved straight to it
+/// would otherwise skip the approval unseen.
+const DEFAULT_SIGNOFF: &[(&str, &[&str])] = &[
+    ("requirement", &["approved", "verified"]),
+    ("decision", &["accepted", "rejected"]),
+    ("risk", &["accepted", "closed"]),
+    ("milestone", &["done"]),
+];
 
 /// What `kiln jira sync` pushes, and where (INTEGRATION.md, "Jira").
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -157,6 +174,29 @@ impl LinkRole {
 }
 
 impl Config {
+    /// The statuses of `type_name` that are sign-off: `[signoff]`'s list
+    /// when it is written (and then only what it says), else the defaults
+    /// the type actually has.
+    pub fn signoff_statuses(&self, type_name: &str) -> Vec<&str> {
+        match &self.signoff {
+            Some(map) => map
+                .get(type_name)
+                .map(|v| v.iter().map(String::as_str).collect())
+                .unwrap_or_default(),
+            None => {
+                let Some(ty) = self.type_named(type_name) else {
+                    return Vec::new();
+                };
+                DEFAULT_SIGNOFF
+                    .iter()
+                    .filter(|(t, _)| *t == type_name)
+                    .flat_map(|(_, statuses)| statuses.iter().copied())
+                    .filter(|s| ty.statuses.iter().any(|x| x == s))
+                    .collect()
+            }
+        }
+    }
+
     pub fn type_named(&self, name: &str) -> Option<&TypeDef> {
         self.types.iter().find(|t| t.name == name)
     }
@@ -481,6 +521,7 @@ mod tests {
             severities: BTreeMap::new(),
             confluence: None,
             exports: vec![],
+            signoff: None,
         };
         let patterns = config.code_patterns();
         assert_eq!(patterns.len(), 1);

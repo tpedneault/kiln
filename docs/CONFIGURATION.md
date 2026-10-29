@@ -24,6 +24,7 @@ named like a token or password is an error (K004).
 | `[jira]` `url` | where `jira` keys point, and the Jira the mirror reads (`kiln list --jira`, K207, the GUI); Server or Data Center | none |
 | `[jira]` `project`, `parent`, `parent_type`, `subtask_type`, `types`, `[jira.status]` | `kiln jira sync`: the Jira project, the project issue (written by the first sync), the issue types, the Kiln types synced (`task`), Kiln status → Jira status name — INTEGRATION.md, "Jira" | none (no sync) |
 | `[check]` | severity per rule: `K201 = "error"`, `K105 = "off"` | each rule's default (FORMAT.md, "Check rules") |
+| `[signoff]` | type → the statuses that are a person's call, for `kiln signoff` (K19); written, it replaces the defaults | requirement approved and verified, decision accepted and rejected, risk accepted and closed, milestone done |
 | `[[export]]` | export targets: `name`, `format` (markdown, html, docx, confluence, confluence-wiki), `layout`, `title`, `template`, `types`, `exclude_status`, `reports`, `numbering`, `item_style` (list, line, table, none), `link_to`, `path`, and `[export.markdown]` (`flavour`, `diagrams`), `[export.html]` (`theme`), `[export.docx]` (`reference`), `[export.confluence]` (`parent` or `page`, `space`, `labels`, `toc_levels`, `restrict_adopted`, `qualify_titles`, `children`) — EXPORT.md | none |
 | `[confluence]` | the connection: `url`, `space`, `flavour`, `user`, `auth`, `labels`, `jira_macro`, `jira_server_id`, `on_drift`, `diagrams`, `max_page_kib`, … — CONFLUENCE.md | none |
 

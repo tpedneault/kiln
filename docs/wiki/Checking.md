@@ -229,6 +229,7 @@ edit) and in exports with the `findings` report, at the same severities.
 | K215 | warning | an item past its first status still has its template's text |
 | K216 | warning | with `--results`: a test verifying an item failed |
 | K217 | warning | with `--results`: a test verifying an item didn't run |
+| K218 | warning | only from `kiln signoff`: a sign-off status changed since a revision |
 
 ## Configuration rules (K001–K005)
 
@@ -560,7 +561,7 @@ statuses.
 changes. Without a guide, or with the section deleted, there is nothing
 to check.
 
-## Design rules (K201–K217)
+## Design rules (K201–K218)
 
 These look at the design as a whole: what is covered, what is overdue,
 what is inconsistent. They are warnings by default (K207 is off), because
@@ -888,6 +889,24 @@ src/export.rs:52:14: K217 warning: the test verifying REQ-003 here (`round_trips
 that every report is passed: `--results` repeats). If Kiln names the
 wrong test, put the comment on the line just above the test's
 declaration, or above its attribute (`#[test]`, `@Test`).
+
+### K218
+
+**Triggers:** only `kiln signoff REV` produces it, never `kiln check`: an
+item whose status changed since `REV` to one of its type's sign-off
+statuses (`[signoff]` in `kiln.toml`; by default a requirement approved
+or verified, a decision accepted or rejected, a risk accepted or closed,
+a milestone done), or that was created with one. The message names the
+last commit since `REV` that touched the file, and its author.
+
+```text
+design/requirements/REQ-014-the-window-appears-within-50-ms.md:5:10: K218 warning: REQ-014 The window appears within 50 ms: status draft → approved, in 5d6e7f8 by Bo Li (2026-10-03); sign-off is a person's call, so check it was meant
+```
+
+**Fix:** nothing, when the person named meant it. When a coding agent (or
+anyone) moved it without that call, set it back in the pull request. To
+make sign-off a separate pull request, set `K218 = "error"`: `kiln
+signoff` then exits 1.
 
 K211–K214 come from the same idea as `kiln next`: work is *open* while
 neither done nor closed. They catch a status moved ahead of the work it

@@ -3,8 +3,10 @@
 //! `git log` pass, for exports' repository links), whether the clone is
 //! shallow, and whether a path is ignored; and (K6) a revision resolved
 //! to its commit, the files at a revision and the tags, for `kiln diff`,
-//! `kiln export --since` and the GUI's baseline; and (K18) the lines
-//! changed since a revision, for `kiln affected`.
+//! `kiln export --since` and the GUI's baseline; (K18) the lines changed
+//! since a revision, for `kiln affected`; and (K19) a file's history, its
+//! contents at a commit and the last commit to touch it, for `kiln log`
+//! and `kiln signoff`.
 //!
 //! Shells out to `git`, as `fenix-git` does, rather than linking a git
 //! library: the user's own git already honours their credentials,
@@ -362,6 +364,91 @@ pub fn parse_changed_lines(diff: &str) -> HashMap<String, Vec<(u32, u32)>> {
     out
 }
 
+/// The commits that touched `path` (relative to `dir`), oldest first,
+/// following renames: each with its id, committer date (`YYYY-MM-DD`),
+/// author and the file's path in that commit. For `kiln log` and `kiln
+/// signoff` (K19).
+pub fn file_history(dir: &Path, path: &str) -> Result<Vec<FileRevision>, GitError> {
+    let output = git(
+        dir,
+        &[
+            "log",
+            "--follow",
+            "--reverse",
+            "--format=%x1e%H%x1f%cs%x1f%an",
+            "--name-only",
+            "--",
+            path,
+        ],
+    )?;
+    if !output.status.success() {
+        return Err(failed(&output));
+    }
+    Ok(parse_file_history(&String::from_utf8_lossy(&output.stdout)))
+}
+
+/// One commit in a file's history.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileRevision {
+    pub commit: String,
+    pub date: String,
+    pub author: String,
+    /// The file's path in this commit (renames followed).
+    pub path: String,
+}
+
+/// [`file_history`] from its `git log` output.
+pub fn parse_file_history(log: &str) -> Vec<FileRevision> {
+    log.split('\u{1e}')
+        .filter_map(|record| {
+            let mut lines = record.lines().filter(|l| !l.trim().is_empty());
+            let header = lines.next()?;
+            let mut fields = header.split('\u{1f}');
+            let commit = fields.next()?.trim().to_owned();
+            let date = fields.next()?.trim().to_owned();
+            let author = fields.next().unwrap_or("").trim().to_owned();
+            let path = lines.next()?.trim().to_owned();
+            (commit.len() >= 7).then_some(FileRevision {
+                commit,
+                date,
+                author,
+                path,
+            })
+        })
+        .collect()
+}
+
+/// The contents of `path` at `commit`, `None` when it isn't there.
+pub fn file_at(dir: &Path, commit: &str, path: &str) -> Result<Option<Vec<u8>>, GitError> {
+    let spec = format!("{commit}:./{path}");
+    let output = git(dir, &["show", "--end-of-options", &spec])?;
+    Ok(output.status.success().then_some(output.stdout))
+}
+
+/// The last commit in `since..HEAD` that touched `path`, with its date and
+/// author; `None` when none did (the change isn't committed yet).
+pub fn last_change(dir: &Path, since: &str, path: &str) -> Result<Option<FileRevision>, GitError> {
+    let range = format!("{since}..HEAD");
+    let output = git(
+        dir,
+        &[
+            "log",
+            "-1",
+            "--format=%x1e%H%x1f%cs%x1f%an",
+            "--name-only",
+            &range,
+            "--",
+            path,
+        ],
+    )?;
+    if !output.status.success() {
+        return Err(failed(&output));
+    }
+    Ok(parse_file_history(&String::from_utf8_lossy(&output.stdout))
+        .into_iter()
+        .next())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -484,5 +571,16 @@ mod tests {
         let changed = parse_changed_lines(diff);
         assert_eq!(changed["src/a.rs"], [(3, 3), (11, 14), (23, 23)]);
         assert!(!changed.contains_key("old.rs"));
+    }
+
+    #[test]
+    fn a_files_history_is_one_record_per_commit() {
+        let log = "\u{1e}aaaaaaa1\u{1f}2026-10-01\u{1f}Ana\n\ndesign/REQ-1-x.md\n\u{1e}bbbbbbb2\u{1f}2026-10-02\u{1f}Bo Li\n\ndesign/REQ-1-y.md\n";
+        let h = parse_file_history(log);
+        assert_eq!(h.len(), 2);
+        assert_eq!(
+            (h[1].author.as_str(), h[1].path.as_str()),
+            ("Bo Li", "design/REQ-1-y.md")
+        );
     }
 }

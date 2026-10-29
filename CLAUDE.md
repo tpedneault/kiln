@@ -35,7 +35,8 @@ project that explains itself: body templates, `kiln init` adds the
 the plan on the GUI's Board and Roadmap; claimed work with `kiln next
 --unowned`; K215; tasks and tests in `design-doc`; `kiln_json`) and K18
 (`--results` with JUnit reports, K216 and K217, ADR-021; `kiln affected`,
-ADR-022; in-progress work apart from ready) are done.
+ADR-022; in-progress work apart from ready) and K19 (`kiln log` and
+`kiln signoff` from git, `[signoff]`, K218, ADR-023) are done.
 
 ## Read first, in this order
 
