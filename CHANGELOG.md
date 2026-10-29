@@ -6,6 +6,12 @@ All notable changes to Kiln are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Release: running the workflow by hand drafts the release (the notes
+  step no longer ends the job early), and a rerun reuses a tag that has
+  no release yet.
+
 ## [1.0.0] - 2026-10-29
 
 The first release. Requirements, design notes, decisions, milestones,
