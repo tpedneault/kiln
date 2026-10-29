@@ -155,7 +155,9 @@ This part is the project's to edit; the section below it is generated.
 - **When you implement or test a requirement, say so in the code.** A
   comment `implements: REQ-014` near the code and `verifies: REQ-014`
   on its test (see "Links" below for the roles code may use) make the
-  code part of the trace.
+  code part of the trace. Before you open a pull request, `kiln
+  affected origin/main` lists the requirements your change touches and
+  the tests that verify them; run those.
 - **Keep `kiln check` clean.** Run it before committing; errors fail CI.
   Fix what it reports rather than lowering a severity in `[check]`.
 - **Don't edit generated files.** Exports listed below are written by

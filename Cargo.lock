@@ -1920,6 +1920,7 @@ version = "0.1.0"
 dependencies = [
  "kiln-model",
  "pulldown-cmark",
+ "quick-xml 0.38.4",
  "regex",
  "toml_edit 0.22.27",
 ]

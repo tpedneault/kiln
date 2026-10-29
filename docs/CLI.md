@@ -10,6 +10,19 @@ documented here when it ships. The file format is
 nearest `kiln.toml`. `--project <DIR>` starts the walk from `DIR`
 instead, for every command.
 
+`--results <FILE>` (repeatable, every command) reads a JUnit XML test
+report, as cargo-nextest, pytest, JUnit, Jest or go-junit-report write
+it (K18). A `verifies` code reference then counts toward coverage only
+when its test passed: the test named by the first declaration below the
+comment (`fn`, `def`, `func`, `function`, `sub`; `it("…")`/`test("…")`;
+else the identifier before `(`), matched to a report case by name, or
+its last `::`, `.` or `/` segment, and by file when the report names one
+(ADR-021). `kiln trace` marks each such reference `(passed)`, `(failed)`
+or `(didn't run)`; `kiln check` reports the last two (K216, K217) and the
+coverage they no longer give (K201); exports' traceability follows. A
+report that can't be read is a usage error (exit 2); stderr sums up the
+verdicts. Without `--results`, a code reference counts as written.
+
 Results go to stdout, messages to stderr, so `kiln list --format json |
 …` and `kiln check --format gitlab > report.json` stay clean.
 
@@ -289,9 +302,10 @@ $ kiln show TASK-004 --format json
 ### `kiln next [--milestone ID] [--unowned] [--format text|json]`
 
 The work ready to start (DESIGN.md, "The plan"): items of a type the
-`part-of` role may link from (`task` by default) that are neither done
-nor closed, whose status isn't `blocked`, and that `depends-on` nothing
-still open. Earliest milestone first (open milestones in ID order, work in
+`part-of` role may link from (`task` by default) still at their type's
+first status (not started; K18), whose status isn't `blocked`, and that
+`depends-on` nothing still open. Work already past its first status is
+in progress, which `kiln status` lists, and isn't offered again. Earliest milestone first (open milestones in ID order, work in
 no milestone last), then by ID; a sub-task counts in its parent's
 milestone. A milestone groups and orders work but doesn't gate it: a task
 in a milestone that depends on an unfinished one is ready when its own
@@ -319,8 +333,9 @@ and says on stderr how much is waiting. Without a `part-of` role in
 The plan by milestone: each milestone that is open or still has open
 work, with its status, due date and progress (its own work, the same
 number `kiln show`, the roadmap report and the GUI give, ADR-020), the
-work ready to start and the work waiting, with what it waits on and who
-has claimed each; then work in no milestone; then what `kiln check`
+work in progress (past its first status, nothing it waits on), the work
+ready to start and the work waiting, with what it waits on and who has
+claimed each; then work in no milestone; then what `kiln check`
 finds.
 
 ```
@@ -400,6 +415,32 @@ REQ-013                            child of REQ-001 — REQ-013 Edits keep the a
 crates/kiln-parse/src/edit.rs:58   implements REQ-013, child of REQ-001
 crates/kiln-parse/src/edit.rs:173  verifies REQ-013, child of REQ-001
 ```
+
+### `kiln affected [REV] [--format text|json|github]`
+
+The items a change reaches (K18): from the lines `git diff` says changed
+between `REV` (default `HEAD`, so what isn't committed yet) and the
+working tree, to each item whose code or file changed, with what
+verifies it, to re-check. A code reference covers its own line down to
+the line before the next code reference in the file, or the end of the
+file (ADR-022): it over-reports rather than misses, so put references
+close to their code. A changed item file reaches its item. Untracked
+files aren't seen, as `git diff` doesn't see them.
+
+```
+$ kiln affected origin/main
+REQ-002 Small binary  (approved)
+  changed   src/lib.rs:14-17 (under `implements` at line 12)
+  re-check  src/lib.rs:40, TEST-003 Measure the binary
+kiln: since origin/main (1a2b3c4), 1 item reached
+```
+
+`--format github` prints a notice on each changed reference (`::notice
+file=src/lib.rs,line=14,title=Kiln affected::changes code that
+`implements` REQ-002 Small binary; re-check …`); JSON gives `since`,
+`commit` and `items`, each `{id, title, status, type, changed, recheck}`,
+a change `{path, line, role, from, to}` or `{path, file: true}`. Not a
+repository, or a revision git doesn't know, is a usage error (exit 2).
 
 ### `kiln diff REV[..REV] [--type TYPE] [--format text|json]`
 

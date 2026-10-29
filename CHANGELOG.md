@@ -258,9 +258,20 @@ All notable changes to Kiln are recorded here. The format follows
   template's prompts. The `design-doc` template places tasks and tests,
   so a first export leaves nothing out. Every JSON object Kiln prints
   carries `"kiln_json": 1` ([docs/CLI.md](docs/CLI.md), "JSON output").
+- K18: the trace says what passed, and what a change touches (REQ-023,
+  ADR-021, ADR-022). `--results FILE` (any command, repeatable) reads a
+  JUnit report: a `verifies` code reference then counts only when its
+  test passed; `kiln trace` marks each `(passed)`, `(failed)` or `(didn't
+  run)`, and K216 and K217 report the last two. `kiln affected [REV]`
+  lists the items whose code or file changed since `REV`, with what
+  verifies them, as text, JSON or GitHub notices
+  ([docs/CLI.md](docs/CLI.md), "`kiln affected`").
 
 ### Changed
 
+- `kiln next` offers only work not started yet; work past its first
+  status is "in progress" in `kiln status` (and its JSON's
+  `in_progress`), not "ready" (K18).
 - A milestone's progress counts its own work only (K17, ADR-020), in
   `kiln show`, the roadmap report and the GUI as in `kiln status`: the
   milestones it `depends-on` no longer add theirs. Committed exports with

@@ -100,6 +100,10 @@ pub struct Project {
     inbound: HashMap<ItemId, Vec<Inbound>>,
     children: HashMap<ItemId, Vec<usize>>,
     mentioned_by: HashMap<ItemId, Vec<usize>>,
+    /// Test results by code reference (K18, `--results`); empty when none
+    /// were given, and cleared when the graph is rebuilt, since indices
+    /// change (the language server never applies results).
+    pub(crate) verdicts: HashMap<usize, crate::results::Verdict>,
 }
 
 /// One Markdown file read: its item (if usable), its findings, and
@@ -274,6 +278,7 @@ impl Project {
             inbound: HashMap::new(),
             children: HashMap::new(),
             mentioned_by: HashMap::new(),
+            verdicts: HashMap::new(),
         };
         project.build_graph();
         Ok(project)
@@ -382,6 +387,7 @@ impl Project {
     /// Sorts, then builds the graph from scratch.
     fn build_graph(&mut self) {
         self.sort();
+        self.verdicts.clear();
         self.by_id.clear();
         self.inbound.clear();
         self.children.clear();
@@ -454,11 +460,15 @@ impl Project {
         self.type_of(item).is_some_and(|t| t.is_done(&item.status))
     }
 
-    /// Whether a link source counts: code locations always do; items
-    /// unless closed.
+    /// Whether a link source counts: items unless closed; code locations
+    /// unless test results were applied and say this one's test failed or
+    /// didn't run (K18).
     pub fn source_is_open(&self, source: Source) -> bool {
         match source {
-            Source::Code(_) => true,
+            Source::Code(i) => self
+                .verdicts
+                .get(&i)
+                .is_none_or(|v| *v == crate::results::Verdict::Passed),
             Source::Item(i) => !self.is_closed(&self.items[i]),
         }
     }

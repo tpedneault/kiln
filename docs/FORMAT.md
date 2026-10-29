@@ -460,6 +460,8 @@ Severities: `error` (exit 1), `warning`, `off`, overridable in `[check]`.
 | K213 | warning | work (an item of a type `part-of` may link from, `task` by default) that is neither done nor closed and is `part-of` no milestone, itself or through its parent |
 | K214 | warning | a requirement with status `implemented` or `verified` while work that `implements` it is neither done nor closed |
 | K215 | warning | an item past its type's `initial` status, not closed, whose body still has a line of its type's `template` word for word (not a heading or a blank line): a prompt nobody replaced; once per item, on the first such line |
+| K216 | warning | with `--results`: a `verifies` code reference whose test failed (a matched case has a `failure` or `error`); it doesn't count toward coverage |
+| K217 | warning | with `--results`: a `verifies` code reference whose test isn't in the report, or was only skipped; it doesn't count toward coverage |
 
 K211–K214 are the plan contradicting itself (ADR-018 in Kiln's own
 design): a status moved ahead of the work it stands for. Like K204–K206

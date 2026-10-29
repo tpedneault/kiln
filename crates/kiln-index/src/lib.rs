@@ -20,6 +20,7 @@
 //! edited file, so the command line, the GUI and the Flint provider
 //! refuse alike when the file changed under them.
 
+mod affected;
 mod diff;
 mod edit;
 mod levels;
@@ -27,9 +28,11 @@ mod new_item;
 mod plan;
 mod project;
 mod renumber;
+mod results;
 mod source;
 mod write;
 
+pub use affected::{Reached, Touch};
 pub use diff::{diff, ChangeKind, Detail, ItemChange};
 pub use edit::{
     apply_config_key, apply_jira_key, apply_link, apply_renumber, apply_set, check_link,
@@ -40,6 +43,7 @@ pub use new_item::{plan_new_item, toml_string, NewItem, NewItemSpec};
 pub use plan::{Group, Waiting, BLOCKED, DEPENDS_ON, PART_OF};
 pub use project::{labelled, Impact, Inbound, LoadError, Progress, Project, Source, Step};
 pub use renumber::{plan_renumber, FileEdits, RenumberPlan};
+pub use results::{ResultsSummary, Verdict, VERIFIES};
 pub use source::{find_root, DiskSource, FileSource, Listing, MemorySource, Stamp};
 pub use write::{read_for_edit, write_back, ReadFile, WriteError};
 
