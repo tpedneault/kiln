@@ -162,7 +162,15 @@ impl Writer<'_> {
             Block::Directive(_) => String::new(),
             Block::Toc => format!(
                 "{{toc:maxLevel={}}}\n\n",
-                self.ctx.target.confluence.toc_levels.unwrap_or(3)
+                self.ctx.target.confluence.toc_levels.unwrap_or_else(|| {
+                    self.ctx
+                        .split
+                        .pages
+                        .iter()
+                        .map(|p| crate::document::toc_levels(&p.nodes))
+                        .max()
+                        .unwrap_or(3)
+                })
             ),
             Block::Props(p) => self.props(p),
             Block::ChildPages => "{children:all=true}\n\n".to_owned(),

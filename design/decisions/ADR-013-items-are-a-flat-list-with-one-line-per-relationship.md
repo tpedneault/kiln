@@ -2,7 +2,7 @@
 id = "ADR-013"
 type = "decision"
 title = "Items are a flat list, with one line per relationship"
-status = "accepted"
+status = "superseded"
 +++
 
 Exports nested items by `parent`: a child was a heading one level below

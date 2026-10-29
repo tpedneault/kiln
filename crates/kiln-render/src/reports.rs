@@ -15,8 +15,9 @@ use crate::doc::{Align, Block, Inline, Table, Target, Tone};
 /// export has one.
 #[derive(Debug, Clone, Default)]
 pub struct ReportOptions<'a> {
-    /// `traceability`: the type to trace (default: the highest
-    /// requirement level, `requirement` without `[requirements]`).
+    /// `traceability`: the type to trace. Without it, the highest
+    /// requirement level, or with several levels the chains through them
+    /// (the `levels` report).
     pub type_name: Option<String>,
     /// `--since`: what the `changes` report lists.
     pub since: Option<&'a Since>,
@@ -67,8 +68,14 @@ pub fn report(
     options: &ReportOptions,
 ) -> Option<Vec<Block>> {
     match name {
-        "traceability" => Some(traceability(project, options)),
-        "levels" => Some(levels(project)),
+        // With several levels, a document's traceability is the chains;
+        // `type=` still traces one type.
+        "traceability" | "levels"
+            if options.type_name.is_none() && project.config.trace().is_some() =>
+        {
+            Some(levels(project))
+        }
+        "traceability" | "levels" => Some(traceability(project, options)),
         "findings" => Some(findings_report(findings)),
         "roadmap" => Some(roadmap(project)),
         "risks" => Some(risks(project)),
@@ -232,9 +239,7 @@ fn traceability(project: &Project, options: &ReportOptions) -> Vec<Block> {
 fn levels(project: &Project) -> Vec<Block> {
     let config = &project.config;
     let Some(trace_role) = config.trace() else {
-        return vec![Block::Paragraph(vec![Inline::text(
-            "This project has one requirement level; [requirements] levels lists more.",
-        )])];
+        return traceability(project, &ReportOptions::default());
     };
     let trace = project.level_trace();
     let lowest = trace.levels.len() - 1;

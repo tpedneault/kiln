@@ -472,11 +472,22 @@ tags = ["performance"]
 
 ## Design document (design-doc)
 
-The general design document: goals and non-goals, requirements, design,
-decisions, milestones with their tasks, risks, tests, traceability and
-open findings, in one document. It places the types `kiln init` writes, so on such a project
-it adds only an export; `kiln init` adds it unless `--preset` names
-another preset or `none`:
+The general design document, on one page, reading top-down: an
+introduction (purpose and scope, goals and non-goals), the requirements
+as one tree, design, decisions, verification (the tests as a table),
+plan (the roadmap and the tasks), risks, then traceability and open
+findings as appendices. Each item's facts are a small table under its
+heading. It places the types `kiln init` writes, so on such a project it
+adds only an export; `kiln init` adds it unless `--preset` names
+another preset or `none`.
+
+With several requirement levels ([Configuration](Configuration#requirements-requirement-levels)),
+the requirements section is the
+[requirements tree](Templates-and-exports#the-requirements-tree): each
+top-level requirement with the requirements refining it beneath, level
+by level, derived ones apart, and the traceability appendix is the
+chain matrix. The preset then adds no `requirement` type beside your
+levels: its `requirement` stands for them.
 
 <!-- added: design-doc -->
 ```toml
@@ -487,6 +498,10 @@ title = "Shop — design document"
 template = "design/templates/design-doc.md"
 path = "docs/DESIGN-DOCUMENT.md"
 ```
+
+To give each top-level section a page of its own on Confluence, add
+`layout = "sections"` to the Confluence target; the requirements tree
+then is one page.
 
 `kiln export --check` in CI keeps a committed copy current
 ([Continuous integration](Continuous-integration)).

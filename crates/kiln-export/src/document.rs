@@ -109,3 +109,29 @@ impl Document {
         out
     }
 }
+
+/// How many heading levels a table of contents of `nodes` lists so that
+/// every item is in it: the depth of the deepest item section, counting
+/// the sections at the top of `nodes` as 1, and at least 3 (a section, a
+/// subsection, an item), at most 6, where headings stop. A requirements
+/// tree goes as deep as it has levels; ADR-013's flat lists stay at 3.
+pub fn toc_levels(nodes: &[Node]) -> u8 {
+    fn deepest(nodes: &[Node], depth: u8) -> u8 {
+        nodes
+            .iter()
+            .filter_map(|n| match n {
+                Node::Section(s) => {
+                    let here = if matches!(s.kind, SectionKind::Item(_)) {
+                        depth
+                    } else {
+                        0
+                    };
+                    Some(here.max(deepest(&s.nodes, depth.saturating_add(1))))
+                }
+                Node::Block(_) => None,
+            })
+            .max()
+            .unwrap_or(0)
+    }
+    deepest(nodes, 1).clamp(3, 6)
+}

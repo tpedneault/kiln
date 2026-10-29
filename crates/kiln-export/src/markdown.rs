@@ -436,8 +436,9 @@ impl<'a> Writer<'a> {
                 format!("{}\n", parts.join(" · "))
             }
             ItemStyle::Table => {
-                let mut out = "| Property | Value |\n| --- | --- |\n".to_owned();
-                out.push_str(&format!("| Status | {status} |\n"));
+                // The status row heads the table: Markdown needs a header
+                // row, and a "Property | Value" one says nothing.
+                let mut out = format!("| Status | {status} |\n| --- | --- |\n");
                 for entry in &props.entries {
                     let values: Vec<String> =
                         entry.values.iter().map(|v| self.inlines(v)).collect();
@@ -452,9 +453,16 @@ impl<'a> Writer<'a> {
         }
     }
 
-    /// A list of this page's sections, three levels deep, linked.
+    /// A list of this page's sections, linked, deep enough to list every
+    /// item (`toc_levels`).
     fn toc(&mut self) -> String {
-        fn walk(nodes: &[Node], depth: usize, out: &mut Vec<(usize, String, String)>) {
+        let levels = usize::from(crate::document::toc_levels(&self.page.nodes));
+        fn walk(
+            nodes: &[Node],
+            depth: usize,
+            levels: usize,
+            out: &mut Vec<(usize, String, String)>,
+        ) {
             for n in nodes {
                 if let Node::Section(s) = n {
                     let key = match &s.kind {
@@ -462,14 +470,14 @@ impl<'a> Writer<'a> {
                         _ => format!("section:{}", s.heading_text()),
                     };
                     out.push((depth, s.heading_text(), key));
-                    if depth < 2 {
-                        walk(&s.nodes, depth + 1, out);
+                    if depth + 1 < levels {
+                        walk(&s.nodes, depth + 1, levels, out);
                     }
                 }
             }
         }
         let mut entries = Vec::new();
-        walk(&self.page.nodes, 0, &mut entries);
+        walk(&self.page.nodes, 0, levels, &mut entries);
         let anchors = self.anchors.get(&self.page.key);
         entries
             .iter()

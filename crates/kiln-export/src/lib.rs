@@ -30,7 +30,7 @@ mod split;
 mod wiki;
 
 pub use assemble::{assemble, capitalised, short, Assembled, Assembly, Revision};
-pub use document::{Document, Node, Section, SectionKind};
+pub use document::{toc_levels, Document, Node, Section, SectionKind};
 pub use docx::{bookmark as docx_bookmark, Reference as DocxReference};
 pub use files::{apply, plan_files, FilePlan, MANIFEST};
 pub use markdown::{escape as markdown_escape, github_slug, gitlab_slug, FileContext};

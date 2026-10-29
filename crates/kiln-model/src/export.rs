@@ -196,11 +196,11 @@ pub struct ExportTarget {
 }
 
 impl ExportTarget {
+    /// The properties table in every layout unless the target says
+    /// otherwise: rows line up from item to item and scan faster than
+    /// lines once an item has a few relationships (ADR-024).
     pub fn item_style(&self) -> ItemStyle {
-        self.item_style.unwrap_or(match self.layout {
-            Layout::Tree => ItemStyle::Table,
-            _ => ItemStyle::List,
-        })
+        self.item_style.unwrap_or(ItemStyle::Table)
     }
 
     /// Whether `kiln:items` nests items by `parent` when it doesn't say

@@ -212,10 +212,24 @@ pub fn parse_config(text: &str) -> (Option<Config>, Vec<Finding>) {
     };
 
     let confluence = crate::exports::confluence(&mut w, root.get("confluence"));
+    // A target without `types` places the requirements first, highest
+    // level first, then the other types in kiln.toml's order.
+    let mut export_order = types.clone();
+    let first: Vec<&str> = if levels.is_empty() {
+        vec!["requirement"]
+    } else {
+        levels.iter().map(String::as_str).collect()
+    };
+    export_order.sort_by_key(|t| {
+        first
+            .iter()
+            .position(|l| *l == t.name)
+            .unwrap_or(first.len())
+    });
     let exports = crate::exports::exports(
         &mut w,
         root.get("export"),
-        &types,
+        &export_order,
         &name,
         confluence.as_ref(),
     );

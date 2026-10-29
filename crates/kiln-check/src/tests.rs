@@ -381,10 +381,8 @@ fn k204_superseded_by_nothing() {
             ),
         ),
     ]);
-    assert_eq!(
-        run("", &f),
-        ["design/ADR-001.md:5:10 K204", "design/ADR-003.md:7:16 K203"]
-    );
+    // ADR-003's `supersedes` is the link K204 asks for, not K203's.
+    assert_eq!(run("", &f), ["design/ADR-001.md:5:10 K204"]);
 }
 
 #[test]

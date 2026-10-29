@@ -699,3 +699,171 @@ fn compact_items_keep_their_body_and_anchor_without_a_heading() {
         "a reference from another page lands on the anchor: {requirements}"
     );
 }
+
+/// Three requirement levels: a top-level requirement refined by system
+/// requirements, refined by software ones; one system requirement under
+/// two parents, one decomposed by `parent`, one derived software
+/// requirement.
+fn levels_source(targets: &str) -> MemorySource {
+    let config = format!(
+        "{}
+[repository]
+web = \"https://git.example.com/pump/-/blob/{{commit}}/{{path}}#L{{line}}\"
+
+[types.system]
+prefix = \"SYS\"
+title = \"System requirement\"
+statuses = [\"draft\", \"approved\", \"obsolete\"]
+closed = [\"obsolete\"]
+parents = [\"system\"]
+
+[types.software]
+prefix = \"SW\"
+title = \"Software requirement\"
+statuses = [\"draft\", \"approved\", \"obsolete\"]
+closed = [\"obsolete\"]
+
+[links.refines]
+from = [\"system\", \"software\"]
+to = [\"requirement\", \"system\"]
+inverse = \"refined by\"
+
+[requirements]
+levels = [\"requirement\", \"system\", \"software\"]
+{targets}",
+        kiln_model::default_config("Pump")
+    );
+    let refines = |ids: &[&str]| {
+        let ids: Vec<String> = ids.iter().map(|i| format!("\"{i}\"")).collect();
+        format!("[links]\nrefines = [{}]\n", ids.join(", "))
+    };
+    MemorySource::new()
+        .with("kiln.toml", config)
+        .with(
+            "design/REQ-001.md",
+            item(
+                "REQ-001",
+                "requirement",
+                "Alarms are quick",
+                "approved",
+                "+++\nWithin seconds.\n",
+            ),
+        )
+        .with(
+            "design/REQ-002.md",
+            item("REQ-002", "requirement", "Alarms are loud", "approved", ""),
+        )
+        .with(
+            "design/SYS-001.md",
+            item(
+                "SYS-001",
+                "system",
+                "Detect in 2 s",
+                "approved",
+                &refines(&["REQ-001"]),
+            ),
+        )
+        .with(
+            "design/SYS-002.md",
+            item(
+                "SYS-002",
+                "system",
+                "Sound at 70 dB",
+                "approved",
+                &refines(&["REQ-001", "REQ-002"]),
+            ),
+        )
+        .with(
+            "design/SYS-003.md",
+            item(
+                "SYS-003",
+                "system",
+                "Detect on battery too",
+                "approved",
+                "parent = \"SYS-001\"\n",
+            ),
+        )
+        .with(
+            "design/SW-001.md",
+            item(
+                "SW-001",
+                "software",
+                "Sample at 50 Hz",
+                "approved",
+                &refines(&["SYS-001"]),
+            ),
+        )
+        .with(
+            "design/SW-002.md",
+            item(
+                "SW-002",
+                "software",
+                "Drive the buzzer",
+                "approved",
+                &refines(&["SYS-002"]),
+            ),
+        )
+        .with(
+            "design/SW-003.md",
+            item(
+                "SW-003",
+                "software",
+                "Watchdog",
+                "approved",
+                "derived = true\n+++\nNothing above asks for it.\n",
+            ),
+        )
+        .with(
+            "design/TEST-001.md",
+            item(
+                "TEST-001",
+                "test",
+                "Bench test",
+                "passing",
+                "[links]\nverifies = [\"REQ-001\"]\n",
+            ),
+        )
+}
+
+#[test]
+// verifies: REQ-025
+fn requirement_levels_make_one_tree_on_the_page() {
+    let source = levels_source(
+        "
+[[export]]
+name = \"doc\"
+format = \"markdown\"
+path = \"out/doc.md\"
+
+[[export]]
+name = \"tree\"
+format = \"markdown\"
+layout = \"tree\"
+path = \"out/tree\"
+",
+    );
+    let project = Project::load(&source).unwrap();
+    assert!(project.findings.is_empty(), "{:?}", project.findings);
+    let rev = revision();
+    let a = Assembly {
+        project: &project,
+        findings: &[],
+        revision: &rev,
+        since: None,
+    };
+    let doc = crate::assemble(&target(&project, "doc"), None, &a);
+    let mut out = String::new();
+    dump(&doc.document.nodes, 0, &mut out);
+    golden("assembly-levels.txt", &out);
+    assert!(doc.left_out.is_empty(), "{:?}", doc.left_out);
+    // Every item is in the table of contents: four heading levels.
+    assert_eq!(crate::toc_levels(&doc.document.nodes), 4);
+
+    let all = prepared(&project, &source, &["doc", "tree"]);
+    let mut dumped = String::new();
+    for p in &all {
+        let files = render_files(p, &all, &web(&project), None, &FakePictures, &source);
+        dumped.push_str(&files_dump(&files));
+    }
+    golden("markdown-levels.md", &dumped);
+}

@@ -52,7 +52,11 @@ attachments ["image-68e9fa5fdb66.png (File(\"design/img/a.png\"))"]
 <p>Published by Kiln from design/REQ-001-launcher.md at c0ffee1. Edit it in the repository; changes made here are overwritten. Comment at the bottom of the page.</p>
 </ac:rich-text-body>
 </ac:structured-macro>
-<table>
+<table data-layout="default">
+<colgroup>
+<col style="width: 160.0px;" />
+<col />
+</colgroup>
 <tbody>
 <tr>
 <th>Status</th>
@@ -105,7 +109,11 @@ attachments ["diagram-84bd4a91e9b5.png (Diagram(\"flowchart TD\\n  a --> b\\n\")
 <p>Published by Kiln from design/REQ-002-fast.md at 9f8e7d6c5b4a. Edit it in the repository; changes made here are overwritten. Comment at the bottom of the page.</p>
 </ac:rich-text-body>
 </ac:structured-macro>
-<table>
+<table data-layout="default">
+<colgroup>
+<col style="width: 160.0px;" />
+<col />
+</colgroup>
 <tbody>
 <tr>
 <th>Status</th>
@@ -126,7 +134,7 @@ attachments ["diagram-84bd4a91e9b5.png (Diagram(\"flowchart TD\\n  a --> b\\n\")
 <ac:link>
 <ri:page ri:content-title="REQ-001 Flint is a launcher" ri:space-key="FLINT" />
 <ac:plain-text-link-body>
-<![CDATA[REQ-001 Flint is a launcher]]>
+<![CDATA[REQ-001]]>
 </ac:plain-text-link-body>
 </ac:link>
 </td>

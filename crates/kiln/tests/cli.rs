@@ -771,7 +771,7 @@ fn diff_and_export_since_a_tag() {
     assert!(md.contains("REQ-001 Fast\n\n*Changed*\n"), "{md}");
     assert!(md.contains("REQ-004 Quiet\n\n*New*\n"), "{md}");
     assert!(
-        md.contains("REQ-002 Small\n\n**draft**"),
+        md.contains("REQ-002 Small\n\n| Status | **draft** |"),
         "unchanged items have no marker: {md}"
     );
     assert!(md.contains("Since v1 ("), "{md}");
@@ -1266,8 +1266,8 @@ fn presets_populate_kiln_toml_once_and_the_wiki_says_what_they_add() {
         blocks.contains("src/basket.rs"),
         "code implements a block: {blocks}"
     );
-    assert!(blocks.contains("**Used by:**"), "{blocks}");
-    assert!(read("quality-requirements.md").contains("**Verified by:**"));
+    assert!(blocks.contains("| Used by |"), "{blocks}");
+    assert!(read("quality-requirements.md").contains("| Verified by |"));
     assert!(
         !read("introduction-and-goals.md").contains("<!--"),
         "the template's notes stay out of the export"
@@ -1490,8 +1490,10 @@ fn a_first_project_explains_itself() {
     // It places the plan and the tests, so a first export leaves nothing out (K17).
     ok(d, &["new", "task", "--title", "Placed"]);
     ok(d, &["new", "test", "--title", "Placed too"]);
-    let dry = kiln_in(d, &["export", "--dry-run"]);
-    assert!(!stdout(&dry).contains("leaves out"), "{}", stdout(&dry));
+    // (A decision still `proposed` is left out on purpose: the document
+    // shows accepted and superseded ones.)
+    let dry = stdout(&kiln_in(d, &["export", "--dry-run"]));
+    assert!(!dry.contains("TASK-") && !dry.contains("TEST-"), "{dry}");
     // Filters take lists, and a status nothing has is said aloud.
     ok(d, &["new", "task", "--title", "One"]);
     ok(d, &["set", "TASK-001", "status=doing"]);

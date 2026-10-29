@@ -305,7 +305,12 @@ impl Emitter<'_> {
                 format!("<p>{}</p>", parts.join(" · "))
             }
             ItemStyle::Table => {
-                let mut out = format!("<table><tbody><tr><th>Status</th><td>{status}</td></tr>");
+                // A narrow label column at the page's text width, not a
+                // table stretched across the page: one per item, they read
+                // as a block of facts under the heading.
+                let mut out = format!(
+                    "<table data-layout=\"default\"><colgroup><col style=\"width: 160.0px;\" /><col /></colgroup><tbody><tr><th>Status</th><td>{status}</td></tr>"
+                );
                 for e in &props.entries {
                     let values: Vec<String> = e.values.iter().map(|v| self.inlines(v)).collect();
                     out.push_str(&format!(

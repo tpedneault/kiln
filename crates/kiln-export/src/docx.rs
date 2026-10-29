@@ -96,6 +96,18 @@ const STYLES: &[(&str, &str)] = &[
         r#"<w:style w:type="paragraph" w:styleId="TOC3"><w:name w:val="toc 3"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:spacing w:after="60"/><w:ind w:left="440"/></w:pPr></w:style>"#,
     ),
     (
+        "TOC4",
+        r#"<w:style w:type="paragraph" w:styleId="TOC4"><w:name w:val="toc 4"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:spacing w:after="60"/><w:ind w:left="660"/></w:pPr></w:style>"#,
+    ),
+    (
+        "TOC5",
+        r#"<w:style w:type="paragraph" w:styleId="TOC5"><w:name w:val="toc 5"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:spacing w:after="60"/><w:ind w:left="880"/></w:pPr></w:style>"#,
+    ),
+    (
+        "TOC6",
+        r#"<w:style w:type="paragraph" w:styleId="TOC6"><w:name w:val="toc 6"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:spacing w:after="60"/><w:ind w:left="1100"/></w:pPr></w:style>"#,
+    ),
+    (
         "KilnCode",
         r#"<w:style w:type="paragraph" w:customStyle="1" w:styleId="KilnCode"><w:name w:val="Kiln Code"/><w:basedOn w:val="Normal"/><w:pPr><w:shd w:val="clear" w:color="auto" w:fill="F6F8FA"/><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:cs="Consolas"/><w:sz w:val="19"/></w:rPr></w:style>"#,
     ),
@@ -587,7 +599,8 @@ impl Writer<'_> {
         }
     }
 
-    /// The table of contents: a Word TOC field (headings 1–3, as links)
+    /// The table of contents: a Word TOC field (headings 1 to `toc_levels`,
+    /// as links)
     /// whose result is filled in already, so the document reads the same
     /// before Word updates it; `updateFields` in the settings asks Word to
     /// add the page numbers on opening.
@@ -598,11 +611,13 @@ impl Writer<'_> {
         // Ids are handed out in document order, so compute them the same
         // way as the page will.
         let mut ids = HashMap::new();
+        let levels = usize::from(crate::document::toc_levels(&page.nodes));
         fn walk(
             w: &mut Writer,
             ids: &mut HashMap<String, usize>,
             nodes: &[Node],
             depth: usize,
+            levels: usize,
             out: &mut Vec<(usize, String, String)>,
         ) {
             for n in nodes {
@@ -610,21 +625,21 @@ impl Writer<'_> {
                     std::mem::swap(&mut w.ids, ids);
                     let id = w.section_id(s);
                     std::mem::swap(&mut w.ids, ids);
-                    if depth <= 2 {
+                    if depth < levels {
                         out.push((depth, id, s.heading_text()));
                     }
-                    walk(w, ids, &s.nodes, depth + 1, out);
+                    walk(w, ids, &s.nodes, depth + 1, levels, out);
                 }
             }
         }
         let mut entries = Vec::new();
-        walk(self, &mut ids, &page.nodes, 0, &mut entries);
+        walk(self, &mut ids, &page.nodes, 0, levels, &mut entries);
         let count = entries.len();
         let mut out = String::new();
         for (i, (depth, id, text)) in entries.into_iter().enumerate() {
             let mut runs = String::new();
             if i == 0 {
-                runs.push_str("<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText xml:space=\"preserve\"> TOC \\o \"1-3\" \\h \\z \\u </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>");
+                runs.push_str(&format!("<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText xml:space=\"preserve\"> TOC \\o \"1-{levels}\" \\h \\z \\u </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>"));
             }
             runs.push_str(&format!(
                 "<w:hyperlink w:anchor=\"{}\" w:history=\"1\">{}</w:hyperlink>",
