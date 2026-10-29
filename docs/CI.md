@@ -81,7 +81,8 @@ create any page once.
 ## Releasing
 
 The `Release` workflow (`.github/workflows/release.yml`) runs when a tag
-`vX.Y.Z` is pushed, and nothing else publishes. `scripts/release.ps1`
+`vX.Y.Z` is pushed, or when it is run by hand on `master` with a version
+(Actions → Release → Run workflow), and nothing else publishes. `scripts/release.ps1`
 holds its steps, so they run the same locally:
 
 1. **prepare**: `release.ps1 -Step check` fails unless the tag's version
@@ -109,7 +110,14 @@ To release:
    `## [Unreleased]` into a new `## [X.Y.Z] - <today>` section below it,
    leaving `## [Unreleased]` empty. Merge it.
 2. Tag the merge commit and push the tag: `git tag vX.Y.Z && git push
-   origin vX.Y.Z`.
+   origin vX.Y.Z`. Or, without pushing a tag (from a session that may
+   push only its own branch, say): run the workflow by hand on `master`
+   with the version `X.Y.Z`. After the same check, `prepare` creates the
+   tag `vX.Y.Z` on `master`'s head through the API, and the run goes on
+   to build and publish from that tag. It goes on in the same run because
+   a tag pushed with the workflow's own token starts no other workflow;
+   and it refuses a tag that already exists, so a version is released
+   once.
 
 When a step fails, the release stays a draft: delete it and the tag
 (`git push origin :refs/tags/vX.Y.Z`), fix the cause on `master`, and tag

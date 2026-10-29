@@ -304,6 +304,9 @@ against a faithful fake of Cloud and Data Center) and the Jira mirror
   `requirement` stands for them. Tables of contents go as deep as the
   deepest item (3 to 6; `toc_levels` still sets Confluence's)
   ([docs/EXPORT.md](docs/EXPORT.md), "The requirements tree").
+- Release: the Release workflow can also be started by hand on `master`
+  with a version; it creates the tag itself and publishes from it
+  ([docs/CI.md](docs/CI.md), "Releasing").
 
 ### Changed
 
