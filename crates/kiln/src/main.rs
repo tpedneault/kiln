@@ -323,6 +323,20 @@ enum Command {
         #[arg(long, value_enum, default_value_t = AffectedFormat::Text)]
         format: AffectedFormat,
     },
+    /// An item's history from git: each commit that changed it, with date, author and what changed.
+    Log {
+        id: String,
+        #[arg(long, value_enum, default_value_t = TextOrJson::Text)]
+        format: TextOrJson,
+    },
+    /// Sign-off status changes since REV (default HEAD), with the commit and author of each: K218 findings.
+    Signoff {
+        /// The revision to compare the working tree with (`origin/main` in a pull request).
+        #[arg(default_value = "HEAD")]
+        rev: String,
+        #[arg(long, value_enum, default_value_t = CheckFormat::Text)]
+        format: CheckFormat,
+    },
     /// Everything that reaches an item by links or parents, transitively.
     Impact {
         id: String,
@@ -406,7 +420,10 @@ const COMMAND_GROUPS: &[(&str, &[&str])] = &[
         "Changing the design",
         &["unlink", "renumber", "preset", "agents"],
     ),
-    ("Reviewing", &["diff", "affected", "confluence"]),
+    (
+        "Reviewing",
+        &["diff", "affected", "signoff", "log", "confluence"],
+    ),
     ("The window and editors", &["gui", "lsp", "provider"]),
     ("Integrations", &["jira", "auth"]),
 ];
@@ -544,6 +561,8 @@ fn main() -> ExitCode {
         } => cmd::trace::run(project, type_name, format),
         Command::Impact { id, format } => cmd::impact::run(project, &id, format),
         Command::Affected { rev, format } => cmd::affected::run(project, &rev, format),
+        Command::Log { id, format } => cmd::log::run(project, &id, format),
+        Command::Signoff { rev, format } => cmd::signoff::run(project, &rev, format),
         Command::Diff {
             range,
             type_name,

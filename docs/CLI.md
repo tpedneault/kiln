@@ -442,6 +442,48 @@ file=src/lib.rs,line=14,title=Kiln affected::changes code that
 a change `{path, line, role, from, to}` or `{path, file: true}`. Not a
 repository, or a revision git doesn't know, is a usage error (exit 2).
 
+### `kiln log ID [--format text|json]`
+
+An item's history from git (K19, ADR-023): each commit that changed it,
+oldest first, with its date, author and what changed, in `kiln diff`'s
+words; then what isn't committed yet. Renames are followed (`git log
+--follow`). Nothing is stored in the item: git is the record.
+
+```
+$ kiln log REQ-014
+REQ-014 The window appears within 50 ms
+2026-10-01  1a2b3c4  Ana    created (draft)
+2026-10-03  5d6e7f8  Bo Li  status draft → approved
+2026-10-09  9a0b1c2  Ana    + verifies TEST-004; body
+uncommitted                 owner (none) → ana
+```
+
+JSON gives `id`, `title`, `path` and `events`, each `{commit, date,
+author, changes}` (`commit`, `date` and `author` `null` for what isn't
+committed). In a shallow clone it says on stderr that older history
+isn't there. Not a repository is a usage error (exit 2).
+
+### `kiln signoff [REV] [--format text|json|gitlab|github]`
+
+Every sign-off status change between `REV` (default `HEAD`) and the
+working tree (K19): an item whose status moved to one of its type's
+sign-off statuses, or that was created with one. `[signoff]` in
+`kiln.toml` says which statuses those are; the defaults follow the agent
+guide's rule (a requirement approved or verified, a decision accepted
+or rejected, a risk accepted or closed, a milestone done). Each is a
+K218 finding on the item's `status` line naming the last commit since
+`REV` that touched the file and its author, or "not committed yet", in
+`kiln check`'s formats:
+
+```
+$ kiln signoff origin/main --format github
+::warning file=design/requirements/REQ-014-….md,line=5,col=10,title=K218::REQ-014 The window appears within 50 ms: status draft → approved, in 5d6e7f8 by Bo Li (2026-10-03); sign-off is a person's call, so check it was meant
+```
+
+It changes nothing and exits 0, unless `[check] K218 = "error"`, which
+makes it exit 1 on any sign-off: for teams that want sign-off in a pull
+request of its own.
+
 ### `kiln diff REV[..REV] [--type TYPE] [--format text|json]`
 
 The items added, changed and removed between two revisions, or between

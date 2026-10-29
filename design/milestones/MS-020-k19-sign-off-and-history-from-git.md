@@ -2,7 +2,7 @@
 id = "MS-020"
 type = "milestone"
 title = "K19: sign-off and history from git"
-status = "active"
+status = "done"
 
 [links]
 depends-on = ["MS-019"]

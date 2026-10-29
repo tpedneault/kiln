@@ -165,7 +165,10 @@ fn sorted(v: &[String]) -> Vec<String> {
 }
 
 /// What changed in one item from `a` to `b`.
-fn details(a: &Item, b: &Item) -> Vec<Detail> {
+/// What differs between two versions of one item, in a fixed order:
+/// what `kiln diff` reports for a changed item and `kiln log` for each
+/// commit (K19).
+pub fn item_details(a: &Item, b: &Item) -> Vec<Detail> {
     let mut out = Vec::new();
     if a.status != b.status {
         out.push(Detail::Status {
@@ -267,7 +270,7 @@ pub fn diff(old: &Project, new: &Project) -> Vec<ItemChange> {
         match first(old, &b.id) {
             None => out.push(change(ChangeKind::Added, Vec::new())),
             Some(a) => {
-                let d = details(a, b);
+                let d = item_details(a, b);
                 if !d.is_empty() {
                     out.push(change(ChangeKind::Changed, d));
                 }

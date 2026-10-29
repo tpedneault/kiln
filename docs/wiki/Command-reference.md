@@ -18,6 +18,8 @@ All examples on this page come from one small scratch project, made with `kiln i
 | [`kiln trace`](#kiln-trace) | coverage of every item of a type, and the gaps; or the requirement levels as chains |
 | [`kiln impact`](#kiln-impact) | everything that depends on an item, transitively |
 | [`kiln affected`](#kiln-affected) | the items a change reaches since a revision, and what to re-check |
+| [`kiln log`](#kiln-log) | an item's history from git: who changed what, when |
+| [`kiln signoff`](#kiln-signoff) | the sign-off status changes since a revision, with their authors |
 | [`kiln diff`](#kiln-diff) | items added, changed and removed between two revisions |
 | [`kiln check`](#kiln-check) | checks the project against the rules |
 | [`kiln export`](#kiln-export) | writes file exports and publishes Confluence exports |
@@ -514,6 +516,51 @@ Notes:
 
 - A code reference covers its own line down to the line before the next code reference in the same file, or the end of the file. It reports too much rather than too little; keep references just above the code they are about.
 - A changed item file reaches that item. Untracked files aren't seen (`git diff` doesn't see them); `git add -N` makes them visible.
+
+### kiln log
+
+```text
+kiln log ID [--format text|json]
+```
+
+Shows an item's history from git: each commit that changed it, oldest first, with the date, the author and what changed, then what isn't committed yet. Git is the record; nothing is stored in the item.
+
+```console
+$ kiln log REQ-001
+REQ-001 Exports are deterministic
+2026-10-01  1a2b3c4  Thomas  created (draft)
+2026-10-03  5d6e7f8  Thomas  status draft → approved; tags (none) → determinism
+uncommitted                  owner (none) → thomas
+```
+
+Notes:
+
+- Renames are followed. A shallow clone has less history; stderr says so (`git fetch --unshallow`).
+- The changes are worded as `kiln diff` words them: status, title, type, parent, links (`+ verifies TEST-001`), tags, owner, due date, Jira keys, `derived`, body, moved.
+
+### kiln signoff
+
+```text
+kiln signoff [REV] [--format text|json|gitlab|github]
+```
+
+Lists every change to a sign-off status between `REV` (default `HEAD`) and the working tree, with the commit and author that made it. A sign-off status is one that is a person's call: by default a requirement approved or verified, a decision accepted or rejected, a risk accepted or closed, a milestone done; `[signoff]` in `kiln.toml` changes the list ([Configuration](Configuration#signoff)).
+
+| Option | Does |
+|---|---|
+| `REV` | the revision to compare with: `origin/main` in a pull request. Default: `HEAD` |
+| `--format text\|json\|gitlab\|github` | `kiln check`'s formats. Default: `text` |
+
+```console
+$ kiln signoff v1.0
+design/requirements/REQ-001-exports-are-deterministic.md:5:10: K218 warning: REQ-001 Exports are deterministic: status draft → approved, in 5d6e7f8 by Thomas (2026-10-03); sign-off is a person's call, so check it was meant
+kiln: since v1.0 (0e1f2a3): 1 warning
+```
+
+Notes:
+
+- An item created with a sign-off status counts too: a requirement that arrives already approved.
+- It exits 0, unless `[check] K218 = "error"`; then any sign-off makes it exit 1.
 
 ### kiln diff
 
@@ -1084,6 +1131,10 @@ An array of the ready items, each `{id, title, status, owner, type, path, line, 
 ### kiln affected
 
 `{since, commit, items}`, `items` an array of `{id, title, status, type, changed, recheck}`: each change `{path, line, role, from, to}` (the reference at `line`, the changed lines `from` to `to`) or `{path, file: true}`; each re-check an item or `{path, line}`. It carries `kiln_json`.
+
+### kiln log
+
+`{id, title, path, events}`, each event `{commit, date, author, changes}`, `changes` an array of strings; `commit`, `date` and `author` are `null` for what isn't committed yet. It carries `kiln_json`.
 
 ### kiln trace
 

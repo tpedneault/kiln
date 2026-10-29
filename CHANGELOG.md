@@ -266,6 +266,13 @@ All notable changes to Kiln are recorded here. The format follows
   lists the items whose code or file changed since `REV`, with what
   verifies them, as text, JSON or GitHub notices
   ([docs/CLI.md](docs/CLI.md), "`kiln affected`").
+- K19: sign-off and history from git (REQ-024, ADR-023). `kiln log ID`
+  shows each commit that changed an item, with date, author and what
+  changed, then what isn't committed. `kiln signoff [REV]` reports every
+  sign-off status change since `REV` (K218) with the commit and author
+  that made it, in `kiln check`'s formats, so CI shows reviewers an
+  agent's approvals. `[signoff]` in `kiln.toml` says which statuses are
+  sign-off ([docs/CLI.md](docs/CLI.md), "`kiln signoff`").
 
 ### Changed
 

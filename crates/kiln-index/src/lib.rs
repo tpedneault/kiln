@@ -33,7 +33,7 @@ mod source;
 mod write;
 
 pub use affected::{Reached, Touch};
-pub use diff::{diff, ChangeKind, Detail, ItemChange};
+pub use diff::{diff, item_details, ChangeKind, Detail, ItemChange};
 pub use edit::{
     apply_config_key, apply_jira_key, apply_link, apply_renumber, apply_set, check_link,
     create_item, parse_date, plan_set, unique, EditError, Renumbered, SetChange, SETTABLE,

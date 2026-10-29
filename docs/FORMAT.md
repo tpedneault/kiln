@@ -131,6 +131,13 @@ parent = "FLINT-100"             # written by the first sync: the project issue
 [jira.status]                    # optional: Kiln status → Jira status name
 blocked = "Blocked"              # unmapped statuses go by status category
 
+# Which statuses are a person's call, for `kiln signoff` (K19). Written,
+# it replaces the defaults: requirement approved and verified, decision
+# accepted and rejected, risk accepted and closed, milestone done.
+[signoff]
+requirement = ["approved", "verified"]
+decision = ["accepted"]
+
 # Severity overrides for check rules (see "Check rules").
 [check]
 K201 = "error"                   # an approved requirement nobody verifies fails CI
@@ -462,6 +469,7 @@ Severities: `error` (exit 1), `warning`, `off`, overridable in `[check]`.
 | K215 | warning | an item past its type's `initial` status, not closed, whose body still has a line of its type's `template` word for word (not a heading or a blank line): a prompt nobody replaced; once per item, on the first such line |
 | K216 | warning | with `--results`: a `verifies` code reference whose test failed (a matched case has a `failure` or `error`); it doesn't count toward coverage |
 | K217 | warning | with `--results`: a `verifies` code reference whose test isn't in the report, or was only skipped; it doesn't count toward coverage |
+| K218 | warning | only from `kiln signoff REV`: an item whose status changed to one of its type's `[signoff]` statuses since `REV`, or that was created with one, naming the last commit in between that touched it and its author ("not committed yet" otherwise); on its `status` |
 
 K211–K214 are the plan contradicting itself (ADR-018 in Kiln's own
 design): a status moved ahead of the work it stands for. Like K204–K206
