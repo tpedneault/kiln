@@ -17,7 +17,7 @@ You have two ways: download a release archive, or build from source with `cargo 
 
 ### From a release archive
 
-Releases are published from version tags (`v0.1.0`, …) on the [Releases page](https://github.com/tpedneault/kiln/releases). Each release has:
+Releases are published from version tags (`v1.0.0`, …) on the [Releases page](https://github.com/tpedneault/kiln/releases). Each release has:
 
 | File | For |
 |---|---|
@@ -36,7 +36,7 @@ On GitHub Actions:
 ```yaml
       - name: Install Kiln
         env:
-          KILN_VERSION: "0.1.0"
+          KILN_VERSION: "1.0.0"
         run: |
           name="kiln-${KILN_VERSION}-x86_64-unknown-linux-gnu"
           base="https://github.com/tpedneault/kiln/releases/download/v${KILN_VERSION}"
@@ -77,7 +77,7 @@ This works today, with no release needed, but compiles Kiln in every job (severa
 $ cargo install --locked --git https://github.com/tpedneault/kiln kiln
 ```
 
-This builds the latest commit of the default branch. To pin a version, add `--tag v0.1.0` once tags exist, or `--rev <commit>` now. `--locked` uses Kiln's committed `Cargo.lock`. The `rust:1-bookworm` image has Rust, Cargo and `git`. On GitLab, keep `CARGO_HOME` outside the project folder (the `rust` image already does), or a Cargo cache inside the checkout makes `--require-clean` refuse.
+This builds the latest commit of the default branch. To pin a version, add `--tag v1.0.0` (any release tag), or `--rev <commit>`. `--locked` uses Kiln's committed `Cargo.lock`. The `rust:1-bookworm` image has Rust, Cargo and `git`. On GitLab, keep `CARGO_HOME` outside the project folder (the `rust` image already does), or a Cargo cache inside the checkout makes `--require-clean` refuse.
 
 ## Full git history
 
@@ -135,7 +135,7 @@ permissions:
   contents: read
 
 env:
-  KILN_VERSION: "0.1.0"   # a release from https://github.com/tpedneault/kiln/releases
+  KILN_VERSION: "1.0.0"   # a release from https://github.com/tpedneault/kiln/releases
 
 jobs:
   check:
@@ -243,7 +243,7 @@ stages: [test, deploy]
   image: debian:bookworm-slim
   variables:
     GIT_DEPTH: 0              # full history: links name the commit that last changed a file
-    KILN_VERSION: "0.1.0"     # a release from https://github.com/tpedneault/kiln/releases
+    KILN_VERSION: "1.0.0"     # a release from https://github.com/tpedneault/kiln/releases
   before_script:
     - apt-get update -qq
     - apt-get install -y -qq --no-install-recommends ca-certificates curl git

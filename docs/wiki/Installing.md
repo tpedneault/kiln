@@ -26,8 +26,8 @@ If the releases page is still empty, build from source (below).
    should equal the first word of the `.sha256` file:
 
    ```powershell
-   (Get-FileHash .\kiln-0.1.0-x86_64-pc-windows-msvc.zip -Algorithm SHA256).Hash.ToLower()
-   Get-Content .\kiln-0.1.0-x86_64-pc-windows-msvc.zip.sha256
+   (Get-FileHash .\kiln-1.0.0-x86_64-pc-windows-msvc.zip -Algorithm SHA256).Hash.ToLower()
+   Get-Content .\kiln-1.0.0-x86_64-pc-windows-msvc.zip.sha256
    ```
 
 2. Unpack it somewhere permanent, for example
@@ -35,7 +35,7 @@ If the releases page is still empty, build from source (below).
 3. Add that folder to your user `PATH`:
 
    ```powershell
-   $dir = "$env:LOCALAPPDATA\Programs\kiln\kiln-0.1.0-x86_64-pc-windows-msvc"
+   $dir = "$env:LOCALAPPDATA\Programs\kiln\kiln-1.0.0-x86_64-pc-windows-msvc"
    [Environment]::SetEnvironmentVariable('Path', "$([Environment]::GetEnvironmentVariable('Path','User'));$dir", 'User')
    ```
 
@@ -54,10 +54,10 @@ you run them.
 ### Linux
 
 ```console
-$ sha256sum -c kiln-0.1.0-x86_64-unknown-linux-gnu.tar.gz.sha256
-kiln-0.1.0-x86_64-unknown-linux-gnu.tar.gz: OK
-$ tar -xzf kiln-0.1.0-x86_64-unknown-linux-gnu.tar.gz
-$ install -m 755 kiln-0.1.0-x86_64-unknown-linux-gnu/kiln ~/.local/bin/
+$ sha256sum -c kiln-1.0.0-x86_64-unknown-linux-gnu.tar.gz.sha256
+kiln-1.0.0-x86_64-unknown-linux-gnu.tar.gz: OK
+$ tar -xzf kiln-1.0.0-x86_64-unknown-linux-gnu.tar.gz
+$ install -m 755 kiln-1.0.0-x86_64-unknown-linux-gnu/kiln ~/.local/bin/
 ```
 
 Make sure `~/.local/bin` is on your `PATH`. The binary links only the C
@@ -80,7 +80,7 @@ which rustup puts on your `PATH`. The first build takes several minutes.
 
 ```console
 $ kiln --version
-kiln 0.1.0
+kiln 1.0.0
 $ kiln --help
 ```
 
