@@ -6,6 +6,13 @@ All notable changes to Kiln are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Lsp: `kiln lsp --languages` (with `--format json`) prints the languages
+  the server serves in the project, the list `kiln init --fenix`
+  registers, without starting it, for editor extensions that register
+  the server themselves.
+
 ### Fixed
 
 - Release: running the workflow by hand drafts the release (the notes

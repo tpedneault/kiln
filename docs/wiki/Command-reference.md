@@ -868,10 +868,12 @@ Notes: without a display, `kiln gui` fails with one line and exit 2. On Windows,
 ### kiln lsp
 
 ```text
-kiln lsp
+kiln lsp [--languages [--format text|json]]
 ```
 
 A language server on stdin and stdout, for Fenix or any editor that speaks the Language Server Protocol (LSP). It serves item files, and code files when your editor runs it beside their own server. It finds the project from the editor's workspace folder, or from the first file opened. It never writes a file. You don't run it yourself; your editor starts it. [Editors and Flint](Editors-and-Flint) covers what it offers and how to set it up.
+
+`kiln lsp --languages` starts no server: it prints the languages the server serves in this project (`markdown`, then the languages of the code `[code] paths` scans), one per line or with `--format json` together with the command to start it. It is for editor extensions that register the server themselves.
 
 ### kiln provider
 

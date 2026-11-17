@@ -590,7 +590,7 @@ page cache.
 
 ## Editing in an editor
 
-### `kiln lsp`
+### `kiln lsp [--languages [--format text|json]]`
 
 A language server on stdin and stdout, for Fenix (`kiln init --fenix`
 sets it up) or any editor that speaks LSP. It finds the project from the
@@ -613,6 +613,16 @@ applies. Actions that create or rename a file are offered only to editors
 that can apply such edits; others get them disabled, naming the command
 to run instead (`kiln new … --open`). Fenix can't yet (INTEGRATION.md,
 G7). Files changed outside the editor are noticed within a few seconds.
+
+`kiln lsp --languages` starts no server and writes nothing: it prints the
+languages the server serves in this project (Fenix's language names;
+`markdown` first, then the language of each file `[code] paths` scans,
+in name order; the list `kiln init --fenix` registers) and exits 0. It
+is for an editor extension that registers the server itself. Text is one
+language per line. `--format json` prints, for example,
+`{"args": ["lsp"], "command": "kiln", "kiln_json": 1, "languages":
+["markdown", "rust"]}` (pretty-printed, keys sorted), `command` and
+`args` being how to start the server. Outside a project it exits 2.
 A Markdown file outside the project gets empty answers. Messages from
 the server itself go nowhere: stdout is the protocol.
 

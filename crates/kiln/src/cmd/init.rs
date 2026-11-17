@@ -152,19 +152,61 @@ fn fenix_language(path: &str) -> Option<&'static str> {
 
 /// The languages Kiln serves in this project: Markdown (its items), and
 /// the language of every code file `[code] paths` scans, in name order.
+///
+/// `init --fenix` registers exactly this list and `kiln lsp --languages`
+/// prints it, both through [`served_languages`], so a Fenix extension that
+/// asks and the `tools.json` Kiln writes can't disagree.
 fn languages(dir: &Path) -> Vec<String> {
-    let mut out = std::collections::BTreeSet::from(["markdown".to_owned()]);
-    if let Ok(project) = kiln_index::Project::load(&kiln_index::DiskSource::new(dir)) {
-        out.extend(
-            project
-                .known_files()
-                .1
-                .iter()
-                .filter_map(|f| fenix_language(f))
-                .map(str::to_owned),
-        );
+    match kiln_index::Project::load(&kiln_index::DiskSource::new(dir)) {
+        Ok(project) => served_languages(&project),
+        // No usable kiln.toml yet: Kiln still serves its Markdown.
+        Err(_) => vec!["markdown".to_owned()],
     }
-    out.into_iter().collect()
+}
+
+/// The languages `kiln lsp` serves in `project`, Markdown first and then
+/// the rest in name order (a stable list is a diffable `tools.json`).
+pub fn served_languages(project: &kiln_index::Project) -> Vec<String> {
+    let code: std::collections::BTreeSet<&str> = project
+        .known_files()
+        .1
+        .iter()
+        .filter_map(|f| fenix_language(f))
+        .collect();
+    std::iter::once("markdown")
+        .chain(code)
+        .map(str::to_owned)
+        .collect()
+}
+
+/// What a client runs to start the language server: the executable and
+/// its arguments, as `init --fenix` writes them to `tools.json`.
+pub const LSP_EXECUTABLE: &str = "kiln";
+pub const LSP_ARGS: [&str; 1] = ["lsp"];
+
+/// `kiln lsp --languages`: prints [`served_languages`] and how to start
+/// the server, without starting it or writing anything. Meant for editor
+/// integrations that register the server themselves (the Fenix extension)
+/// instead of reading `.fenix/tools.json`.
+pub fn print_languages(project: Option<&Path>, format: crate::TextOrJson) -> Result<u8, Fail> {
+    let loaded = crate::project::load(project)?;
+    let languages = served_languages(&loaded.project);
+    match format {
+        crate::TextOrJson::Text => {
+            for l in &languages {
+                println!("{l}");
+            }
+        }
+        crate::TextOrJson::Json => print!(
+            "{}",
+            super::json_out(&serde_json::json!({
+                "languages": languages,
+                "command": LSP_EXECUTABLE,
+                "args": LSP_ARGS,
+            }))
+        ),
+    }
+    Ok(0)
 }
 
 /// Registers `kiln lsp` in `.fenix/tools.json` as an additional language
@@ -228,8 +270,8 @@ fn register_lsp(dir: &Path) -> Result<(), Fail> {
         None => {
             additional.push(serde_json::json!({
                 "name": "kiln",
-                "executable": "kiln",
-                "args": ["lsp"],
+                "executable": LSP_EXECUTABLE,
+                "args": LSP_ARGS,
                 "languages": wanted,
             }));
             true
