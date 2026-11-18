@@ -210,7 +210,7 @@ Creates an item of type `TYPE` with the next free ID and prints its path. The ne
 | `--tag TAG` | adds a tag (lowercase). Repeatable |
 | `--body-file PATH` | the body, from that file, in place of the type's template. `-` reads stdin |
 | `--open` | opens the new file at its title line in the Fenix editor; see the notes |
-| `--format text\|json` | `json` prints `{"id", "path"}` instead of the path. Default: `text` |
+| `--format text\|json` | `json` prints `{"id", "kiln_json", "path"}` instead of the path. Default: `text` |
 
 ```console
 $ kiln new requirement --title "Exports are deterministic"
@@ -305,7 +305,7 @@ Notes:
 kiln show ID [--format text|json]
 ```
 
-Shows one item with everything Kiln computes about it: parent and children, tags, Jira keys, owner, due date, outgoing links by role, incoming links under their inverse names ("verified by", including code locations), items that mention it, coverage for each coverage role, and progress for a milestone; then, after a blank line, its body.
+Shows one item with everything Kiln computes about it: parent and children, tags, Jira keys, owner, due date, outgoing links by role, incoming links under their inverse names ("verified by", including code locations), items that mention it, coverage for each coverage role, and progress for a milestone with work; then, after a blank line, its body.
 
 | Option | Does |
 |---|---|
@@ -372,7 +372,7 @@ Notes:
 
 - A sub-task (a task with a task `parent`) counts in its parent's milestone.
 - A milestone that `depends-on` another orders its work after it but doesn't hold it back: a task is ready when *its own* dependencies are done. To make a later task wait, link it: `kiln link TASK-009 depends-on TASK-003`.
-- When nothing is ready, it prints nothing and stderr says how many items wait. Without a `part-of` role in `kiln.toml` there is no work: exit 2.
+- When nothing is ready, the text form prints nothing and `--format json` prints `[]`; stderr says `kiln: no work is ready`, then how many items wait or are claimed. Without a `part-of` role in `kiln.toml` there is no work: exit 2.
 
 ### kiln status
 
@@ -731,6 +731,7 @@ Notes:
 - A target `kiln check` calls broken (K005, K112) doesn't export.
 - Confluence reads the space with `KILN_CONFLUENCE_TOKEN` (and `KILN_CONFLUENCE_USER` on Cloud), or the token `kiln auth confluence` stored.
 - Without `--yes`, a run on a terminal asks before publishing each Confluence target. A run that isn't on a terminal stops after the plan and exits 1.
+- A Confluence target Kiln can't plan (no token, a server error) fails the whole run, so no target prints anything: name the targets that can be planned.
 - A refused plan (a page edited in Confluence, a page too large, an adopted page with content) publishes nothing of that target and exits 1. A server or network error exits 3; the next run finishes what the failed one started.
 - `kiln export` with no names also runs Confluence targets. To check only a committed file in CI, name it: `kiln export --check design-md`.
 - Several Confluence endpoints are not yet confirmed against live Cloud and Data Center servers; they are tested against a fake server. See [Publishing to Confluence](Publishing-to-Confluence).
@@ -803,7 +804,7 @@ verifies = ["REQ-002"]
 +++
 ```
 
-Linking twice is not an error (exit 0).
+Linking twice is not an error (exit 0). Unlinking a link that isn't there is a usage error (exit 2).
 
 ### kiln renumber
 
@@ -941,7 +942,7 @@ Token for https://confluence.example.com:
 stored the token for https://confluence.example.com (signed in as Thomas) in the credential store as fenix-suite/confluence:https://confluence.example.com
 ```
 
-Notes: `KILN_CONFLUENCE_TOKEN`, when set, is used instead of the stored token. CI sets that variable rather than running `kiln auth`. On a headless Linux machine without a Secret Service, the store can't be read and the error says so.
+Notes: `KILN_CONFLUENCE_TOKEN`, when set, is used instead of the stored token. CI sets that variable rather than running `kiln auth`, which off a terminal exits 2 with a line saying so. On a headless Linux machine without a Secret Service, the store can't be read and the error says so.
 
 ### kiln jira sync
 
@@ -1016,8 +1017,8 @@ An error is one line on stderr, starting `kiln: `, naming what failed and why, w
 |---|---|
 | 0 | fine. Warnings from `kiln check` don't change it |
 | 1 | `kiln check` found an error; `kiln export --check` found changes; a Confluence plan was refused, or a publish was needed but not confirmed (not on a terminal and no `--yes`); an edit was refused because a file changed on disk |
-| 2 | usage or configuration error: unknown command, type, status or ID; no `kiln.toml`; a `kiln.toml` Kiln can't read (except for `kiln check`, which reports it as a finding with exit 1); a value the configuration doesn't allow; a git revision that doesn't exist; a shallow clone without `--allow-shallow`; `--require-clean` with uncommitted changes; no display for `kiln gui` |
-| 3 | network or server error: Confluence, or Jira for `list --jira` and `auth jira` (including a Jira token that can't be read) |
+| 2 | usage or configuration error: unknown command, type, status or ID; no `kiln.toml`; a `kiln.toml` Kiln can't read (except for `kiln check`, which reports it as a finding with exit 1); a value the configuration doesn't allow; `kiln auth …` off a terminal; a git revision that doesn't exist; a shallow clone without `--allow-shallow`; `--require-clean` with uncommitted changes; no display for `kiln gui` |
+| 3 | network or server error: Confluence, or Jira for `list --jira`, `jira sync`, `jira pull` and `auth jira` (including a Jira token that can't be read) |
 
 ## JSON output
 
@@ -1086,7 +1087,7 @@ One object with every key always present (empty or `null` when there is nothing)
 | `inbound` | object | incoming links: role (not its inverse name) → array of items and code locations |
 | `mentioned_by` | array of items | items whose body mentions it |
 | `coverage` | object | coverage role → `true` or `false`, for roles that can point at its type |
-| `progress` | object or null | `{done, total}` for a milestone |
+| `progress` | object or null | `{done, total}` for a milestone with work |
 | `body` | string | the body, after the closing `+++` |
 
 ```json
@@ -1128,7 +1129,7 @@ An array of the ready items, each `{id, title, status, owner, type, path, line, 
 
 ### kiln status
 
-`{project, milestones, findings}`: `milestones` is an array of `{milestone, done, total, in_progress, ready, waiting}` (`milestone` is `{id, title, status, due}` or `null` for work in no milestone; `ready` is an array of items with their `owner`; each `waiting` item also has `owner`, `waits_on`, an array of items, and `blocked`, a boolean); `findings` is `{errors, warnings}`. Like every object, it carries `kiln_json`.
+`{project, milestones, findings}`: `milestones` is an array of `{milestone, done, total, in_progress, ready, waiting}` (`milestone` is `{id, title, status, due}` or `null` for work in no milestone; `in_progress` and `ready` are arrays of items with their `owner`; each `waiting` item also has `owner`, `waits_on`, an array of items, and `blocked`, a boolean); `findings` is `{errors, warnings}`. Like every object, it carries `kiln_json`.
 
 ### kiln affected
 
@@ -1193,7 +1194,7 @@ An array, one object per thing that reaches the item: `source` (an ID or a code 
 |---|---|
 | `from` | the first revision as given |
 | `fromCommit` | its full commit |
-| `to` | the second revision as given, or `working tree` |
+| `to` | the second revision as given, or `working tree` (there is no `toCommit`) |
 | `items` | per item: `id`, `type`, `title`, `path`, `change` (`added`, `changed`, `removed`), `details` (what changed, as in the text form, for example `status approved → implemented`, `body`) |
 
 ### kiln check
@@ -1217,7 +1218,7 @@ An array of findings: `code` (`K201`), `severity` (`error` or `warning`), `path`
 
 ### kiln export
 
-An array, one object per target.
+An array, one object per target, without `kiln_json`. Keys are camelCase (`leftOut`, `parentTitle`) except the plan operations' `page_id`.
 
 A file target: `name`, `format`, `layout`, `write` (files that would be or were written, each `{path, new}`), `unchanged` (paths), `remove` (paths of files it wrote earlier and no longer produces), `leftOut` (open items the document doesn't place).
 

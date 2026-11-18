@@ -13,6 +13,27 @@ All notable changes to Kiln are recorded here. The format follows
   registers, without starting it, for editor extensions that register
   the server themselves.
 
+### Changed
+
+- Fenix: INTEGRATION.md describes the Fenix extension for Kiln
+  (`fenix.kiln`, in the fenix-extensions repository): the commands and
+  JSON it relies on, how it relates to `kiln init --fenix` and the
+  agenda's G1, what it leaves to a terminal, what only a real Fenix can
+  confirm, and X1–X8, what it needs from Kiln (not Fenix gaps), each with
+  what it does meanwhile. The extension is built and tested against a fake
+  host and kiln 1.0.0's recorded output, not released and never run in a
+  real Fenix. The wiki's Editors and Flint page gains a section for it. A
+  note records that the Fenix commit Kiln pins can no longer be fetched.
+- CLI: CLI.md and the wiki's command reference say what kiln 1.0.0 really
+  prints: `status --format json` has `in_progress`, `owner`, `due` and a
+  `null` milestone; `show` has `progress` null for a milestone with no
+  work and `inbound` keyed by the role's own name; `next --format json`
+  prints `[]`; `new --format json` prints `kiln_json`; `link` and
+  `unlink` output and `unlink`'s exit 2; `diff` and `export` JSON keys;
+  `jira sync`, `jira pull` and `kiln auth` off a terminal in the exit
+  codes; and that one Confluence target Kiln can't plan fails the whole
+  `export` run.
+
 ### Fixed
 
 - Release: running the workflow by hand drafts the release (the notes

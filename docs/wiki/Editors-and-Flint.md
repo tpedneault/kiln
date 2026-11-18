@@ -1,4 +1,4 @@
-This page shows how to work on Kiln items from your editor and from the Flint launcher. It covers the language server (`kiln lsp`) and what it does for you while you write, how to set it up in the Fenix editor and in other editors, how to open items in Fenix, and the Flint provider (`kiln provider`). Read it once your project has a few items and you want completion, live checking and quick navigation instead of running commands by hand.
+This page shows how to work on Kiln items from your editor and from the Flint launcher. It covers the language server (`kiln lsp`) and what it does for you while you write, how to set it up in the Fenix editor (by hand, or with the not yet released Fenix extension) and in other editors, how to open items in Fenix, and the Flint provider (`kiln provider`). Read it once your project has a few items and you want completion, live checking and quick navigation instead of running commands by hand.
 
 Fenix (https://github.com/tpedneault/fenix) is a text editor and Flint (https://github.com/tpedneault/flint) a keyboard launcher, both from the same suite as Kiln. Kiln works fully without them; they only add convenience.
 
@@ -49,7 +49,8 @@ Some actions create or rename a file: "New child …", "Create test that verifie
 Fenix runs Kiln as an **additional** language server: beside each
 language's own server (rust-analyzer for Rust, for example), for Markdown
 and for the languages of your code. You need a Fenix recent enough to have
-additional servers (October 2026 or later). From the project root:
+additional servers (October 2026 or later). (The [Fenix extension](#the-fenix-extension)
+does this itself, so `kiln init --fenix` isn't needed with it.) From the project root:
 
 ```console
 $ kiln init --fenix
@@ -116,6 +117,20 @@ Rename and formatting in code files stay with the language's own server.
 - **Actions that create or rename files.** Fenix's LSP client doesn't yet apply workspace edits that create or rename files. Fenix shows only code actions it can apply, so "New child …", "Create test that verifies …" and "Rename file to …" don't appear. Run the command instead, for example `kiln new test --title "…" --open`, then `kiln link TEST-002 verifies REQ-001`. Rename updates every reference but not the file name; `kiln check` then reports K105, and you rename the file yourself. (This is recorded in Kiln's integration notes as gap G7.)
 - **Files changed outside the editor.** Fenix doesn't tell language servers about files created, deleted or changed elsewhere (`kiln new` in a terminal, a `git pull`). Kiln polls instead: item files and `kiln.toml` every 2 seconds, code files every 10 seconds. Changes made outside the editor show up within a few seconds. (Gap G8.)
 - **Code files in older Fenix versions.** Before additional servers, Fenix ran one language server per file type, so Kiln served Markdown only. Update Fenix; an older one rejects the `"additional"` entry in `tools.json` as an unknown field.
+
+## The Fenix extension
+
+**Status: not yet in Fenix's extension store, never run in a real Fenix.** It is built and tested against a fake host and the output of kiln 1.0.0, and its source is in the fenix-extensions repository (https://github.com/tpedneault/fenix-extensions), under `extensions/kiln`. Its `README.md` there is the reference for its keys, commands and settings; this section says only what it is.
+
+`fenix.kiln` makes a folder with a `kiln.toml` a Kiln project in Fenix, without setup. It works by running `kiln` and showing what it says, so it needs `kiln` on the `PATH`, or its path in the extension's `kiln.path` setting, and kiln 1.0.0 or later. What you get:
+
+- the plan on one page, a tab per view in the order of [the GUI](The-GUI): Tree, Trace, Impact, Board, Roadmap, Decisions, Changes, Item, Check, Exports and Comments, refreshed when files change;
+- edits from the plan's keys or a buffer (status, links, new items, title, parent, owner, due date, renumber), each one `kiln` command, so Kiln's checks apply and the extension never writes an item file;
+- writing file exports and publishing to Confluence or syncing Jira from the Exports tab, after you type the target's name (the project key for Jira). `--force`, `--adopt`, `--prune-removed` and `kiln auth …` stay on a terminal, which the extension can open for you; it never holds a token;
+- titles and statuses after item IDs, Kiln's rows in the project doctor, a notification when a save brings the first `kiln check` error, a Home section with the work that is ready, and "start working on this", which claims the item with `kiln set` and clocks in on the agenda;
+- read tools for coding agents, and edit tools you can turn on with a setting.
+
+It starts [`kiln lsp`](#the-language-server) itself, so `kiln init --fenix` isn't needed with it. If `.fenix/tools.json` already runs kiln (from `kiln init --fenix`), the extension keeps that entry and adds none, so kiln never runs twice; remove the entry and save, and the extension's takes over. With kiln 1.0.0 it registers Markdown only, because `kiln lsp --languages`, which tells it the code languages, isn't in a release yet. Kiln needs none of this: everything above is also on the command line and in the GUI.
 
 ## Setting it up in other editors
 
