@@ -1719,3 +1719,44 @@ fn an_items_history_and_its_sign_off_come_from_git() {
     assert!(stdout(&strict)
         .contains("K218 error: TEST-001 Timing: status draft → passing, not committed yet"));
 }
+
+#[test]
+fn lsp_languages_lists_what_init_fenix_would_register() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    let out = kiln_in(d, &["lsp", "--languages"]);
+    assert_eq!(out.status.code(), Some(2), "outside a project");
+    ok(d, &["init", "--preset", "none", "--name", "Demo"]);
+    assert_eq!(ok(d, &["lsp", "--languages"]), "markdown\n");
+    let config = std::fs::read_to_string(d.join("kiln.toml")).unwrap();
+    std::fs::write(
+        d.join("kiln.toml"),
+        config.replace("# [code]\n# paths = [\"src\"]", "[code]\npaths = [\"src\"]"),
+    )
+    .unwrap();
+    std::fs::create_dir_all(d.join("src")).unwrap();
+    std::fs::write(d.join("src/lib.rs"), "fn x() {}\n").unwrap();
+    std::fs::write(d.join("src/run.tcl"), "puts x\n").unwrap();
+    assert_eq!(ok(d, &["lsp", "--languages"]), "markdown\nrust\ntcl\n");
+    let json: serde_json::Value =
+        serde_json::from_str(&ok(d, &["lsp", "--languages", "--format", "json"])).unwrap();
+    assert_eq!(
+        json,
+        serde_json::json!({"kiln_json": 1, "languages": ["markdown", "rust", "tcl"],
+            "command": "kiln", "args": ["lsp"]})
+    );
+    // The same list `init --fenix` registers.
+    std::fs::create_dir_all(d.join(".fenix")).unwrap();
+    ok(d, &["init", "--preset", "none", "--fenix"]);
+    let tools: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(d.join(".fenix/tools.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        tools["lsp"]["additional"][0]["languages"],
+        json["languages"]
+    );
+    assert_eq!(tools["lsp"]["additional"][0]["executable"], json["command"]);
+    assert_eq!(tools["lsp"]["additional"][0]["args"], json["args"]);
+    let out = kiln_in(d, &["lsp", "--format", "json"]);
+    assert_eq!(out.status.code(), Some(2), "--format needs --languages");
+}

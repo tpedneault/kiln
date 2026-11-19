@@ -280,8 +280,15 @@ enum Command {
         #[arg(long, value_name = "ID")]
         item: Option<String>,
     },
-    /// Language server on stdin and stdout, for Fenix or any LSP editor.
-    Lsp,
+    /// Language server on stdin and stdout, for Fenix or any LSP editor (`--languages` lists what it serves).
+    Lsp {
+        /// Print the languages it serves in this project and how to start it, then exit; starts no server.
+        #[arg(long)]
+        languages: bool,
+        /// With --languages: one language per line, or JSON.
+        #[arg(long, value_enum, default_value_t = TextOrJson::Text, requires = "languages")]
+        format: TextOrJson,
+    },
     /// Flint provider on stdin and stdout: items, drill-downs, actions.
     Provider {
         /// The provider's name in Flint's settings.toml `[[providers]]`.
@@ -492,7 +499,11 @@ fn main() -> ExitCode {
         .map(|()| 0)
         .map_err(|e| Fail::new(EXIT_USAGE, format!("provider: {e}"))),
         Command::Gui { since, item } => cmd::gui::run(project, since, item),
-        Command::Lsp => kiln_lsp::serve_stdio(project::today)
+        Command::Lsp {
+            languages: true,
+            format,
+        } => cmd::init::print_languages(project, format),
+        Command::Lsp { .. } => kiln_lsp::serve_stdio(project::today)
             .map(|()| 0)
             .map_err(|e| Fail::new(EXIT_USAGE, format!("lsp: {e}"))),
         Command::New {

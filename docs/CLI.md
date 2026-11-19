@@ -103,8 +103,8 @@ $ echo "One row per item, a header first." | kiln new task --title "Write the CS
 }
 ```
 
-`--format json` prints the new item's `id` and `path` instead of the
-path alone.
+`--format json` prints `{id, kiln_json, path}` instead of the path
+alone (no line number).
 
 `--open` opens the file at its title, trying in order: the command in
 `KILN_EDITOR`, when it is set; the running Fenix (through its control
@@ -281,7 +281,9 @@ files with the ID), `parent`, `children`, `tags`, `jira`, `owner`, `due`,
 `level` (1-based, with requirement levels), `derived`, `links` (role →
 targets), `inbound` (role → sources, items and code locations),
 `mentioned_by`, `coverage` (role → `true`/`false`), `progress` (`{done,
-total}` for a milestone, else `null`) and `body`. Every item it names is
+total}` for a milestone with work, else `null`) and `body`. `inbound` is
+keyed by the role's own name (`verifies`), not the inverse wording the
+text form prints (`verified by`). Every item it names is
 `{id, title, status}`; a reference to an ID that doesn't exist is `{id,
 missing: true}`; a code location is `{path, line}`.
 
@@ -324,8 +326,9 @@ those out, so a second agent doesn't take the task a first one is on.
 Claim work in the command that takes it: `kiln set TASK-004 owner=ana
 status=doing`. JSON gives each item's `id`, `title`, `status`, `owner`,
 `type`, `path`, `line` and `milestone` (`{id, title, status}`, or
-`null`). When nothing is ready it prints nothing
-and says on stderr how much is waiting. Without a `part-of` role in
+`null`). When nothing is ready the text form prints nothing and JSON
+prints `[]`; stderr says `kiln: no work is ready`, then how much is
+waiting or claimed. Without a `part-of` role in
 `kiln.toml` there is no work, and it stops (exit 2).
 
 ### `kiln status [--format text|json]`
@@ -353,8 +356,11 @@ kiln check: 1 warning
 ```
 
 JSON gives `project`, `milestones` (each `{milestone, done, total,
-ready, waiting}`, a waiting item with `waits_on` and `blocked`) and
-`findings` (`{errors, warnings}`). It exits 0 whatever it finds.
+in_progress, ready, waiting}`, a waiting item with `waits_on` and
+`blocked`; the milestone also carries `due`, and work in no milestone is
+a group whose `milestone` is `null`; every in-progress, ready and
+waiting item carries `owner`) and `findings` (`{errors, warnings}`). It
+exits 0 whatever it finds.
 
 ### `kiln trace [--type TYPE | --levels] [--format text|json|csv]`
 
@@ -501,8 +507,10 @@ v1.0 (1a2b3c4) → the working tree
 1 added, 1 changed, 1 removed
 ```
 
-`--type` keeps one type; `--format json` gives each item's change and
-details. A revision git doesn't know is a usage error (exit 2).
+`--type` keeps one type; `--format json` gives `from`, `fromCommit`,
+`to` (`working tree` when only one revision is given) and each item's
+change and details (keys in camelCase; there is no `toCommit`). A
+revision git doesn't know is a usage error (exit 2).
 
 ## Checking
 
@@ -556,7 +564,7 @@ design-md (markdown, document) → docs/generated/DESIGN.md
 | `--adopt` | Confluence: publishes into a `page =` that already has content, replacing it |
 | `--prune-removed DAYS` | Confluence: sends pages retired more than DAYS days ago to the space's trash |
 | `--since REV` | marks each item new or changed since REV (a tag, branch or commit) and fills the `changes` report (EXPORT.md, "Reports") |
-| `--format json` | the outcome per target as JSON (the Confluence plan included) |
+| `--format json` | the outcome per target as an array of JSON objects (the Confluence plan included): no `kiln_json`, keys in camelCase except the plan operations' `page_id` |
 
 File targets write atomically and only what changed, and remove the files
 they wrote earlier and no longer produce. "leaves out" lists open items
@@ -585,12 +593,14 @@ in Confluence, a page too large, an adopted page with content) publishes
 nothing of that target and exits 1; a server or network error exits 3,
 and the next run finishes what the failed one started. `--format json`
 adds what was published under `applied` (publishing with JSON output
-needs `--yes`). CONFLUENCE.md has the details: drift, retired pages, the
-page cache.
+needs `--yes`). A Confluence target Kiln can't plan (no token, a server
+error) fails the whole run, so no target prints anything: name the
+targets that can be planned. CONFLUENCE.md has the details: drift,
+retired pages, the page cache.
 
 ## Editing in an editor
 
-### `kiln lsp`
+### `kiln lsp [--languages [--format text|json]]`
 
 A language server on stdin and stdout, for Fenix (`kiln init --fenix`
 sets it up) or any editor that speaks LSP. It finds the project from the
@@ -613,6 +623,16 @@ applies. Actions that create or rename a file are offered only to editors
 that can apply such edits; others get them disabled, naming the command
 to run instead (`kiln new … --open`). Fenix can't yet (INTEGRATION.md,
 G7). Files changed outside the editor are noticed within a few seconds.
+
+`kiln lsp --languages` starts no server and writes nothing: it prints the
+languages the server serves in this project (Fenix's language names;
+`markdown` first, then the language of each file `[code] paths` scans,
+in name order; the list `kiln init --fenix` registers) and exits 0. It
+is for an editor extension that registers the server itself. Text is one
+language per line. `--format json` prints, for example,
+`{"args": ["lsp"], "command": "kiln", "kiln_json": 1, "languages":
+["markdown", "rust"]}` (pretty-printed, keys sorted), `command` and
+`args` being how to start the server. Outside a project it exits 2.
 A Markdown file outside the project gets empty answers. Messages from
 the server itself go nowhere: stdout is the protocol.
 
@@ -801,7 +821,9 @@ Adds `TARGET` to `[links] ROLE` of `ID` (creating either as needed), or
 removes it (dropping the role, and `[links]`, when they empty). `link`
 checks the role exists, allows `ID`'s type as its source and `TARGET`'s
 as its target; written on the inverse side (`verified-by`), it says which
-command to run instead. Linking twice is not an error.
+command to run instead. `link` prints `ID ROLE TARGET`, or `… (already
+there)` with exit 0 when linked twice; `unlink` prints `ID no longer ROLE
+TARGET`, and unlinking a link that isn't there is a usage error (exit 2).
 
 ### `kiln renumber ID --to NEW [--file PATH]`
 
@@ -855,5 +877,5 @@ kiln: a requirement can't be the source of `verifies` (from: test, code)
 |---|---|
 | 0 | fine |
 | 1 | `kiln check` found an error, `kiln export --check` found changes, a Confluence plan was refused, or a change was refused (a file changed on disk) |
-| 2 | usage or configuration error: unknown command or ID, no `kiln.toml`, a `kiln.toml` Kiln can't read, a value the configuration doesn't allow |
-| 3 | network or server error (Confluence, or Jira for `list --jira` and `auth jira`) |
+| 2 | usage or configuration error: unknown command or ID, no `kiln.toml`, a `kiln.toml` Kiln can't read, a value the configuration doesn't allow, `kiln auth …` off a terminal (its own line says to set the token variable instead) |
+| 3 | network or server error (Confluence, or Jira for `list --jira`, `jira sync`, `jira pull` and `auth jira`) |

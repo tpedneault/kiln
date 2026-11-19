@@ -7,6 +7,20 @@ were checked against its source at
 `eb23547eb5939a52b8de06c298271ce4c8604927` (both 2026-10-12). File
 references are relative to those repositories.
 
+**Noted 2026-11-18: the Fenix pin can no longer be fetched.** `git fetch`
+of `ce118a2…` from `github.com/tpedneault/fenix` answers `not our ref`,
+so a fresh clone of Kiln can't resolve the five Fenix crates pinned in
+`Cargo.toml` (and DESIGN.md) and doesn't build; nothing above was
+re-checked against a newer Fenix. What is known: Fenix's head (a clone
+at `d87e0b7`, 2026-11-15) has `fenix-storage`, `fenix-control` and
+`fenix-keymap` under `crates/`, and no `fenix-diagram` and no
+`fenix-jira`. A `fenix-diagram` crate (version 1.0.0, "shared by the
+diagrams and notebook extensions") is in the fenix-extensions
+repository, `crates/diagram`, and a `fenix-jira-client` (1.2.0, which
+says it speaks Jira Cloud too) in `crates/jira`; whether either is the
+successor of what Kiln pins, with the same API, was not checked. The
+Fenix pins are still the ones the rest of this document describes.
+
 ## Principles
 
 The same as between Flint and Fenix:
@@ -153,7 +167,141 @@ Two things it doesn't give, worked around:
 `fenix/agenda.clockIn` takes an agenda task id. So "Start working on this"
 works today for an item with a `jira` key that already has an agenda task
 for that key. Otherwise the action is shown disabled: "no agenda task for
-FLINT-88 (needs Fenix G1)".
+FLINT-88 (needs Fenix G1)". The Fenix extension (below) isn't held up by
+this: it creates the task through the agenda extension's own service.
+
+### The Fenix extension (`fenix.kiln`)
+
+**Status: built and tested against a fake host and kiln 1.0.0's recorded
+output; not released, and never run in a real Fenix.** Everything below
+says what the extension is written to do, from its own README, not what
+was seen in Fenix. It lives in the fenix-extensions repository
+(`extensions/kiln`; its `README.md` is the reference for keys, commands,
+settings and agent tools, which this document doesn't copy). Kiln
+isn't changed by it, and Fenix isn't either (principle 2).
+
+What it gives, in a folder with a `kiln.toml`: the plan on pages with a
+tab per view (the GUI's, in the GUI's order), edits from the plan's keys
+or a buffer, Exports and Comments tabs, titles after item IDs, Kiln's rows
+in the project doctor, tasks, a Home section, a notification when a save
+brings `kiln check` its first error, "start working on this" with the
+agenda's clock, and read tools (and, once a setting allows it, `kiln_set`,
+`kiln_link` and `kiln_new`) for coding agents.
+
+**What it uses of Kiln.** It runs the `kiln` program and nothing else
+(its only permission to run a program, no network, no credentials):
+
+- to read, always with `--format json`: `list`, `list --jira`, `status`,
+  `next`, `check`, `show`, `trace`, `impact`, `diff`, `export --dry-run`
+  and `confluence comments`;
+- to change: `set`, `link`, `unlink`, `new` and `renumber` (one command
+  per edit, values as single arguments after `--`), `export NAME` for
+  a file target, `export NAME --yes` for a Confluence target after its name
+  is typed, `jira sync --yes` after the Jira project key is typed, and
+  `jira pull`.
+
+It reads `kiln.toml` itself only to offer choices (statuses, roles,
+targets); kiln checks every edit, and **it never writes an item file**.
+The JSON shapes in CLI.md, with `kiln_json`, are therefore a contract with
+it: it ignores keys it doesn't know and refuses a `status` or `show` object
+whose `kiln_json` isn't the one it reads, so a key added in Kiln doesn't
+break it and a key removed or renamed (a `kiln_json` bump) does. Its
+tests read kiln 1.0.0's real output, recorded from this repository and a
+small demo project; where kiln can't be run without a
+server (a successful `export`, `confluence comments`, `jira sync`), the
+answers are written by hand from this source and say so.
+
+**How it relates to what is described above.**
+
+- *The language server.* The extension registers `kiln lsp` itself through
+  Fenix's API when the project loads, so with it installed `kiln init
+  --fenix` and `.fenix/tools.json` aren't needed. A project whose
+  `.fenix/tools.json` already lists kiln keeps that entry and the
+  extension adds none, so kiln never runs twice; remove the entry and the
+  extension's takes over. Without `kiln lsp --languages` (X1) it registers
+  Markdown only.
+- *Opening items.* It opens an item's file through the host API the
+  extension runs on, not through the control channel Kiln's `--open` and
+  GUI use (K1, K5, K7), so `KILN_EDITOR` isn't consulted.
+- *The agenda clock-in.* "Start working on this" sets the owner and status
+  with one `kiln set`, then clocks in on the agenda extension's task for the
+  item, found by a Jira key or by an `ID Title` title, or made through that
+  extension's own service (`agenda.add_task`). **G1 doesn't block the
+  extension**, because it isn't going through the control channel; G1
+  stays open for Kiln's own path (`kiln-fenix`, used by Flint's
+  provider, which has only the control channel). A task the extension
+  makes has no Jira key, so an item with a Jira key is clocked only when
+  the agenda already has that ticket.
+
+**What it leaves to a terminal**: `--force`, `--adopt`,
+`--prune-removed` and `--allow-shallow` (decisions typed where they are
+written down), and `kiln auth confluence` and `kiln auth jira`, which it
+runs in a terminal pane under the current one so the token is typed into
+kiln and never seen by the extension. It never publishes as an agent tool
+or a task.
+
+**What only Thomas can verify** (in the style of CLAUDE.md's list; none of
+it has been seen):
+
+- that the extension installs in Fenix 1.6 or later (`cargo xtask pack`,
+  `cargo xtask install`), a folder with a `kiln.toml` is a `KILN` project,
+  and the plan's tabs, keys, mouse and refresh work, on Windows and Linux;
+- that `kiln` is found on the PATH Fenix runs with (or through
+  `kiln.path`) and that the doctor's rows say so when it isn't;
+- the language server registered by the extension: completion, hover,
+  `gd` and `gr` in a project with no `.fenix/tools.json`, and that a
+  project whose file already runs kiln gets one server and not two;
+- that an edit made by kiln under an open buffer is re-read in place, and
+  that one with unsaved edits is flagged (G5's behaviour, from the
+  extension's side);
+- "start working on this" against a real Agenda extension: the task is
+  found or made, the clock starts, and what a running clock does;
+- Exports: a dry run, a file write and a publish to a Confluence and a Jira
+  server through the extension (they are kiln's own network calls, whose
+  **verify** items stay open: CONFLUENCE.md), with the typed-name prompt and
+  the time a long publish takes (the extension waits up to two hours);
+- the token flow: `A` opening `kiln auth …` in a terminal pane under the
+  plan, and the credential store being readable from there;
+- the agent tools through a real coding agent, including that Fenix asks
+  before `kiln_set`, `kiln_link` and `kiln_new` when
+  `fenix.kiln.agent_edits` is on;
+- the titles after IDs on a large file and a large project (cost while
+  scrolling), and the Home section and notification.
+
+**What the extension needs from Kiln (X1–X8).** Not Fenix gaps: nothing
+here is Fenix's to change, so they are not G-items and don't share their
+numbers. They are Kiln additions that would let the extension stop
+working around the command line as it is, each with what it does until
+then. None is scheduled.
+
+1. **The languages `kiln lsp` serves, as data.** `kiln lsp --languages`
+   (with `--format json`: the command, its arguments and `languages`)
+   exists on this branch (commit `4592faf`) and is **unverified: never
+   compiled, and in no release.** With kiln 1.0.0 the extension registers
+   Markdown only, says so once on its output page, and adds the code
+   languages when a kiln that has the command is found.
+2. **The configuration as data.** Nothing prints the types with their
+   statuses in order, the initial, done and closed statuses, parents, link
+   roles with what they may link, sign-off statuses and export targets.
+   Meanwhile the extension parses `kiln.toml` itself and mirrors Kiln's
+   defaults (FORMAT.md), which can drift from them; kiln still checks
+   every edit, so a stale choice is refused, not written.
+3. **`kiln new --format json` gives `id` and `path`, not a line.** The new
+   file opens at its top.
+4. **`kiln diff` can't mean "the latest tag"** (`kiln gui --since` can).
+   The Changes tab starts with no baseline until one is typed with `b`.
+5. **`kiln status` lists only open work.** The Roadmap shows progress
+   counts but not the done items, and a done milestone has no progress.
+6. **`kiln jira sync` has no `--format json`.** The extension shows kiln's
+   text lines, parsing only which line is the heading, the totals, a
+   refusal and which operations write.
+7. **`kiln trace --levels --format json` has no recorded shape in the
+   extension's fixtures**, so it isn't used: the Trace tab traces one
+   type at a time (`T` for the next).
+8. **One Confluence target kiln can't plan fails the whole `kiln export`
+   run**, with no output for the other targets (CLI.md, "Exporting"). The
+   extension asks per target (`export --dry-run --format json -- NAME`),
+   and a bare `kiln export`, which its tasks used to run, is not used.
 
 ### Gaps in Fenix
 
@@ -403,4 +551,5 @@ token work in all three.
 | G8 | `didChangeWatchedFiles` (and `didClose`) to language servers | Fenix | K4 | small |
 | G9 | A proxy (or a caller's agent) for `fenix-jira` | Fenix | K8, behind a proxy | small |
 
-Nothing here blocks K0–K8.
+Nothing here blocks K0–K8. X1–X8, what the Fenix extension needs from
+Kiln, are Kiln-side and listed under "The Fenix extension", not here.
